@@ -1,0 +1,31 @@
+{
+  "id": "PKIX-hbzo.3",
+  "title": "The corpus gates pin disagreement as expected, so they cannot detect being wrong",
+  "design": "Distinct from classifying the entries: the gate's premise is the problem, not its contents.\n\ncheck-baseline compares ground_truth_disagreements by chain name, so a NEW disagreement is caught. What it cannot catch is the recorded set being wrong: an entry classified as a policy choice that is really a bug stays invisible for as long as nobody re-reads it, and the gate reports success the whole time. A committed count reads as coverage to anyone who does not open the file.\n\nPKITS is a weak example of this now (1 entry). limbo is a strong one (2902).\n\nThe fix is not obvious and the bead should settle it rather than assume: options include splitting the baseline into 'known policy choice' and 'unclassified', failing the gate on anything unclassified, or carrying a required justification per entry so an unexplained disagreement cannot be committed. Whichever is chosen, the property wanted is that the gate distinguishes 'no new disagreements' from 'the disagreements we have are understood'.",
+  "acceptance_criteria": "[ ] The gate can fail because a recorded disagreement is unexplained, not only because a new one appeared\n[ ] A reader of the baseline can tell classified from unclassified without reading the analysis prose\n[ ] Documented in pkix-difftest/README.md so the next person does not read a count as coverage",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T00:30:34.814883356Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T00:30:34.814883356Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-hbzo.3",
+      "depends_on_id": "PKIX-hbzo",
+      "type": "parent-child",
+      "created_at": "2026-11-27T00:30:34.961873777Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    },
+    {
+      "issue_id": "PKIX-hbzo.3",
+      "depends_on_id": "PKIX-ady7.2",
+      "type": "blocks",
+      "created_at": "2026-11-27T00:30:45.999511227Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}

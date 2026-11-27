@@ -1,0 +1,23 @@
+{
+  "id": "PKIX-9x9a.2",
+  "title": "Document the identity / authorization line in the seam",
+  "design": "Holder binding is RFC 5755's job and is done -- pkix-ac::matches_holder, and pkix-chain::verify_attribute_cert refuses an AC issued to a different holder. Whether a clearance dominates a label is the caller's, always.\n\nThe tempting failure is a policy module that also decides identity: once a host is evaluating predicates over attributes it is a short step to having it decide who the holder is, and at that point the holder binding RFC 5755 specifies has been quietly replaced by application code with no spec behind it.\n\nThe seam's documentation should make that line crisp enough that the mistake looks like a mistake. Related precedent worth citing: 4.5 forbids an AC issuer from being a CA, which is what stops a PKI CA being reused as an attribute authority -- the same class of confusion, prevented structurally rather than by warning.",
+  "acceptance_criteria": "[ ] The seam's docs state what it decides and what it must never decide\n[ ] Holder binding named as established before the seam is reached, not as one of its inputs to re-litigate\n[ ] An example showing a host evaluating a predicate without access to identity decisions",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T00:31:08.334277375Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T00:31:08.334277375Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-9x9a.2",
+      "depends_on_id": "PKIX-9x9a",
+      "type": "parent-child",
+      "created_at": "2026-11-27T00:31:08.477210222Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}

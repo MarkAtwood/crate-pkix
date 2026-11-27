@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-9x9a",
+  "title": "(EPIC) The authorization seam: hand over attributes and predicates, never a verdict",
+  "design": "pkix-ac already decided 'parse all, interpret none': all six RFC 5755 attribute types parse, none are interpreted, because deciding what a Clearance permits is security policy belonging to the application -- it turns on a policy identifier the application owns, a lattice it defines, and often a classification scheme no library should encode.\n\nThis epic is that decision pushed one step: a seam that hands a host the attributes and the predicates to evaluate, and never a resolved verdict.\n\nDeliberately split from the WASM host. The solver-shaped seam is nearly free; a sandboxed runtime is a different order of work and the largest attack surface anything here would ship. Tying them into one bead makes the cheap half wait on the expensive half.",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "epic",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T00:31:07.767765897Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T00:31:07.767765897Z"
+}

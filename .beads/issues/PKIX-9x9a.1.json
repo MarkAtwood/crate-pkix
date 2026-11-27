@@ -1,0 +1,23 @@
+{
+  "id": "PKIX-9x9a.1",
+  "title": "Design the authorization seam for pkix-ac",
+  "design": "Constraint-solver-shaped: the seam hands over attributes and predicates and gets back nothing it then has to trust.\n\nWhat the host is given, to be settled in this bead rather than assumed:\n  - attribute OIDs and their raw values, uninterpreted\n  - the holder binding result, as a fact already established\n  - the evaluation time\n\nWhat the seam explicitly does NOT supply, which is the whole design:\n  - no comparability assumption between attribute values\n  - no lattice\n  - no ordering\n\nThe last three are the temptation. A seam that supplies an ordering has decided that clearances are comparable, which is true for ESS/X.411 and false for TLP, and a host whose scheme has no subject-clearance concept cannot un-decide it.\n\nPrecedent in this workspace: pkix-ac::verify takes the authority's certificate and documents that the caller must have validated it, rather than taking trust anchors and deciding. Same shape -- hand over the fact, refuse the judgement.",
+  "acceptance_criteria": "[ ] The seam's inputs and non-inputs written down, with the reason each omission is deliberate\n[ ] No API returns an authorization verdict\n[ ] Documented against RFC 5755 4.4's six attribute types, naming which are passed through uninterpreted\n[ ] A caller can evaluate a scheme with no ordering without fighting the types",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T00:31:07.987904192Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T00:31:07.987904192Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-9x9a.1",
+      "depends_on_id": "PKIX-9x9a",
+      "type": "parent-child",
+      "created_at": "2026-11-27T00:31:08.136093657Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}

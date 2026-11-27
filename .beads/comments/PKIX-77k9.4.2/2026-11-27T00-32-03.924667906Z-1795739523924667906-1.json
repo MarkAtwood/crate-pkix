@@ -1,0 +1,7 @@
+{
+  "id": "1795739523924667906-1",
+  "issue_id": "PKIX-77k9.4.2",
+  "author": "Mark Atwood",
+  "text": "Framing, which applies to every bead from this review: COMPLEMENT, NOT REPLACEMENT.\n\nwebpki declined policy trees, delta and indirect CRLs, OCSP, CT, DANE and attribute certificates deliberately, and for defensible reasons about scope and allocation. 'Here is the thing for the users you turned away' is a far easier conversation than 'yours is worse', and it is also the honest description of what this workspace is.\n\nAnything written up out of these beads should read that way -- including the tables, where scoring a capability webpki chose not to implement as a failure invites the reader to discount the whole comparison.",
+  "created_at": "2026-11-27T00:32:03.924667906Z"
+}

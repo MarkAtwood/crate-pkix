@@ -7,7 +7,13 @@
 //! validate.
 
 use der::Decode as _;
-use pkix_ac::{AttributeCertificate, Error, ProfileViolation};
+use pkix_ac::{AttributeCertificate, Error, ProfileViolation, Targeting};
+use x509_cert::ext::pkix::name::GeneralName;
+
+/// A `GeneralName` dNSName, which is what the targeting fixtures use.
+fn dns(host: &str) -> GeneralName {
+    GeneralName::DnsName(der::asn1::Ia5String::new(host).expect("an IA5String host"))
+}
 use pkix_path::DefaultVerifier;
 use x509_cert::Certificate;
 
@@ -253,5 +259,223 @@ fn every_profile_violation_explains_itself() {
             rendered.len() > 45,
             "{v:?} must say which rule broke, got {rendered:?}"
         );
+    }
+}
+/// A targeted AC: the verifier it names matches, others do not.
+///
+/// Oracle: RFC 5755 §4.3.2 — "the targets check passes if the current
+/// server is one of the targetName fields ... or if the current server
+/// is a member of one of the targetGroup fields".
+///
+/// `Untargeted` is a third answer, not a synonym for either, which is
+/// why the untargeted fixtures are checked alongside.
+#[test]
+fn targeting_matches_a_named_verifier_and_a_named_group() {
+    let targeted = ac("ac-targeted.der");
+    let me = dns("verifier.example.com");
+    let group = dns("printers.example.com");
+    let other = dns("elsewhere.example.com");
+
+    assert_eq!(
+        targeted.check_targeting(std::slice::from_ref(&me), &[]),
+        Ok(Targeting::Matched)
+    );
+    assert_eq!(
+        targeted.check_targeting(&[], std::slice::from_ref(&group)),
+        Ok(Targeting::Matched)
+    );
+    assert_eq!(
+        targeted.check_targeting(std::slice::from_ref(&other), std::slice::from_ref(&other)),
+        Ok(Targeting::NotATarget),
+        "a verifier the AC does not name is not a target"
+    );
+    // A name must not match as a group, nor a group as a name: the two
+    // Target arms mean different things.
+    assert_eq!(
+        targeted.check_targeting(&[], std::slice::from_ref(&me)),
+        Ok(Targeting::NotATarget)
+    );
+    assert_eq!(
+        targeted.check_targeting(std::slice::from_ref(&group), &[]),
+        Ok(Targeting::NotATarget)
+    );
+
+    // An untargeted AC answers Untargeted whatever the caller is called.
+    let untargeted = ac("ac-role-valid.der");
+    assert_eq!(
+        untargeted.check_targeting(std::slice::from_ref(&other), &[]),
+        Ok(Targeting::Untargeted)
+    );
+}
+
+/// Several `Targets` elements are flattened into one.
+///
+/// Oracle: §4.3.2 — X.509-2000 defines the extension as a `SEQUENCE OF
+/// Targets` while a conforming issuer emits one, and "if more than one
+/// Targets element is found in an AC, the extension MUST be treated as
+/// if all Target elements had been found within one Targets element".
+#[test]
+fn several_targets_elements_are_treated_as_one() {
+    let split = ac("ac-targeted-split.der");
+    assert_eq!(split.targets().expect("parses").expect("present").len(), 2);
+    for host in ["first.example.com", "second.example.com"] {
+        assert_eq!(
+            split.check_targeting(std::slice::from_ref(&dns(host)), &[]),
+            Ok(Targeting::Matched),
+            "{host} is in the second Targets element and must still match"
+        );
+    }
+}
+
+/// `targetCert` parses and is refused — §4.3.2 says it MUST NOT be used.
+#[test]
+fn a_target_cert_is_refused() {
+    let tc = ac("ac-target-cert.der");
+    // It parses: the syntax permits what the profile forbids.
+    assert_eq!(tc.targets().expect("parses").expect("present").len(), 1);
+    assert_eq!(
+        tc.check_targeting(&[], &[]),
+        Err(Error::ProfileViolation(ProfileViolation::TargetCertUsed))
+    );
+}
+
+/// RFC 5755 §5 rule 7: "If the AC contains an unsupported critical
+/// extension, the AC MUST be rejected."
+///
+/// The non-critical twin is the control. Both fixtures carry the same
+/// unknown OID and differ only in the criticality flag, so this cannot
+/// pass by rejecting unknown extensions outright — which would break
+/// every AC carrying an extension we have not heard of.
+#[test]
+fn an_unsupported_critical_extension_is_rejected_and_a_non_critical_one_is_not() {
+    let critical = ac("ac-unsupported-critical.der");
+    match critical.check_profile() {
+        Err(Error::UnsupportedCriticalExtension(oid)) => {
+            assert_eq!(oid.to_string(), "1.3.6.1.4.1.99999.1");
+        }
+        other => panic!("§5 rule 7 requires rejection, got {other:?}"),
+    }
+
+    ac("ac-unsupported-noncritical.der")
+        .check_profile()
+        .expect("an unknown non-critical extension must be ignored, not refused");
+}
+
+/// §4.3 fixes each profiled extension's criticality, so getting it
+/// wrong is detectable.
+#[test]
+fn the_profiled_extensions_criticality_is_enforced() {
+    // §4.3.6: noRevAvail MUST be non-critical.
+    ac("ac-norevavail.der").check_profile().expect("conforming");
+    assert_eq!(
+        ac("ac-norevavail-critical.der").check_profile(),
+        Err(Error::ProfileViolation(
+            ProfileViolation::NoRevAvailCritical
+        ))
+    );
+
+    // §4.3.1: auditIdentity MUST be critical, and 1..=20 octets.
+    ac("ac-audit-identity.der")
+        .check_profile()
+        .expect("conforming");
+    assert_eq!(
+        ac("ac-audit-not-critical.der").check_profile(),
+        Err(Error::ProfileViolation(
+            ProfileViolation::AuditIdentityNotCritical
+        ))
+    );
+    assert_eq!(
+        ac("ac-audit-too-long.der").check_profile(),
+        Err(Error::ProfileViolation(
+            ProfileViolation::AuditIdentityLength
+        ))
+    );
+}
+
+/// The same extension twice is refused — §4.2.
+///
+/// Two instances let two implementations read one certificate
+/// differently, which is the whole reason the rule exists.
+#[test]
+fn a_duplicate_extension_is_refused() {
+    let dup = ac("ac-duplicate-ext.der");
+    assert_eq!(
+        dup.inner()
+            .acinfo
+            .extensions
+            .as_ref()
+            .map(std::vec::Vec::len),
+        Some(2),
+        "the fixture must really carry two"
+    );
+    assert_eq!(
+        dup.check_profile(),
+        Err(Error::ProfileViolation(
+            ProfileViolation::DuplicateExtension
+        ))
+    );
+}
+
+/// The two accessors that exist to be read rather than enforced.
+#[test]
+fn no_rev_avail_and_audit_identity_are_readable() {
+    let plain = ac("ac-role-valid.der");
+    assert!(!plain.no_revocation_available());
+    assert_eq!(plain.audit_identity(), None);
+
+    assert!(ac("ac-norevavail.der").no_revocation_available());
+    assert_eq!(
+        ac("ac-audit-identity.der").audit_identity(),
+        // The generator writes an OCTET STRING of 0..8 as the value, so
+        // the extension value is that DER, header included.
+        Some(&[0x04, 0x08, 0, 1, 2, 3, 4, 5, 6, 7][..])
+    );
+}
+
+/// `check_extensions` works called on its own, not only through
+/// `check_profile`.
+///
+/// It is public and reachable both ways. The §4.3 tests above go through
+/// `check_profile`, which calls it, so this covers the standalone entry
+/// point a caller might reasonably use to ask only about extensions —
+/// for instance to report on a certificate whose §4.2 holder or issuer
+/// form it has already decided to tolerate.
+#[test]
+fn check_extensions_stands_alone() {
+    ac("ac-role-valid.der")
+        .check_extensions()
+        .expect("no extensions at all is not a violation");
+    ac("ac-norevavail.der")
+        .check_extensions()
+        .expect("a conforming noRevAvail passes");
+    assert_eq!(
+        ac("ac-norevavail-critical.der").check_extensions(),
+        Err(Error::ProfileViolation(
+            ProfileViolation::NoRevAvailCritical
+        ))
+    );
+    assert!(matches!(
+        ac("ac-unsupported-critical.der").check_extensions(),
+        Err(Error::UnsupportedCriticalExtension(_))
+    ));
+}
+
+/// The §4.5 check on the authority's own certificate.
+///
+/// Oracle: §4.5 — "an AC issuer cannot be a CA as well", and keyUsage
+/// "MUST NOT explicitly indicate that the AC issuer's public key cannot
+/// be used to validate a digital signature". `pkix-ct`'s
+/// `precert-issuer` is CA:TRUE with keyUsage "Certificate Sign, CRL
+/// Sign" and so fails both; the purpose-built authority passes.
+#[test]
+fn a_ca_is_refused_as_an_attribute_authority() {
+    pkix_ac::check_issuer_profile(&aa()).expect("the purpose-built authority conforms");
+
+    let ca = ct_fixture("precert-issuer.der");
+    match pkix_ac::check_issuer_profile(&ca) {
+        Err(Error::ProfileViolation(
+            ProfileViolation::IssuerIsACa | ProfileViolation::IssuerCannotSign,
+        )) => {}
+        other => panic!("a CA must be refused as an authority, got {other:?}"),
     }
 }

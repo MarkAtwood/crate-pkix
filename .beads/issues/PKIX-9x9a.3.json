@@ -1,0 +1,31 @@
+{
+  "id": "PKIX-9x9a.3",
+  "title": "Prove the seam with two throwaway implementations, then discard them",
+  "design": "Two implementations against the seam, written and then deleted. Not shipped, not feature-gated, not left in tests -- written to find out whether the seam is general, and discarded once it has answered.\n\nOne lattice-ordered, ESS/X.411 shape: clearances compare, dominance is meaningful, there is a subject-clearance concept.\nOne with no comparability at all, TLP shape: labels are opaque tags, nothing dominates anything, and there is no subject clearance to speak of.\n\nThe second is the one that matters. A seam built while looking only at the first will have an ordering baked in somewhere, and the TLP implementation is what finds it. This is the cheapest available proof that the seam is not a hole shaped like one customer.\n\nWhat to record: not the implementations, but what each forced the seam to change. If neither forced a change, say so -- that is also a result, though a slightly suspicious one.\n\nPrecedent from today: pkix-chain's attribute-certificate wrapper was written as pkix-ac's first consumer specifically to find API problems before publishing, and it found that the test fixtures violated 4.5. First consumers earn their keep; two consumers with opposite assumptions should earn more.",
+  "acceptance_criteria": "[ ] A lattice-ordered implementation written against the seam\n[ ] A no-comparability implementation written against the seam\n[ ] What each forced the seam to change, recorded on this bead\n[ ] Both deleted, with nothing left behind that a consumer could mistake for a supported policy module",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T00:31:27.53317694Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T00:31:27.53317694Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-9x9a.3",
+      "depends_on_id": "PKIX-9x9a",
+      "type": "parent-child",
+      "created_at": "2026-11-27T00:31:27.685193463Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    },
+    {
+      "issue_id": "PKIX-9x9a.3",
+      "depends_on_id": "PKIX-9x9a.1",
+      "type": "blocks",
+      "created_at": "2026-11-27T00:31:27.838451563Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "PKIX-77k9.4.1",
+  "title": "Offer the CryptoProvider / WebPkiSupportedAlgorithms change as a contribution",
+  "design": "Making that type verifier-neutral helps ANY third-party verifier, not just this one, which is what makes it worth offering on its own terms rather than as part of a proposal about us.\n\nFiled separately from the integration epic's other work on purpose: it is the item most likely to buy standing, and it is useful whether or not anything else in that epic happens. A contribution that helps the ecosystem is a different conversation from asking the ecosystem to adopt our verifier.\n\nContext from this session: pkix-rustls 0.1.0 exists and implements rustls's ServerCertVerifier without a CryptoProvider, which is what established that the type is the friction point rather than a convenience. That experience is the evidence for the PR -- we found the seam by having to work around it.\n\nShould be drafted as 'here is a change that makes third-party verifiers possible', with our own verifier as the motivating example rather than the ask.",
+  "acceptance_criteria": "[ ] The change scoped against current rustls, not against the version pkix-rustls was written for\n[ ] Written as an ecosystem improvement with us as the example\n[ ] Offered upstream\n[ ] Useful to a third-party verifier that is not ours -- stated, and checked against at least one other",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T00:31:54.17999169Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T00:31:54.17999169Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-77k9.4.1",
+      "depends_on_id": "PKIX-77k9.4",
+      "type": "parent-child",
+      "created_at": "2026-11-27T00:31:54.324899455Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}

@@ -205,16 +205,34 @@ pub type Targets = Vec<Target>;
 #[allow(clippy::large_enum_variant)]
 pub enum Target {
     /// A name the intended verifier answers to.
-    #[asn1(context_specific = "0", tag_mode = "IMPLICIT")]
+    ///
+    /// `EXPLICIT`, despite this module being `DEFINITIONS IMPLICIT
+    /// TAGS`. X.680 makes a tag on an untagged `CHOICE` explicit,
+    /// because a `CHOICE` has no single tag of its own for an implicit
+    /// tag to replace — and `GeneralName` is an untagged `CHOICE`. So
+    /// `[0]` is constructed and wraps the `GeneralName`'s own tag.
+    /// `constructed = "true"` must be stated alongside the explicit tag
+    /// mode or the derive will not match the constructed bit — the same
+    /// pairing `x509_cert`'s own `GeneralName::DirectoryName` uses.
+    ///
+    /// This is the opposite of [`Holder::entity_name`], where the inner
+    /// type is a `SEQUENCE OF` and the implicit tag does replace its
+    /// tag. Both live in this one module, which is why each field says
+    /// which it is.
+    #[asn1(context_specific = "0", tag_mode = "EXPLICIT", constructed = "true")]
     TargetName(GeneralName),
 
-    /// A group the intended verifier belongs to.
-    #[asn1(context_specific = "1", tag_mode = "IMPLICIT")]
+    /// A group the intended verifier belongs to. `EXPLICIT`, as
+    /// [`Self::TargetName`].
+    #[asn1(context_specific = "1", tag_mode = "EXPLICIT", constructed = "true")]
     TargetGroup(GeneralName),
 
     /// `targetCert` exists "only to allow future compatibility with
     /// [X.509-2000]" and §4.3.2 says it MUST NOT be used. Represented so
     /// that an AC carrying one parses and can be refused with a reason.
+    ///
+    /// `IMPLICIT` here, unlike the two arms above: `TargetCert` is a
+    /// `SEQUENCE`, which has a tag of its own for `[2]` to replace.
     #[asn1(context_specific = "2", tag_mode = "IMPLICIT", constructed = "true")]
     TargetCert(TargetCert),
 }

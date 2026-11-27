@@ -1,0 +1,23 @@
+{
+  "id": "PKIX-hbzo.4",
+  "title": "Add the crypto backend as a difftest dimension -- the mechanism exists, wolfCrypt does not",
+  "design": "Filed from a review that asked whether pkix-difftest can vary the backend. It can, and already does -- that half of the question is answered:\n\n  default        = pkix-path's own defaults, rsa + p256\n  rustcrypto     = every backend pkix-path ships (rsa, p256, p384, p521, ed25519)\n\nThose produce separate committed baselines (baseline-limbo-allfeatures.*, per PKIX-wmch), so the harness already treats the backend as a dimension and the P-384 real-world chains are the delta it was built to show.\n\nWhat does not exist is a SECOND IMPLEMENTATION. Both current configurations are RustCrypto; varying which of its backends is enabled is not the same as varying who does the arithmetic, and the interesting failures the review is pointing at -- where two implementations disagree about the same signature -- cannot appear until there are two.\n\nwolfCrypt is not wired anywhere: no wolfcrypt or wolfssl dependency in any manifest in the workspace. That linkage is the maintainer's, stated explicitly earlier ('I will fix the wolfssl linkage later'), so this bead does not attempt it.\n\nSo: blocked on the linkage, and the harness work afterwards is small -- a third feature selecting the backend and a third baseline. The review's framing is right even though its premise was half-answered: CI tests one implementation and the crate ships the ability to use another.",
+  "acceptance_criteria": "[ ] A feature selecting wolfCrypt as the SignatureVerifier, once the linkage exists\n[ ] A committed baseline for it, alongside default and rustcrypto\n[ ] Chains where the two implementations disagree reported as their own class rather than folded into existing buckets\n[ ] pkix-difftest/README.md records that backend is a dimension and which configurations are covered",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T00:31:55.043948368Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T00:31:55.043948368Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-hbzo.4",
+      "depends_on_id": "PKIX-hbzo",
+      "type": "parent-child",
+      "created_at": "2026-11-27T00:31:55.186725042Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}

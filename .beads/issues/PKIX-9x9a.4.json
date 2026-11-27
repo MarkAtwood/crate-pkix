@@ -1,0 +1,23 @@
+{
+  "id": "PKIX-9x9a.4",
+  "title": "Size pkix-policy-wasm honestly before committing to it",
+  "design": "A separate, optional, EDGE crate -- and the question this bead answers is whether to build it at all, not how.\n\nIt would be the largest attack surface anything in this workspace ships, and it cannot live anywhere near the no_std core. The workspace's standing constraint is no dependency on an OS or a filesystem; a WASM runtime is the opposite of that, so it belongs at the outer edge or nowhere.\n\nSize these before any code, because any one of them could be the reason not to:\n  - which runtime, and what it drags in\n  - the sandbox boundary, stated as what a hostile module can and cannot reach\n  - memory model and limits\n  - fuel or timeout policy, and what happens when a policy module does not terminate\n  - the host-call surface -- the smallest set that still lets a predicate be evaluated\n  - versioning: a policy module compiled against one host-call surface outliving that surface\n\nDeliberately NOT blocked on the seam design, and the seam is not blocked on this. The seam is nearly free and useful on its own; this is expensive and may never be worth doing. Filed at P3 for that reason -- if the answer is no, the seam still stands.",
+  "acceptance_criteria": "[ ] Each item above answered in writing, with the cost\n[ ] An explicit go / no-go, with the reason\n[ ] If go: the sandbox boundary stated as a threat model, not a feature list\n[ ] If no-go: recorded here so the question is not reopened from scratch",
+  "status": "open",
+  "priority": 3,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T00:31:28.046345805Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T00:31:28.046345805Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-9x9a.4",
+      "depends_on_id": "PKIX-9x9a",
+      "type": "parent-child",
+      "created_at": "2026-11-27T00:31:28.198337688Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}

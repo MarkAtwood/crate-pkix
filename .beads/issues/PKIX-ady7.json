@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-ady7",
+  "title": "(EPIC) Credibility artifacts: measured comparison against rustls-webpki",
+  "design": "Every claim this workspace makes about itself relative to rustls-webpki is currently unmeasured. The framing for all children is COMPLEMENT, NOT REPLACEMENT: webpki declined policy trees, delta and indirect CRLs, OCSP, CT, DANE and attribute certificates deliberately, for defensible reasons about scope and allocation. 'Here is the thing for the users you turned away' is both an easier conversation and the honest description of this workspace. No child of this epic should be written as 'theirs is worse'.",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "epic",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T00:30:12.961643981Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T00:30:12.961643981Z"
+}

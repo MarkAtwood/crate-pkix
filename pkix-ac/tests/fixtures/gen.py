@@ -146,6 +146,82 @@ def role_attribute(role_uri: str) -> bytes:
     return seq(oid(ID_AT_ROLE), tlv(0x31, role))  # SET OF AttributeValue
 
 
+# RFC 5755 §4.3 extension OIDs.
+ID_PE_AC_AUDIT_IDENTITY = "1.3.6.1.5.5.7.1.4"
+ID_CE_TARGET_INFORMATION = "2.5.29.55"
+ID_CE_NO_REV_AVAIL = "2.5.29.56"
+
+
+def extension(oid_dotted: str, critical: bool, value: bytes) -> bytes:
+    """Extension ::= SEQUENCE { extnID, critical DEFAULT FALSE, extnValue }
+
+    `critical` is DEFAULT FALSE, so DER requires it to be ABSENT when
+    false -- emitting an explicit FALSE would be a non-canonical encoding
+    the parser is entitled to reject.
+    """
+    parts = [oid(oid_dotted)]
+    if critical:
+        parts.append(tlv(0x01, b"\xff"))
+    parts.append(tlv(0x04, value))
+    return seq(*parts)
+
+
+def general_name_dns(host: str) -> bytes:
+    """GeneralName dNSName [2] IA5String. IMPLICIT, so [2] replaces the
+    IA5String tag."""
+    return tlv(0x82, host.encode())
+
+
+def target_name(gn: bytes) -> bytes:
+    """Target targetName [0] GeneralName -- RFC 5755 §4.3.2.
+
+    EXPLICIT despite the module being DEFINITIONS IMPLICIT TAGS. X.680
+    makes a tag on an untagged CHOICE explicit, because a CHOICE has no
+    single tag of its own for an implicit tag to replace, and GeneralName
+    is an untagged CHOICE. So [0] is constructed and WRAPS the
+    GeneralName's own tag rather than replacing it.
+
+    This is the opposite of Holder.entityName [1] GeneralNames, where the
+    inner type is a SEQUENCE OF and the implicit tag does replace its
+    tag. Both appear in the same module.
+    """
+    return tlv(0xA0, gn)
+
+
+def target_group(gn: bytes) -> bytes:
+    """Target targetGroup [1] GeneralName. EXPLICIT, as targetName."""
+    return tlv(0xA1, gn)
+
+
+def target_cert(name_der: bytes, serial: int) -> bytes:
+    """Target targetCert [2] TargetCert -- which §4.3.2 says MUST NOT be
+    used. Emitted so the refusal can be tested.
+
+    TargetCert is a SEQUENCE, a tagged type, so here the implicit tag
+    DOES replace it -- [2] stands in for TargetCert's own SEQUENCE tag.
+    Its first field, targetCertificate, is an IssuerSerial, which is a
+    SEQUENCE in its own right and still needs its own wrapper. Omitting
+    that made the parser read the GeneralNames as the IssuerSerial and
+    then find a [4] where it wanted a SEQUENCE.
+    """
+    return tlv(0xA2, seq(issuer_serial_contents(name_der, serial)))
+
+
+def targets(*ts: bytes) -> bytes:
+    """Targets ::= SEQUENCE OF Target."""
+    return seq(*ts)
+
+
+def target_information(*targets_elements: bytes) -> bytes:
+    """The extension value: SEQUENCE OF Targets.
+
+    X.509-2000 defines it as a SEQUENCE OF Targets while §4.3.2 says a
+    conforming issuer emits exactly one; users must accept several and
+    treat them as one. Both shapes are generated.
+    """
+    return seq(*targets_elements)
+
+
 def issuer_serial_contents(name_der: bytes, serial: int) -> bytes:
     """The contents of an IssuerSerial — RFC 5755 §4.1.
 
@@ -158,7 +234,8 @@ def issuer_serial_contents(name_der: bytes, serial: int) -> bytes:
 def acinfo(holder_name: bytes, issuer_name: bytes, serial: int,
            not_before: str, not_after: str, attrs: bytes,
            issuer_v1_form: bool = False,
-           holder_both_forms: bool = False) -> bytes:
+           holder_both_forms: bool = False,
+           exts: bytes = b"") -> bytes:
     version = integer(1)  # AttCertVersion v2
     # IMPLICIT tagging: [1] REPLACES the SEQUENCE OF tag of GeneralNames,
     # so the GeneralName sits directly inside [1] with no inner SEQUENCE.
@@ -186,8 +263,12 @@ def acinfo(holder_name: bytes, issuer_name: bytes, serial: int,
     else:
         issuer = tlv(0xA0, general_names(general_name_directory(issuer_name)))
     validity = seq(gen_time(not_before), gen_time(not_after))
+    # `extensions` is the last field of AttributeCertificateInfo, after
+    # the optional issuerUniqueID, and is itself OPTIONAL -- so an empty
+    # extension list is omitted rather than encoded as an empty SEQUENCE.
+    tail = seq(exts) if exts else b""
     return seq(version, holder, issuer, ECDSA_SHA256, integer(serial),
-               validity, attrs)
+               validity, attrs, tail)
 
 
 def sign(data: bytes) -> bytes:
@@ -246,6 +327,75 @@ def main() -> None:
                   seq(role_attribute("urn:example:role:auditor")),
                   holder_both_forms=True)
     (HERE / "ac-holder-both.der").write_bytes(attribute_certificate(info))
+
+    # ---- §4.3 extensions -------------------------------------------
+    #
+    # None of the fixtures above carry extensions, which left every §4.3
+    # rule and the §5 rule 7 critical-extension refusal unexercised.
+
+    role = seq(role_attribute("urn:example:role:auditor"))
+    window = ("20250101000000Z", "20340101000000Z")
+
+    def with_exts(serial, exts):
+        return acinfo(leaf_subject, aa_subject, serial, *window, role, exts=exts)
+
+    # Targeted at one name and one group. targetInformation MUST be
+    # critical (§4.3.2).
+    info = with_exts(0x30, extension(
+        ID_CE_TARGET_INFORMATION, True,
+        target_information(targets(
+            target_name(general_name_dns("verifier.example.com")),
+            target_group(general_name_dns("printers.example.com")),
+        ))))
+    (HERE / "ac-targeted.der").write_bytes(attribute_certificate(info))
+
+    # Two Targets elements, which X.509-2000 permits and §4.3.2 requires
+    # a user to flatten into one.
+    info = with_exts(0x31, extension(
+        ID_CE_TARGET_INFORMATION, True,
+        target_information(
+            targets(target_name(general_name_dns("first.example.com"))),
+            targets(target_name(general_name_dns("second.example.com"))),
+        )))
+    (HERE / "ac-targeted-split.der").write_bytes(attribute_certificate(info))
+
+    # targetCert, which §4.3.2 says MUST NOT be used.
+    info = with_exts(0x32, extension(
+        ID_CE_TARGET_INFORMATION, True,
+        target_information(targets(target_cert(leaf_subject, 0x77)))))
+    (HERE / "ac-target-cert.der").write_bytes(attribute_certificate(info))
+
+    # An unknown OID marked critical: RFC 5755 §5 rule 7 says reject.
+    info = with_exts(0x33, extension("1.3.6.1.4.1.99999.1", True, b"\x05\x00"))
+    (HERE / "ac-unsupported-critical.der").write_bytes(attribute_certificate(info))
+
+    # The same unknown OID, NOT critical: must be ignored, not rejected.
+    info = with_exts(0x34, extension("1.3.6.1.4.1.99999.1", False, b"\x05\x00"))
+    (HERE / "ac-unsupported-noncritical.der").write_bytes(attribute_certificate(info))
+
+    # noRevAvail: criticality MUST be FALSE (§4.3.6), value is NULL.
+    null = b"\x05\x00"
+    info = with_exts(0x35, extension(ID_CE_NO_REV_AVAIL, False, null))
+    (HERE / "ac-norevavail.der").write_bytes(attribute_certificate(info))
+    info = with_exts(0x36, extension(ID_CE_NO_REV_AVAIL, True, null))
+    (HERE / "ac-norevavail-critical.der").write_bytes(attribute_certificate(info))
+
+    # The same extension twice: §4.2 forbids it, and two instances let
+    # two implementations read one certificate differently.
+    dup = extension(ID_CE_NO_REV_AVAIL, False, null)
+    info = with_exts(0x37, dup + dup)
+    (HERE / "ac-duplicate-ext.der").write_bytes(attribute_certificate(info))
+
+    # auditIdentity: criticality MUST be TRUE, value 1..=20 octets
+    # (§4.3.1).
+    audit = tlv(0x04, bytes(range(8)))
+    info = with_exts(0x38, extension(ID_PE_AC_AUDIT_IDENTITY, True, audit))
+    (HERE / "ac-audit-identity.der").write_bytes(attribute_certificate(info))
+    info = with_exts(0x39, extension(ID_PE_AC_AUDIT_IDENTITY, False, audit))
+    (HERE / "ac-audit-not-critical.der").write_bytes(attribute_certificate(info))
+    too_long = tlv(0x04, bytes(21))
+    info = with_exts(0x3A, extension(ID_PE_AC_AUDIT_IDENTITY, True, too_long))
+    (HERE / "ac-audit-too-long.der").write_bytes(attribute_certificate(info))
 
     for f in sorted(HERE.glob("ac-*.der")):
         print(f"{f.name}: {f.stat().st_size} bytes")

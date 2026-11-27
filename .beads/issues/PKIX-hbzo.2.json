@@ -1,0 +1,31 @@
+{
+  "id": "PKIX-hbzo.2",
+  "title": "Classify every recorded ground-truth disagreement",
+  "design": "Filed from a review that cited '46 recorded ground-truth disagreements'. That number is stale, and the correction matters because it changes where the work is:\n\n  PKITS: 1. The 46 was the FIRST entry in a progression the analysis file records as 46 -\u003e 35 -\u003e 17 -\u003e 15 -\u003e 2 -\u003e 1. The single survivor is 4.1.4 Valid DSA Signatures Test4, where pkix-path ships no DSA backend.\n\n  x509-limbo: 2902, which is the real number and nobody has cited it. 2165 are class Agreement -- all three oracles agree with each other and all three differ from the corpus -- plus 731 LooserThanWild, 5 StricterThanWild, 1 DiagnosticDivergence. 2127 of the 2165 are bettertls::.\n\nSo the concern is sound and the location was wrong. PKITS is essentially clean; limbo is where the unclassified mass sits, and its dominant bucket is cross-oracle agreement against the corpus, which usually means a corpus expectation three independent implementations reject -- a different thing from a bug in ours.\n\nbaseline-limbo-analysis.md already attributes the dominant signal to the documented CN-as-DNS policy choice. That attribution is prose and unverified at this scale; this bead is to make it a classification with counts that come from the data.\n\nEach entry classifies as: real bug in pkix-path, harness limitation, or deliberate policy choice. Until that exists nobody can honestly state limbo coverage.",
+  "acceptance_criteria": "[ ] Every limbo ground-truth disagreement classified bug / harness / policy, derived from the baseline rather than hand-sorted\n[ ] Counts per class committed, and re-derivable by a script so they cannot drift\n[ ] The CN-as-DNS attribution either confirmed with a count or withdrawn\n[ ] Real bugs filed as their own beads\n[ ] PKITS's single DSA disagreement recorded as expected, not outstanding",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T00:30:34.442933294Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T00:30:34.442933294Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-hbzo.2",
+      "depends_on_id": "PKIX-hbzo",
+      "type": "parent-child",
+      "created_at": "2026-11-27T00:30:34.597841543Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    },
+    {
+      "issue_id": "PKIX-hbzo.2",
+      "depends_on_id": "PKIX-ady7.2",
+      "type": "blocks",
+      "created_at": "2026-11-27T00:30:45.862351802Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}
