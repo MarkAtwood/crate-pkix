@@ -1,0 +1,22 @@
+{
+  "id": "PKIX-zn4l",
+  "title": "Accounted for: pkix-chain's _verifier_is_send_sync mutant is unobservable",
+  "description": "## Why\n\nThe survivor cargo-mutants reports for pkix-chain that no test can kill.\n\n    pkix-chain/src/lib.rs:2198:9  replace _verifier_is_send_sync with ()\n\n`_verifier_is_send_sync` is a function inside a `const` block whose body is\n`_assert_send_sync::\u003cVerifier\u003c'a, V, R, A\u003e\u003e()`. It is never called at\nruntime; its job is to fail the build if `Verifier` stops being `Sync`, and\nthe build still fails in that case whether or not the body is replaced --\nthe mutation removes the assertion, and nothing a test can observe changes.\n\n## Decision\n\nAccounted for, not fixable. Recorded so the next sweep of this crate reads\n16 survivors closed and one explained, rather than one unexplained.\n\nThe obligation itself is discharged by compilation, which is the point of\nwriting it that way.\n",
+  "status": "open",
+  "priority": 3,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T16:21:39.205799995Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T16:21:39.205799995Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-zn4l",
+      "depends_on_id": "PKIX-9bzr",
+      "type": "discovered-from",
+      "created_at": "2026-11-27T16:21:39.352072287Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}

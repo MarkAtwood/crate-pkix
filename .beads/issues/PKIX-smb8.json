@@ -1,0 +1,22 @@
+{
+  "id": "PKIX-smb8",
+  "title": "pkix-revocation: Display/source rendering and two signer-discovery conjuncts",
+  "description": "## Why\n\nThe remaining pkix-revocation survivors after the behavioural clusters are\nclosed. Lower value than those, listed so the sweep's result is fully\naccounted for.\n\n## The survivors\n\n    lib.rs:220:9   Display for OutOfScopeReason -\u003e Ok(())\n    lib.rs:603:9   Display for Error -\u003e Ok(())\n    lib.rs:695:5   crl_reason_name -\u003e \"\" / \"xyzzy\"\n    lib.rs:711:9   Error::source -\u003e None\n    lib.rs:712:13  delete match arm Self::CrlParseError(e) | Self::OcspParseError(e) in source\n    crl.rs:1437    (closed) check_crl_sign\n    signer_discovery.rs:178:15  replace += with *= in reaches_self_signed\n    signer_discovery.rs:233:13  replace \u0026\u0026 with || in find_parent\n    ocsp.rs:356    (closed) CertID disjunction on the anchor path\n\n`Display for Error` and `crl_reason_name` are the same class\n`pkix-chain`'s kind enums were: an error that renders as nothing is a log\nline that says a revocation check failed without saying why. One test per\nenum, every variant, asserting non-empty and distinct -- the pattern in\n`pkix-chain/tests/serde_round_trip.rs::every_kind_renders_distinctly` and\n`pkix-identity`'s `identity_error_display_covers_all_variants`.\n\n`Error::source` returning `None` breaks `{:#}`-style chained reporting and\nanything walking the chain to find the DER error underneath. The deleted\narm is the one that exposes the parse error, which is the only variant\nwith a source worth having.\n\n`reaches_self_signed`'s `+=` to `*=` is a loop counter: `*=` leaves it at\nzero, so the depth bound never trips and a cyclic issuer graph loops until\nsomething else stops it. Worth checking whether the cycle is otherwise\nbounded before deciding how to test it.\n\n`find_parent`'s `\u0026\u0026` to `||` relaxes a two-part parent test to either\npart, which is the same shape as the AIA orphan predicate's conjuncts\nclosed in pkix-chain.\n\n## Found by\n\nThe first pkix-revocation mutation sweep, 2026-11-27: 276 mutants, 93\nmissed. 50 closed so far.\n",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T16:21:38.994670604Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T16:21:38.994670604Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-smb8",
+      "depends_on_id": "PKIX-9bzr",
+      "type": "discovered-from",
+      "created_at": "2026-11-27T16:21:39.161423644Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}

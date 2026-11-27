@@ -1,0 +1,22 @@
+{
+  "id": "PKIX-8d92",
+  "title": "pkix-path: ~45 survivors left, led by the name-constraint intersection",
+  "description": "## Why\n\npkix-path's sweep found 100 survivors; roughly 45 remain after five rounds\nof fixes. Grouped by what they are about.\n\n## Clusters\n\n**Name-constraint intersection in chain_walk.** The `subtree_within` calls\nand `already_in_result`. This is RFC 5280 §6.1.4 (g) permitted/excluded\nsubtree intersection -- the machinery that makes a constraint on an\nintermediate bind everything below it. Highest value of what is left:\na wrong intersection is a trust-scope defect, which is the class the\n§4.2.1.10 and SMTP-DANE findings earlier in this sweep belonged to.\n\n**§6.1.1 path length.** `\u003e` to `\u003e=` on the max-path-length comparison, and\nthe `max_chain_certs` arithmetic. Boundary cases, the same shape as the CRL\nand OCSP freshness windows closed in pkix-revocation: inclusive at the\ndocumented end, and nothing asserts which end.\n\n**policy_graph (3).** RFC 5280 §6.1.3/§6.1.4 policy mapping and the\nvalid-policy tree.\n\n**sha1_digest (3).** Verify-only, opt-in per the project stance. Pinning it\nneeds a known-answer vector, which is a two-line test against the RFC 3174\nsample.\n\n**serde_der.rs (11).** The DER serde shims. Same class as\npkix-revocation's `crl_reason_serde`, where a round-trip over every variant\nwith hand-written wire values killed all eleven -- that is the template.\n\n**check_max_validity.** One comparison.\n\n**NormalizedIter / DirStringBytes (5).** RFC 4518 string prep internals\nfeeding `names_match`. Behavioural, and `names_match` is security-relevant;\nthese want direct unit tests on the iterator rather than tests through DN\ncomparison.\n\n**Public helpers with no in-crate caller.** `cert_is_ca`,\n`tbs_certificate_der`. A crate-scoped sweep cannot reach them by\nconstruction; consumers may cover them, and that needs checking per case\nrather than assuming either way. `pkix-identity`'s\n`dns_name_matches_pattern` was the same shape and did turn out to be\nentirely untested.\n\n## Method\n\nRe-run to regenerate the list:\n\n    cargo mutants -p pkix-path --all-features -j 4 --timeout-multiplier 4\n\nSix mutants timed out on the first run; `--timeout-multiplier 4` is what\nkeeps a slow-but-correct test from being read as a hang.\n\n## Found by\n\nThe pkix-path mutation sweep, 2026-11-27: 552 mutants, 100 missed.\n",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T16:22:03.38187959Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T16:22:03.38187959Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-8d92",
+      "depends_on_id": "PKIX-9bzr",
+      "type": "discovered-from",
+      "created_at": "2026-11-27T16:22:03.539688742Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}

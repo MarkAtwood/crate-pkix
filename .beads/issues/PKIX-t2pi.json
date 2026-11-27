@@ -1,0 +1,22 @@
+{
+  "id": "PKIX-t2pi",
+  "title": "CrlChecker anchor path: the discovery arm and the §4.14 domain check are unpinned",
+  "description": "## Why\n\n`check_revocation_against_anchor` has a discovery arm and a §4.14 domain check\nthat no test distinguishes.\n\n## The survivors\n\n    crl.rs:822:42  replace match guard `self.signer_discovered` with true\n    crl.rs:822:42  replace match guard `self.signer_discovered` with false\n    crl.rs:867:13  replace \u0026\u0026 with || in the (2c) conjunction\n    crl.rs:868:13  replace \u0026\u0026 with ||\n    crl.rs:867:16  delete ! in the (2c) conjunction\n    crl.rs:868:16  delete !\n\n822 is `(Some(discovered), false) if self.signer_discovered`, the arm that\nmakes a discovered signer authoritative regardless of the CRL's\n`IDP.indirectCRL` flag. Always false, a discovered signer on a direct CRL\nreports `IndirectCrlIssuerUnexpected`; always true, a caller-supplied\n`crl_issuer_cert` is treated as discovered.\n\n867/868 are the (2c) check, whose own comment explains why it is not a\nrestatement of (2a) and (2b):\n\n    if self.signer_discovered\n        \u0026\u0026 !crl_declares_indirect\n        \u0026\u0026 !names_match(cert.issuer, crl.issuer)\n\nUnder discovery, (2a) ties the CRL issuer to the discovered signer's subject\nwhile (2b) ties the certificate to the anchor, leaving the two free to\ndisagree. Weaken any of the three conjuncts and that gap reopens on the anchor\npath.\n\n## What a test needs\n\nThe anchor path with `new_with_signer_discovery`, which\n`signer_discovery.rs`'s own test module exercises only through\n`check_revocation`. The fixtures there (bridge / new_key_ca) are the right\nshapes; what is missing is driving them against a `TrustAnchor`.\n\n## Found by\n\nThe first pkix-revocation mutation sweep, 2026-11-27.\n",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T16:20:54.793118529Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T16:20:54.793118529Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-t2pi",
+      "depends_on_id": "PKIX-9bzr",
+      "type": "discovered-from",
+      "created_at": "2026-11-27T16:20:54.949234311Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "PKIX-gme8",
+  "title": "pkix-identity: eight survivors left, two of them unkillable",
+  "description": "## Why\n\npkix-identity's sweep: 164 mutants, 27 missed, 19 closed. These eight are\nwhat is left.\n\n## The survivors\n\n    lib.rs:116:9    replace _assertions with ()\n\nUnobservable, same class as pkix-chain's `_verifier_is_send_sync`: a\ncompile-time assertion block whose obligation the build discharges.\n\n    lib.rs:485:33   replace || with \u0026\u0026 in MailboxName::parse\n\nEquivalent. `local_raw.is_empty() || domain_raw.is_empty()` is refused again\ndownstream by `validate_ascii_local_part` (empty local-part) and\n`normalize_dns_name` (empty domain), so no input distinguishes the two\nforms. Recorded in the commit that closed the rest of the function; left\nin place as redundant defence rather than deleted.\n\n## The rest\n\nSix survivors remain unexamined at the time of writing -- the sweep list is\nin the session scratchpad under mutants-pkix-identity/. Re-run the sweep to\nregenerate it:\n\n    cargo mutants -p pkix-identity --all-features -j 4 --timeout-multiplier 4\n\npkix-identity has one non-default feature (`serde`), so `--all-features` is\nthe right scope; a default-feature run would report the serde shims as\nsurvivors spuriously (see AGENTS.md, \"Name the features when running a\nmutation sweep\").\n\n## Found by\n\nThe pkix-identity mutation sweep, 2026-11-27.\n",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T16:22:03.175435126Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T16:22:03.175435126Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-gme8",
+      "depends_on_id": "PKIX-9bzr",
+      "type": "discovered-from",
+      "created_at": "2026-11-27T16:22:03.337457996Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}

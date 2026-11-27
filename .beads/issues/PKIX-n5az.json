@@ -1,0 +1,22 @@
+{
+  "id": "PKIX-n5az",
+  "title": "general_name_matches: the directoryName arm and the non-DN comparison are untested",
+  "description": "## Why\n\n`general_name_matches` is how a distribution point's names are compared\nagainst an IDP's (RFC 5280 §6.3.3(b)(1) \"matches\"). It exists because\n`GeneralName`'s derived `PartialEq` is byte equality, which is wrong for\n`directoryName`: DNs compare under RFC 4518 string prep.\n\n## The survivors\n\n    crl.rs:1584:9   delete match arm (GN::DirectoryName(a_dn), GN::DirectoryName(b_dn))\n    crl.rs:1588:16  replace == with != in the `_ =\u003e a == b` arm\n\nDeleting the DN arm drops to byte equality, so two DNs that differ only in\ncase or whitespace stop matching and a CRL that applies is refused -- a\nfail-closed defect, and the arm's entire reason for existing.\n\n`==` to `!=` on the other arm is the fail-open direction: non-DN variants\n(`uniformResourceIdentifier`, `dNSName`) would match precisely when they\ndiffer.\n\n## What a test needs\n\nA certificate whose `cRLDistributionPoints` names a distribution point, and a\nCRL whose IDP names one too, in two forms:\n\n  * both `directoryName`, DER-different but RFC 4518-equivalent (case) --\n    kills the deleted arm;\n  * both `uniformResourceIdentifier`, one pair equal and one pair different\n    -- kills the `==` flip.\n\nThe PKITS vectors in `crl_dp_selection.rs` already drive the predicate and did\nnot kill either, so this wants its own fixture directory. The case-folded DN\ntrick is the one `ocsp-certid-binding/` uses.\n\n## Found by\n\nThe first pkix-revocation mutation sweep, 2026-11-27.\n",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T16:20:54.589116724Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T16:20:54.589116724Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-n5az",
+      "depends_on_id": "PKIX-9bzr",
+      "type": "discovered-from",
+      "created_at": "2026-11-27T16:20:54.745627224Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "PKIX-swxv",
+  "title": "check_dp_scope: two RFC 5280 §6.3.3(b) scope guards unpinned",
+  "description": "## Why\n\nThe `crl_applies_to` / `check_dp_scope` predicate answers RFC 5280 §6.3.3(b):\ndoes this certificate's `cRLDistributionPoints` point at this CRL? Two of its\nmatch guards survive mutation, and one of them is the fail-open direction.\n\n## The survivors\n\n    crl.rs:1893:33  replace match guard `crl_is_indirect` with true\n    crl.rs:1897:21  replace match guard `names_match(crl_issuer, cert_issuer)` with true\n\n1897 is the one that matters. The arm is\n\n    None if names_match(crl_issuer, cert_issuer) =\u003e cert_issuer,\n    None =\u003e continue,\n\nso with the guard always true, a distribution point carrying no `cRLIssuer`\nmatches whatever CRL is presented, regardless of whether that CRL's issuer is\nthe certificate's issuer. A CRL from an unrelated CA then counts as in scope.\n\n1893 is the converse direction: `Some(dn) if crl_is_indirect =\u003e dn` honours a\nDP's named `cRLIssuer` only for a CRL that declares `indirectCRL`. Always\ntrue, a direct CRL claims the scope of an indirect one.\n\n## Open question to settle first\n\n`check_revocation` already enforces `names_match(cert.issuer, crl.issuer)` for\ndirect CRLs via `enforce_direct_crl_domain`, which may make 1897 unreachable\nfrom that entry point. The public `crl_applies_to` predicate shares the\nimplementation but not necessarily that gate -- read the two call paths before\nbuilding a fixture.\n\nThis is the same shape as the OCSP CertID key-hash half settled in\n`ocsp_certid_binding.rs`: a guard that cannot be reached because an earlier\ncheck subsumes it. If that is the answer here, record it in the test module\nrather than contorting a fixture, and say which earlier check does the work.\n\n## Found by\n\nThe first pkix-revocation mutation sweep, 2026-11-27: 276 mutants, 93 missed.\n",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T16:20:33.941392413Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T16:20:33.941392413Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-swxv",
+      "depends_on_id": "PKIX-9bzr",
+      "type": "discovered-from",
+      "created_at": "2026-11-27T16:20:34.101141242Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}
