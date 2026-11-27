@@ -736,3 +736,56 @@ fn a_fetch_that_adds_nothing_is_not_reported_as_fetching_disabled() {
         "fetching was not disabled — a request was made and answered"
     );
 }
+
+/// A trust anchor whose subject matches the issuer a certificate names,
+/// but whose key did not sign it, must not suppress the AIA fetch.
+///
+/// `orphans_on_paths` asks "is this certificate's issuer already
+/// available?" and counts an anchor only when its name matches *and* its
+/// key verifies the signature. Dropping the second half makes any
+/// same-named anchor answer yes: the certificate stops looking like an
+/// orphan, its `caIssuers` URI is never requested, and a chain that AIA
+/// could have completed fails instead. An attacker who can get one
+/// same-named certificate into a relying party's anchor set -- a stale
+/// root, a cross-signed pair's other half, a decoy -- would then be able
+/// to switch off AIA discovery for every certificate under that name.
+///
+/// `int-wrong-key.der` is the fixture for exactly this shape: same subject
+/// DN as `int.der`, different key.
+#[test]
+fn review_aia_runs_despite_a_same_named_anchor_with_the_wrong_key() {
+    let real_int = load("int.der");
+    let decoy = load("int-wrong-key.der");
+    assert_eq!(
+        decoy.tbs_certificate().subject(),
+        real_int.tbs_certificate().subject(),
+        "fixture premise: the decoy anchor shares the real intermediate's DN"
+    );
+
+    let anchors = [
+        TrustAnchor::from_cert(load("root.der")),
+        TrustAnchor::from_cert(decoy),
+    ];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+    let f = MapFetcher::new(HashMap::from([(
+        "http://aia.test/int.der".to_owned(),
+        bytes("tests/fixtures/review", "int.der"),
+    )]));
+
+    // The pool holds the leaf alone, so the intermediate can only come
+    // from the fetch.
+    let r = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy, &f)
+        .verify_one(&[load("leaf.der")]);
+
+    assert!(
+        r.is_ok(),
+        "the same-named anchor must not stand in for the missing issuer; \
+         got {r:?} after fetching {:?}",
+        f.fetched()
+    );
+    assert!(
+        f.fetched().contains(&"http://aia.test/int.der".to_owned()),
+        "the AIA seam must have been consulted, fetched: {:?}",
+        f.fetched()
+    );
+}
