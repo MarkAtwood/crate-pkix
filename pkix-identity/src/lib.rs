@@ -894,6 +894,20 @@ pub fn verify_mailbox(cert: &Certificate, mailbox: &MailboxName<'_>) -> Result<(
 /// return false.
 fn san_entry_matches_mailbox(entry: &GeneralName, target: &MailboxName<'_>) -> bool {
     match entry {
+        // The guard states RFC 8398 §3 -- an rfc822Name is for ASCII
+        // local-parts -- but it decides nothing, and no test can show that
+        // it does. `rfc822Name` is an IA5String, and `der` refuses any byte
+        // above 0x7F when decoding one, so the SAN entry's local-part is
+        // always ASCII; `is_internationalized` is `!local.is_ascii()`, so
+        // the target's never is when it is set. `matches_rfc822_mailbox`
+        // compares the two for equality, which cannot hold, and the arm
+        // would return `false` exactly as the fallthrough does.
+        //
+        // Kept because it is the rule, not an optimisation: it says which
+        // SAN type a target of this shape may match, and the next change to
+        // `matches_rfc822_mailbox` -- comparing only domains, say -- would
+        // need it. A mutation sweep reports the guard as a survivor for
+        // this reason and not for a missing test.
         GeneralName::Rfc822Name(rfc822) if !target.is_internationalized => {
             matches_rfc822_mailbox(rfc822.as_str(), target)
         }
