@@ -216,6 +216,30 @@ failure arrives after the push instead of before it:
 The feature-powerset job deliberately clears `RUSTFLAGS`, and the
 bare-metal job sets its own; everything else inherits the deny.
 
+### A field the builder will not set can still be written
+
+`cryptography` refuses to emit a certificate with a duplicate extension, a
+pre-2050 `GeneralizedTime`, or an `encipherOnly` without `keyAgreement`, and it
+gives no way to choose an OCSP response's `producedAt` -- OpenSSL fills that in
+with the clock at signing time. None of that makes the shape untestable. Build
+the object, rebuild the signed part at the DER level with the field replaced,
+and re-sign with the key the generator already holds.
+`pkix-path/tests/fixtures/dup-ext/gen.py` established the pattern;
+`gentime/gen.py` and `pkix-revocation/tests/fixtures/ocsp-produced-at/gen.py`
+follow it.
+
+So the question is never whether the builder can be coaxed into setting the
+field. It is whether the field sits inside something this generator can
+re-sign. Asking the first question produced a WONTFIX for the `producedAt`
+boundary that was simply wrong.
+
+Two things the splice needs. Sign *after* editing, because a validator checks
+the signature before anything else and an unsigned splice is refused for the
+wrong reason. And have the generator verify its own output -- that it parses,
+that it carries the value asked for, and that the new signature checks under
+the key that is supposed to have made it -- since a fixture whose signature
+broke tests the error path it was built to avoid.
+
 ## Commit messages: no tool attribution
 
 Never add `Assisted-by`, `Co-Authored-By`, `Generated with`, or any other
