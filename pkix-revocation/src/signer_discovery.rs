@@ -285,7 +285,13 @@ fn cert_subject_key_id(cert: &Certificate) -> Option<OctetString> {
     Some(ski.0)
 }
 
-#[cfg(test)]
+// `std`, not bare `test`: every helper below reads a PKITS fixture off
+// disk and formats a path, so the module needs `std::fs` and `format!`.
+// `crl` stopped implying `std` when no_std CRL checking became possible,
+// which left `cargo test -p pkix-revocation --features crl` unable to
+// compile this module at all -- and nothing noticed, because the feature
+// job runs `cargo hack check`, which does not build test targets.
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;
 
