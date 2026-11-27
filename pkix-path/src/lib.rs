@@ -7145,3 +7145,121 @@ mod tests_policy_fields_rsa {
         .expect("RSA leaf with serverAuth EKU must pass required_leaf_eku=[serverAuth]");
     }
 }
+
+/// `NcTypeMask`, the bitmask that records which name forms a path has
+/// constrained.
+///
+/// RFC 5280 §4.2.1.10 requires a certificate carrying a name form this
+/// implementation cannot match -- `otherName`, `ediPartyName`,
+/// `registeredID` -- to be rejected when a constraint on that form is in
+/// effect. The mask is how "in effect" is tracked, so a bit that does not
+/// work is a certificate that slips through.
+///
+/// Nothing exercised the type directly: it is reached only through
+/// `check_name_constraints`, and the PKITS corpus has no vector for the
+/// unsupported forms, so the bits for them could all have been zero.
+#[cfg(test)]
+mod nc_type_mask_tests {
+    use super::NcTypeMask;
+
+    /// Every name form, in bit order. Written out rather than derived, so
+    /// the test is a statement about which forms have a bit at all.
+    const ALL: [(&str, NcTypeMask); 8] = [
+        ("rfc822Name", NcTypeMask::RFC822),
+        ("dNSName", NcTypeMask::DNS),
+        ("directoryName", NcTypeMask::DIRECTORY_NAME),
+        ("uniformResourceIdentifier", NcTypeMask::URI),
+        ("iPAddress", NcTypeMask::IP_ADDRESS),
+        ("otherName", NcTypeMask::OTHER_NAME),
+        ("ediPartyName", NcTypeMask::EDI_PARTY_NAME),
+        ("registeredID", NcTypeMask::REGISTERED_ID),
+    ];
+
+    /// Each form has a bit of its own, and that bit is set.
+    ///
+    /// A shifted-away constant is the failure that matters: `1 << 6`
+    /// becoming zero makes `intersects` answer false for every mask, so an
+    /// `ediPartyName` constraint stops counting as in effect and a
+    /// certificate carrying that form is no longer refused.
+    ///
+    /// `RFC822`'s own shift is the exception, and not for want of a test:
+    /// `1 << 0` and `1 >> 0` are the same number, so no test distinguishes
+    /// them. Every other bit is covered here.
+    #[test]
+    fn each_name_form_has_its_own_bit() {
+        for (name, mask) in ALL {
+            assert!(
+                mask.intersects(mask),
+                "{name}'s bit is empty, so no constraint on it can register"
+            );
+            assert_ne!(
+                mask,
+                NcTypeMask::EMPTY,
+                "{name} is indistinguishable from EMPTY"
+            );
+        }
+
+        for (i, (a_name, a)) in ALL.iter().enumerate() {
+            for (b_name, b) in ALL.iter().skip(i + 1) {
+                assert!(
+                    !a.intersects(*b),
+                    "{a_name} and {b_name} share a bit, so a constraint on one \
+                     would register as a constraint on the other"
+                );
+            }
+        }
+    }
+
+    /// The empty mask intersects nothing, including itself.
+    #[test]
+    fn the_empty_mask_intersects_nothing() {
+        assert!(!NcTypeMask::EMPTY.intersects(NcTypeMask::EMPTY));
+        for (name, mask) in ALL {
+            assert!(!NcTypeMask::EMPTY.intersects(mask), "EMPTY against {name}");
+            assert!(!mask.intersects(NcTypeMask::EMPTY), "{name} against EMPTY");
+        }
+    }
+
+    /// Accumulating a form twice leaves it set.
+    ///
+    /// This is the one place the distinction between union and symmetric
+    /// difference shows: on disjoint masks they agree, so a `^` in either
+    /// operator passes every test built from distinct forms. Two CA
+    /// certificates in one path constraining `dNSName` is an ordinary
+    /// chain, and under symmetric difference the second would clear what
+    /// the first recorded -- the constraint would stop being in effect
+    /// because it was imposed twice.
+    #[test]
+    fn accumulating_one_form_twice_leaves_it_set() {
+        assert_eq!(NcTypeMask::DNS | NcTypeMask::DNS, NcTypeMask::DNS);
+
+        let mut acc = NcTypeMask::EMPTY;
+        acc |= NcTypeMask::DNS;
+        acc |= NcTypeMask::RFC822;
+        acc |= NcTypeMask::DNS;
+        assert!(
+            acc.intersects(NcTypeMask::DNS),
+            "dNSName was constrained twice and must still be in effect"
+        );
+        assert!(
+            acc.intersects(NcTypeMask::RFC822),
+            "rfc822Name was constrained once and must still be in effect"
+        );
+        assert!(
+            !acc.intersects(NcTypeMask::URI),
+            "no constraint named uniformResourceIdentifier"
+        );
+    }
+
+    /// `BitOr` and `BitOrAssign` agree.
+    ///
+    /// They are written separately, so one could accumulate while the other
+    /// replaced.
+    #[test]
+    fn the_two_union_operators_agree() {
+        let by_value = NcTypeMask::DNS | NcTypeMask::OTHER_NAME;
+        let mut by_assign = NcTypeMask::DNS;
+        by_assign |= NcTypeMask::OTHER_NAME;
+        assert_eq!(by_value, by_assign);
+    }
+}
