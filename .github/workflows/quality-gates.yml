@@ -330,7 +330,11 @@ jobs:
   default-features:
     name: default features (what a consumer gets)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # 40, not the 25 this job used before the per-crate step below: that
+    # step compiles every member's test targets a second time, each with
+    # only its own features resolved, so little of the workspace build
+    # can be reused.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -362,6 +366,32 @@ jobs:
       # --no-dev-deps, so it never builds a test target.
       - name: Tests build and pass with default features
         run: cargo test --workspace
+
+      # The step above is not enough on its own. `cargo test --workspace`
+      # resolves features once for the whole graph, so a feature any one
+      # member enables on a dependency is enabled for every member's
+      # build of it. pkix-difftest depends on pkix-revocation with
+      # "crl", which switched `crl` on for pkix-revocation's own test
+      # targets too — three of them imported `crl`-gated items with no
+      # `required-features` declaration, and nothing noticed, because the
+      # only build that would have failed is the one nobody ran:
+      # `cargo test -p pkix-revocation`. That is the build a contributor
+      # runs while working on a single crate, and it was broken.
+      #
+      # Compiling each member on its own restores the isolation the
+      # workspace build takes away. --no-run, because the step above
+      # already executes the tests; what is missing here is the compile.
+      - name: Each crate's tests build on their own
+        run: |
+          set -euo pipefail
+          cargo metadata --no-deps --format-version 1 \
+            | python3 -c 'import json,sys; [print(p["name"]) for p in json.load(sys.stdin)["packages"]]' \
+            | sort \
+            | while read -r pkg; do
+                echo "::group::$pkg"
+                cargo test -p "$pkg" --no-run
+                echo "::endgroup::"
+              done
 
       # No exclusions. pkix-ct and pkix-lint were excluded because both
       # linked unconditionally to items that only exist behind a feature,
