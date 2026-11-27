@@ -3160,6 +3160,150 @@ fn ip_constraint_within(a: &[u8], b: &[u8]) -> bool {
     })
 }
 
+/// RFC 5280 §4.2.1.10 subtree containment for the non-`directoryName` name
+/// forms.
+///
+/// These are pure functions over strings and byte slices, and a mutation
+/// sweep found every one of them unguarded: the suite reached them only
+/// through whole-chain fixtures, which never supply the degenerate inputs
+/// that separate a correct comparison from a nearly-correct one.
+#[cfg(test)]
+mod tests_constraint_forms {
+    use super::{
+        ip_constraint_within, is_ipv4_literal, is_strict_subdomain, matches_ip_address,
+        subtree_within, uri_constraint_within,
+    };
+    use der::Decode as _;
+    use x509_cert::ext::pkix::name::GeneralName;
+
+    /// `.example.com` is not a *strict* subdomain of `example.com`.
+    ///
+    /// A strict subdomain adds at least one label, so the shortest one is
+    /// `a.example.com`. The guard is `name.len() > parent.len() + 1`, and
+    /// both of its obvious weakenings admit this degenerate input: `>=`
+    /// directly, and `*` in place of `+` because `parent.len() * 1` is
+    /// `parent.len()`. The leading dot then satisfies the separator check
+    /// and the suffix compares equal, so a bare `.example.com` would be
+    /// reported as a subdomain of itself-with-a-dot.
+    #[test]
+    fn a_leading_dot_alone_is_not_a_strict_subdomain() {
+        assert!(!is_strict_subdomain(".example.com", "example.com"));
+        // The real thing still is.
+        assert!(is_strict_subdomain("a.example.com", "example.com"));
+        assert!(is_strict_subdomain("deep.a.example.com", "example.com"));
+        // And a sibling that merely ends in the same bytes is not.
+        assert!(!is_strict_subdomain("notexample.com", "example.com"));
+    }
+
+    /// A URI subtree contains itself.
+    ///
+    /// Both arms are `Some`, so the comparison is
+    /// `equal || is_strict_subdomain`. With `&&` a domain would have to be a
+    /// strict subdomain of itself, which nothing is, and a constraint would
+    /// stop containing its own subtree.
+    #[test]
+    fn a_uri_subtree_contains_itself_and_its_subdomains() {
+        assert!(uri_constraint_within(".example.com", ".example.com"));
+        assert!(uri_constraint_within(".a.example.com", ".example.com"));
+        assert!(!uri_constraint_within(".example.com", ".a.example.com"));
+    }
+
+    /// `is_ipv4_literal` rejects an empty label and an over-long one.
+    ///
+    /// The three conditions are joined by `||`, so turning either into `&&`
+    /// makes one of them reachable only together with the next: an empty
+    /// label stops being rejected, or a four-digit label does.
+    #[test]
+    fn an_ipv4_literal_needs_one_to_three_digits_per_label() {
+        assert!(is_ipv4_literal("192.0.2.1"));
+        assert!(
+            !is_ipv4_literal("1..2.3"),
+            "an empty label is not a digit run"
+        );
+        assert!(
+            !is_ipv4_literal("1234.1.1.1"),
+            "four digits is outside one-to-three, all-digits notwithstanding"
+        );
+        assert!(!is_ipv4_literal("a.b.c.d"));
+    }
+
+    /// `matches_ip_address` handles IPv6 constraints, not only IPv4.
+    ///
+    /// The length match has an arm for 8 bytes (IPv4 address + mask) and one
+    /// for 32 (IPv6). Deleting the 32-byte arm sends every IPv6 constraint
+    /// to `_ => return false`, so an excluded IPv6 subtree would stop
+    /// excluding and a permitted one would stop permitting.
+    #[test]
+    fn an_ipv6_constraint_is_matched() {
+        // 2001:db8::/32 as constraint (16 address + 16 mask), subject
+        // 2001:db8::1.
+        let mut constraint = [0u8; 32];
+        constraint[0..4].copy_from_slice(&[0x20, 0x01, 0x0d, 0xb8]);
+        constraint[16..20].copy_from_slice(&[0xff, 0xff, 0xff, 0xff]);
+        let mut subject = [0u8; 16];
+        subject[0..4].copy_from_slice(&[0x20, 0x01, 0x0d, 0xb8]);
+        subject[15] = 1;
+        assert!(matches_ip_address(&subject, &constraint));
+
+        // Outside the prefix.
+        let mut other = [0u8; 16];
+        other[0..4].copy_from_slice(&[0x20, 0x01, 0x0d, 0xb9]);
+        assert!(!matches_ip_address(&other, &constraint));
+
+        // IPv4 still works, so this is about the arm and not the function.
+        let v4_constraint = [192, 0, 2, 0, 255, 255, 255, 0];
+        assert!(matches_ip_address(&[192, 0, 2, 7], &v4_constraint));
+        assert!(!matches_ip_address(&[192, 0, 3, 7], &v4_constraint));
+    }
+
+    /// `ip_constraint_within` accepts both lengths it documents.
+    ///
+    /// The guard is `a.len() != b.len() || !(a.len() == 8 || a.len() == 32)`.
+    /// Flipping the `== 8` to `!=` makes the negation reject exactly the
+    /// 8-byte IPv4 case the function is most used for.
+    #[test]
+    fn an_ipv4_constraint_is_within_a_shorter_prefix() {
+        // 192.0.2.0/24 inside 192.0.0.0/16: b's mask bits are a subset of
+        // a's, and the addresses agree under b's mask.
+        let a = [192, 0, 2, 0, 255, 255, 255, 0];
+        let b = [192, 0, 0, 0, 255, 255, 0, 0];
+        assert!(ip_constraint_within(&a, &b));
+        assert!(!ip_constraint_within(&b, &a), "the wider one is not inside");
+
+        // Mismatched family lengths are not comparable.
+        let v6 = [0u8; 32];
+        assert!(!ip_constraint_within(&a, &v6));
+    }
+
+    /// `subtree_within` routes two `directoryName`s to the DN comparison.
+    ///
+    /// Deleting that match arm sends them to the catch-all, so a
+    /// `directoryName` constraint would stop containing anything — including
+    /// itself.
+    #[test]
+    fn two_directory_names_are_compared_as_dns() {
+        // C=US  and  C=US,O=Test
+        const C_US: &[u8] = &[
+            0x30, 0x0d, 0x31, 0x0b, 0x30, 0x09, 0x06, 0x03, 0x55, 0x04, 0x06, 0x13, 0x02, 0x55,
+            0x53,
+        ];
+        const C_US_O_TEST: &[u8] = &[
+            0x30, 0x1c, 0x31, 0x0b, 0x30, 0x09, 0x06, 0x03, 0x55, 0x04, 0x06, 0x13, 0x02, 0x55,
+            0x53, 0x31, 0x0d, 0x30, 0x0b, 0x06, 0x03, 0x55, 0x04, 0x0a, 0x13, 0x04, 0x54, 0x65,
+            0x73, 0x74,
+        ];
+        let dn = |der: &[u8]| {
+            GeneralName::DirectoryName(
+                x509_cert::name::Name::from_der(der).expect("hand-built Name parses"),
+            )
+        };
+
+        assert!(subtree_within(&dn(C_US_O_TEST), &dn(C_US)));
+        assert!(subtree_within(&dn(C_US), &dn(C_US)));
+        assert!(!subtree_within(&dn(C_US), &dn(C_US_O_TEST)));
+    }
+}
+
 // ---------------------------------------------------------------------------
 // RSA key size helper (PKIX-ken.1.5)
 // ---------------------------------------------------------------------------
