@@ -111,10 +111,25 @@ means the opposite.) GitHub issue #11 has two parts. `validate_path`
 used to skip a same-name anchor whose key differed from a self-issued
 top certificate; it now verifies that certificate with the anchor key,
 so `validate_path([leaf, ica])` succeeds (pkix-path
-`tests/review_self_issued_rollover.rs`). `build_first_valid_path` still
-only tries leaf → anchor, so this harness verdict is expected to stay
-StricterThanWild until the builder is fixed. This baseline has not been
-re-run since (the limbo corpus is out of tree).
+`tests/review_self_issued_rollover.rs`). `build_first_valid_path` was then
+described here as still only trying leaf → anchor, so the harness verdict
+was expected to stay StricterThanWild until the builder was fixed.
+
+**That is no longer true, and this note was stale rather than the builder
+broken.** Candidate iteration (PKIX-lwr9.4.1, the change this same
+section describes) is what fixed it: `build_first_valid_path` constructs
+its `PathCandidates` with a verifier, which filters signature-inconsistent
+chains, and the rollover chain `[leaf, ica]` is yielded and validates.
+Verified directly against pkix-path's own issue-11 fixtures, now covered
+by `pkix-path-builder/tests/key_rollover.rs` (PKIX-xj81.3) — including
+that a forged same-name anchor yields no path and does not mask the real
+one.
+
+So `rfc5280::nc::permitted-self-issued` is expected to be Agreement on a
+re-run, not StricterThanWild. This baseline has not been re-run (the limbo
+corpus is out of tree), which is exactly why the claim survived: the only
+statement anywhere about this behaviour was a stale one saying it did not
+work.
 
 Prior to this change (PKIX-lwr9.6, 2026-05-11), the limbo loader used
 single-shot `build_path` after PKIX-yn3e (AKI-based candidate

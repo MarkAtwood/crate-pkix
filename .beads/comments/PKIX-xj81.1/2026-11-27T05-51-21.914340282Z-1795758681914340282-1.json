@@ -1,0 +1,7 @@
+{
+  "id": "1795758681914340282-1",
+  "issue_id": "PKIX-xj81.1",
+  "author": "Mark Atwood",
+  "text": "PKIX-xj81.3 was completed WITHOUT this shared generator, and its dependency edge on this bead has been removed. It reused pkix-path's existing issue-11 fixtures (tests/fixtures/review/self-issued-rollover/) rather than generating its own.\n\nThat turned out to be the better choice, not a shortcut: the builder half and the validate_path half now exercise the same bytes, so the two cannot drift apart -- which was the actual risk, since the builder's behaviour on that topology is only meaningful relative to what validate_path accepts.\n\nWorth weighing for the remaining five topology beads (.2, .4, .5, .6, .7): where pkix-path already has a fixture for the same topology, reusing it beats generating a parallel one. This generator is still the right call for topologies pkix-path has no fixture for.",
+  "created_at": "2026-11-27T05:51:21.914340282Z"
+}
