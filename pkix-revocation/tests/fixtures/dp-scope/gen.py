@@ -35,6 +35,17 @@ by the name half of the rule whatever the guards did.
   leaf-dp-with-crlissuer     CDP: distributionPoint + cRLIssuer = CA-A
   indirect-crl-from-b        CRL by CA-B, IDP indirectCRL + same DP name
   direct-crl-from-a          CRL by CA-A, IDP same DP name, not indirect
+  leaf-dp-dirname            CDP: distributionPoint is a directoryName
+  direct-crl-from-a-dirname  CRL by CA-A, IDP names the same DN in another
+                             case
+
+THE directoryName PAIR
+----------------------
+`general_name_matches` compares two `GeneralName`s, and the reason it is not
+just `PartialEq` is `directoryName`: DNs compare under RFC 4518 string prep,
+not byte for byte. Every other distribution point here is a URI, which takes
+the derived comparison, so nothing exercised the DN arm. The pair above names
+one DN in two cases: equal under the rule, different as DER.
 
 `crl_applies_to` is a pure scope predicate and verifies no signature, but
 the CRLs are signed properly anyway so they stay usable if a later test
@@ -94,9 +105,17 @@ def ca(subject, key, serial):
     )
 
 
-def leaf(subject_cn, issuer_name, issuer_key, leaf_key, serial, crl_issuer_name):
+def leaf(
+    subject_cn,
+    issuer_name,
+    issuer_key,
+    leaf_key,
+    serial,
+    crl_issuer_name,
+    dp_name=None,
+):
     dp = x509.DistributionPoint(
-        full_name=[x509.UniformResourceIdentifier(DP_URI)],
+        full_name=[dp_name or x509.UniformResourceIdentifier(DP_URI)],
         relative_name=None,
         crl_issuer=(
             [x509.DirectoryName(crl_issuer_name)] if crl_issuer_name is not None else None
@@ -117,7 +136,7 @@ def leaf(subject_cn, issuer_name, issuer_key, leaf_key, serial, crl_issuer_name)
     )
 
 
-def crl(issuer_name, key, indirect):
+def crl(issuer_name, key, indirect, dp_name=None):
     return (
         x509.CertificateRevocationListBuilder()
         .issuer_name(issuer_name)
@@ -130,7 +149,7 @@ def crl(issuer_name, key, indirect):
                 indirect_crl=indirect,
                 only_contains_attribute_certs=False,
                 only_some_reasons=None,
-                full_name=[x509.UniformResourceIdentifier(DP_URI)],
+                full_name=[dp_name or x509.UniformResourceIdentifier(DP_URI)],
                 relative_name=None,
             ),
             critical=True,
@@ -177,6 +196,30 @@ def main():
     write(
         "direct-crl-from-a.der",
         crl(a_name, a_key, False).public_bytes(serialization.Encoding.DER),
+    )
+
+    # A directoryName distribution point, named in two encodings that
+    # RFC 4518 case folding makes equal.
+    write(
+        "leaf-dp-dirname.der",
+        leaf(
+            "DP Scope Leaf DirName",
+            a_name,
+            a_key,
+            leaf_key,
+            0xD005,
+            None,
+            dp_name=x509.DirectoryName(name("dp scope point")),
+        ).public_bytes(serialization.Encoding.DER),
+    )
+    write(
+        "direct-crl-from-a-dirname.der",
+        crl(
+            a_name,
+            a_key,
+            False,
+            dp_name=x509.DirectoryName(name("DP Scope Point")),
+        ).public_bytes(serialization.Encoding.DER),
     )
 
 

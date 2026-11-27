@@ -119,3 +119,42 @@ fn a_named_crl_issuer_still_refuses_a_crl_from_someone_else() {
         "CA-B is not the named cRLIssuer, got: {r:?}"
     );
 }
+
+/// A `directoryName` distribution point compares under RFC 4518, not byte
+/// for byte.
+///
+/// `general_name_matches` exists for this one case: `GeneralName`'s derived
+/// `PartialEq` is byte equality, which is right for a URI and wrong for a
+/// DN. Every other distribution point in this crate's fixtures is a URI and
+/// so takes the derived comparison, which left the `directoryName` arm with
+/// no test -- deleting it entirely changed nothing, and a CRL whose IDP
+/// named the same DN in another case would have been reported out of scope.
+///
+/// The two fixtures name one DN in two cases: equal under the rule,
+/// different as DER.
+#[test]
+fn a_directory_name_distribution_point_compares_under_rfc_4518() {
+    let leaf = load("leaf-dp-dirname.der");
+    crl_applies_to(&leaf, &fixture("direct-crl-from-a-dirname.der"))
+        .expect("the IDP names the same distribution point DN, differing only in case");
+}
+
+/// The complement: a different DN is still a different distribution point.
+///
+/// Without this, the test above would pass for a comparison that accepted
+/// any two DNs. The URI-named CRL is the one from the same issuer, so the
+/// issuer half of the rule is satisfied and the refusal is about the name.
+#[test]
+fn a_different_distribution_point_name_is_still_out_of_scope() {
+    let leaf = load("leaf-dp-dirname.der");
+    let r = crl_applies_to(&leaf, &fixture("direct-crl-from-a.der"));
+    assert!(
+        matches!(
+            r,
+            Err(Error::OutOfScope(
+                OutOfScopeReason::CrlIdpDistributionPointMismatch
+            ))
+        ),
+        "a URI distribution point is not the DN one, got: {r:?}"
+    );
+}
