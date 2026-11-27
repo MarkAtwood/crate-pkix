@@ -2280,6 +2280,161 @@ fn cert_has_san_identity(cert: &Certificate) -> bool {
         .any(|ext| ext.extn_id == OID_SUBJECT_ALT_NAME && ext.critical)
 }
 
+/// RFC 5280 §7.1 DN comparison, and §4.2.1.10 subtree containment.
+///
+/// Both functions here are private and were reached only through whole-chain
+/// fixtures, which left several of their decisions untested — a mutation
+/// sweep flipped the `&&` in both `names_match` AVA loops and both
+/// comparisons in `dn_within_subtree`'s length guard, and every one
+/// survived. Unit tests, because the inputs that distinguish these cases
+/// are DNs no certificate generator produces on the way to anything else.
+#[cfg(test)]
+mod tests_dn_comparison {
+    use super::{dn_within_subtree, names_match};
+    use der::Decode as _;
+    use x509_cert::name::Name;
+
+    // Hand-built DER. Each is a Name whose RDNs hold one PrintableString AVA.
+    const CN_ALICE: &[u8] = &[
+        0x30, 0x10, 0x31, 0x0e, 0x30, 0x0c, 0x06, 0x03, 0x55, 0x04, 0x03, 0x13, 0x05, 0x41, 0x6c,
+        0x69, 0x63, 0x65,
+    ];
+    /// The same value as `CN_ALICE` under a different attribute OID
+    /// (organizationName, 2.5.4.10).
+    const O_ALICE: &[u8] = &[
+        0x30, 0x10, 0x31, 0x0e, 0x30, 0x0c, 0x06, 0x03, 0x55, 0x04, 0x0a, 0x13, 0x05, 0x41, 0x6c,
+        0x69, 0x63, 0x65,
+    ];
+    const C_US: &[u8] = &[
+        0x30, 0x0d, 0x31, 0x0b, 0x30, 0x09, 0x06, 0x03, 0x55, 0x04, 0x06, 0x13, 0x02, 0x55, 0x53,
+    ];
+    const C_US_O_TEST: &[u8] = &[
+        0x30, 0x1c, 0x31, 0x0b, 0x30, 0x09, 0x06, 0x03, 0x55, 0x04, 0x06, 0x13, 0x02, 0x55, 0x53,
+        0x31, 0x0d, 0x30, 0x0b, 0x06, 0x03, 0x55, 0x04, 0x0a, 0x13, 0x04, 0x54, 0x65, 0x73, 0x74,
+    ];
+    const C_US_O_TEST_CN_ALICE: &[u8] = &[
+        0x30, 0x2c, 0x31, 0x0b, 0x30, 0x09, 0x06, 0x03, 0x55, 0x04, 0x06, 0x13, 0x02, 0x55, 0x53,
+        0x31, 0x0d, 0x30, 0x0b, 0x06, 0x03, 0x55, 0x04, 0x0a, 0x13, 0x04, 0x54, 0x65, 0x73, 0x74,
+        0x31, 0x0e, 0x30, 0x0c, 0x06, 0x03, 0x55, 0x04, 0x03, 0x13, 0x05, 0x41, 0x6c, 0x69, 0x63,
+        0x65,
+    ];
+
+    fn n(der: &[u8]) -> Name {
+        Name::from_der(der).expect("hand-built Name parses")
+    }
+
+    /// The same value under a different attribute type is a different name.
+    ///
+    /// Both AVA loops in `names_match` require the OID *and* the value to
+    /// agree. With `||` in place of either `&&`, `CN=Alice` and `O=Alice`
+    /// compare equal — the comparison would stop distinguishing attribute
+    /// types, and DN equality is what binds a certificate to its issuer.
+    #[test]
+    fn the_same_value_under_a_different_attribute_type_is_a_different_name() {
+        assert!(names_match(&n(CN_ALICE), &n(CN_ALICE)));
+        assert!(
+            !names_match(&n(CN_ALICE), &n(O_ALICE)),
+            "CN=Alice is not O=Alice"
+        );
+        assert!(
+            !names_match(&n(O_ALICE), &n(CN_ALICE)),
+            "and not in the other argument order either"
+        );
+    }
+
+    /// A DN is within the subtree rooted at itself.
+    ///
+    /// §4.2.1.10 containment is prefix containment, and every sequence is a
+    /// prefix of itself. The length guard is `constraint.len() >
+    /// subject.len()`; with `>=` an exactly-equal DN falls out as "not
+    /// within", which breaks both directions of name constraints — a
+    /// permitted subtree would reject the DN it names, and an excluded
+    /// subtree would fail to exclude it.
+    #[test]
+    fn a_dn_is_within_the_subtree_rooted_at_itself() {
+        assert!(dn_within_subtree(&n(C_US_O_TEST), &n(C_US_O_TEST)));
+        assert!(dn_within_subtree(&n(C_US), &n(C_US)));
+    }
+
+    /// A constraint longer than the subject contains nothing.
+    ///
+    /// The guard exists because the `zip` below it stops at the shorter of
+    /// the two, so without it a deep constraint would be compared only
+    /// against its own prefix and report a match. With `==` in place of
+    /// `>`, `{C=US}` lands inside the subtree `{C=US, O=Test, CN=Alice}` —
+    /// over-permissive for a permitted subtree, since a certificate would
+    /// satisfy a constraint far more specific than its own name.
+    #[test]
+    fn a_constraint_longer_than_the_subject_contains_nothing() {
+        assert!(
+            !dn_within_subtree(&n(C_US), &n(C_US_O_TEST_CN_ALICE)),
+            "{{C=US}} is not inside the subtree {{C=US, O=Test, CN=Alice}}"
+        );
+        assert!(
+            !dn_within_subtree(&n(C_US_O_TEST), &n(C_US_O_TEST_CN_ALICE)),
+            "one RDN short is still outside"
+        );
+    }
+
+    /// One RDN with two AVAs sharing a value under different OIDs, and one
+    /// with a duplicated OID. RFC 5280 §5.1.2.4 says an RDN SHOULD NOT
+    /// carry duplicate OIDs, so the second is malformed — which is exactly
+    /// the case `names_match`'s bidirectional pass documents itself as
+    /// handling.
+    const CN_AND_O_ALICE: &[u8] = &[
+        0x30, 0x1e, 0x31, 0x1c, 0x30, 0x0c, 0x06, 0x03, 0x55, 0x04, 0x03, 0x13, 0x05, 0x41, 0x6c,
+        0x69, 0x63, 0x65, 0x30, 0x0c, 0x06, 0x03, 0x55, 0x04, 0x0a, 0x13, 0x05, 0x41, 0x6c, 0x69,
+        0x63, 0x65,
+    ];
+    const CN_ALICE_TWICE: &[u8] = &[
+        0x30, 0x1e, 0x31, 0x1c, 0x30, 0x0c, 0x06, 0x03, 0x55, 0x04, 0x03, 0x13, 0x05, 0x41, 0x6c,
+        0x69, 0x63, 0x65, 0x30, 0x0c, 0x06, 0x03, 0x55, 0x04, 0x03, 0x13, 0x05, 0x41, 0x6c, 0x69,
+        0x63, 0x65,
+    ];
+
+    /// The bidirectional AVA pass is what makes a duplicated OID safe.
+    ///
+    /// `{CN=Alice, O=Alice}` and `{CN=Alice, CN=Alice}` have the same RDN
+    /// count and the same AVA count, and every AVA of the second has a
+    /// strict match in the first — so the forward pass alone cannot tell
+    /// them apart. Only the reverse pass can: `O=Alice` has no counterpart
+    /// in `{CN=Alice, CN=Alice}`.
+    ///
+    /// Why this test rather than a simpler one: mutating the `&&` in
+    /// *either* AVA loop to `||` leaves every other test in this crate
+    /// green, because for well-formed RDNs the two passes are redundant and
+    /// each catches what the other would miss. That redundancy is the
+    /// design, and this is the input where it is load-bearing instead of
+    /// redundant — a duplicated OID, which the loop's own comment claims to
+    /// handle and nothing verified.
+    #[test]
+    fn a_duplicated_oid_does_not_match_two_distinct_attributes() {
+        assert!(
+            !names_match(&n(CN_AND_O_ALICE), &n(CN_ALICE_TWICE)),
+            "{{CN=Alice, O=Alice}} is not {{CN=Alice, CN=Alice}}"
+        );
+        assert!(
+            !names_match(&n(CN_ALICE_TWICE), &n(CN_AND_O_ALICE)),
+            "and not in the other argument order, which is the pass that \
+             catches it when the first is weakened"
+        );
+        // Each still matches itself, so the above cannot pass on a
+        // comparison that never returns true for two-AVA RDNs.
+        assert!(names_match(&n(CN_AND_O_ALICE), &n(CN_AND_O_ALICE)));
+        assert!(names_match(&n(CN_ALICE_TWICE), &n(CN_ALICE_TWICE)));
+    }
+
+    /// And the ordinary case still works: a shorter constraint is a prefix.
+    ///
+    /// Without this the two negative tests above would pass on a function
+    /// that never returns `true`.
+    #[test]
+    fn a_shorter_constraint_contains_a_longer_subject() {
+        assert!(dn_within_subtree(&n(C_US_O_TEST), &n(C_US)));
+        assert!(dn_within_subtree(&n(C_US_O_TEST_CN_ALICE), &n(C_US_O_TEST)));
+    }
+}
+
 /// Compare two `AttributeTypeAndValue` values after RFC 4518 normalization.
 ///
 /// Allocation-free: `BMPString` values are transcoded to UTF-8 lazily by
