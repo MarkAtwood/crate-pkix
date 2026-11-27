@@ -119,3 +119,77 @@ fn revoked_reason_code_wire_form_uses_rfc_numeric_codes() {
         "wire form did not use numeric reason code: {json}"
     );
 }
+
+/// Every RFC 5280 §5.3.1 reason code, in both directions.
+///
+/// The test above covers `keyCompromise` alone, which left the other nine
+/// codes free to serialize as anything and -- worse -- free to vanish on
+/// the way back. `deserialize_opt` maps an unrecognised code to `None`
+/// deliberately, so a dropped case does not fail: it silently turns a
+/// revocation reason into "no reason given". A cached `Error::Revoked`
+/// read back by a newer build would lose the reason the certificate was
+/// revoked for, which is the part a caller routes on.
+///
+/// The codes are written out from RFC 5280 §5.3.1 rather than derived
+/// from the enum, so the table is an independent oracle. The sequence
+/// skips 7: RFC 5280 assigns no reason to it.
+#[test]
+fn every_reason_code_round_trips_through_its_rfc_number() {
+    const CODES: [(CrlReason, u32); 10] = [
+        (CrlReason::Unspecified, 0),
+        (CrlReason::KeyCompromise, 1),
+        (CrlReason::CaCompromise, 2),
+        (CrlReason::AffiliationChanged, 3),
+        (CrlReason::Superseded, 4),
+        (CrlReason::CessationOfOperation, 5),
+        (CrlReason::CertificateHold, 6),
+        (CrlReason::RemoveFromCRL, 8),
+        (CrlReason::PrivilegeWithdrawn, 9),
+        (CrlReason::AaCompromise, 10),
+    ];
+
+    for (reason, code) in CODES {
+        let serial_der: [u8; 3] = [0x02, 0x01, 0x07];
+        let err = Error::Revoked {
+            serial: Serial::from_der(&serial_der).expect("serial decodes"),
+            reason_code: Some(reason),
+        };
+        let json = serde_json::to_string(&err).expect("serialize");
+        assert!(
+            json.contains(&format!(r#""reason_code":{code}"#)),
+            "{reason:?} must serialize as {code}, got: {json}"
+        );
+        let back: Error = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(err, back, "{reason:?} did not survive the round trip");
+    }
+}
+
+/// An unassigned code deserializes as "no reason given" rather than
+/// failing, so a value a future revision adds does not make the whole
+/// cached error unreadable.
+///
+/// 7 is unassigned in RFC 5280 §5.3.1 and stands in for any code this
+/// build does not know.
+#[test]
+fn an_unassigned_reason_code_deserializes_as_no_reason() {
+    let serial_der: [u8; 3] = [0x02, 0x01, 0x07];
+    let known = Error::Revoked {
+        serial: Serial::from_der(&serial_der).expect("serial decodes"),
+        reason_code: Some(CrlReason::KeyCompromise),
+    };
+    let json = serde_json::to_string(&known)
+        .expect("serialize")
+        .replace(r#""reason_code":1"#, r#""reason_code":7"#);
+    assert!(
+        json.contains(r#""reason_code":7"#),
+        "the substitution must have landed: {json}"
+    );
+
+    let back: Error = serde_json::from_str(&json).expect("an unknown code must still deserialize");
+    match back {
+        Error::Revoked { reason_code, .. } => {
+            assert_eq!(reason_code, None, "an unassigned code must become None")
+        }
+        other => panic!("expected Error::Revoked, got {other:?}"),
+    }
+}
