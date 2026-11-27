@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-vtnh",
+  "title": "Wycheproof as a crypto-backend difftest dimension",
+  "description": "## Why\n\nProject Wycheproof is edge-case test vectors for crypto primitives -- ECDSA signature malleability, RSA padding, DSA, EdDSA, key-size boundaries. That is one layer below path validation but exactly where DefaultVerifier and the SignatureVerifier backends live, and it is the natural companion to PKIX-hbzo.4 (crypto backend as a difftest dimension), since the same harness would compare backends against the same vectors.\n\n## Availability -- VERIFIED 2026-11-27\n\n* Repository has MOVED: github.com/C2SP/wycheproof, not github.com/google/wycheproof. HTTP 200.\n* Apache-2.0. Confirmed only from third-party listings (Packagist, ecosyste.ms, a Gitee mirror); the LICENSE file URL resolves (HTTP 200) but its contents were not read. Read it before vendoring anything.\n* Vectors live in testvectors/ and testvectors_v1/ as JSON.\n\n## What\n\nLoad the ECDSA, RSA-PKCS1, RSA-PSS and EdDSA vector files as a difftest corpus and run them through each SignatureVerifier backend. Each vector carries an expected result, so unlike x509-limbo this is labelled ground truth and a disagreement is a bug rather than a divergence to classify.\n\n## Why it may matter more than it looks\n\nToday's pkix-path mutation sweep left sha1_digest's three mutations alive -- no test verifies an ECDSA-SHA1 signature end to end -- and the verify_signature OID dispatch arms in DefaultVerifier too. Wycheproof would cover that class of gap systematically rather than one fixture at a time.",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T08:00:29.882529502Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T08:00:29.882529502Z"
+}

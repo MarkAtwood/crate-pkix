@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-s2ph",
+  "title": "Conformance corpora worth evaluating: availability unverified",
+  "description": "## Why\n\nCandidate test-data sources beyond PKITS and x509-limbo. Filed as ONE bead rather than a dozen speculative ones because none of these has been verified past the point noted, and a bead per item would read as a plan when it is a list.\n\n## Verified 2026-11-27\n\n* Wycheproof -- moved to github.com/C2SP/wycheproof, Apache-2.0 per third-party listings. Has its own bead.\n* CT logs -- feasible, no canonical corpus, tiled logs are the modern form. Has its own bead.\n* dane.sys4.de -- LIVE, HTTP 200. An earlier note guessed it had bit-rotted; it has not, at least at the HTTP level. Whether it still serves deliberately-broken TLSA records is unchecked.\n* internet.nl -- LIVE, HTTP 200.\n\n## Not verified at all\n\n* NIST CAVP / ACVP vectors -- the validation suites behind FIPS. Structured for exactly this purpose and mechanically relevant to the FIPS story. Format and licensing unchecked.\n* BoringSSL / OpenSSL / GnuTLS test suites -- each has decades of certificate fixtures accumulated from real bugs. Harvesting their cert corpora as oracle input is unglamorous and probably productive. Licensing differs per project and matters if anything is vendored.\n* DNSSEC -- IETF dnssec-test-vectors work, RFC 4034/5702/6605 appendix vectors, BIND and Unbound test zones. Relevant to pkix-dane-resolver.\n* S/MIME -- Thunderbird and gpg4win interop suites, older NIST S/MIME interoperability material.\n* OpenPGP -- sop (Stateless OpenPGP) interop tests and Sequoia's suite, if the PGP side of the MIME work is in scope.\n* MTA-STS / TLSRPT -- no corpus known to exist. Building the first one would itself be a contribution, and is the only item here that is a creation rather than an acquisition.\n\n## Ranking\n\nCT-logs-as-corpus and the remaining mutation sweeps are expected to yield more than any new conformance suite, because the specified behaviour is already well covered and the unexplored territory is real-world weirdness and untested-rule detection.\n\n## Before acting on any item\n\nCheck current availability, licensing and format. Nothing above except the four marked verified has been confirmed from this machine.",
+  "status": "open",
+  "priority": 3,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T08:01:07.412451812Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T08:01:07.412451812Z"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-9bzr",
+  "title": "Finish the mutation sweep across the remaining crates",
+  "description": "## Why\n\npkix-path's sweep: 552 mutants, 100 missed, 393 caught, 53 unviable, 6 timeouts. The survivors found real defects, not just missing tests -- including a §4.2.1.10 rule enforced on intermediates and on neither trust-anchor constructor.\n\nOn that hit rate this is the cheapest remaining source of findings in the workspace.\n\n## Status\n\nRUNNING as of 2026-11-27. pkix-revocation (276 mutants), pkix-chain (205), pkix-identity (164). Output under the session scratchpad, mutants-\u003ccrate\u003e/.\n\n## Method, which matters for reading the results\n\n* WITHOUT -D warnings. A mutant that trips an unused-binding warning is reported unviable rather than as a survivor, which hides real gaps -- the automated form of a false negative that bit this session four times by hand.\n* --timeout-multiplier 4, so a slow-but-correct test is not mistaken for a hang.\n* Triage by 'is this a bug', not by category. A survivor in a public helper unused inside its own crate (cert_is_ca, tbs_certificate_der) is invisible to a crate-scoped sweep by construction -- consumers may cover it, and that needs checking per case rather than assuming either way.\n\n## Still unswept after these three\n\npkix-ct, pkix-lint, pkix-ac, pkix-dane, pkix-mta-sts, pkix-revocation-http, pkix-truststore and the rest.",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T08:00:31.302940196Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T08:00:31.302940196Z"
+}

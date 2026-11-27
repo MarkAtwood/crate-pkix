@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-mg8u",
+  "title": "Property-based differential testing: generate chains, compare oracles",
+  "description": "## Why\n\nUnbounded supply of inputs, and it finds shapes no human corpus author thought of. Complements the fixed corpora rather than replacing them: PKITS and x509-limbo are finite and now largely agreed-on, so their marginal yield is near zero, while a generator keeps producing novel topologies.\n\n## What\n\nGenerate certificate chains with a shrinking generator (proptest or quickcheck) over the dimensions that actually change verdicts:\n\n* chain length, self-issued certificates interleaved, cross-signed alternatives\n* name constraints: form, permitted vs excluded, nesting depth, empty subtree sets\n* basicConstraints pathLenConstraint vs real depth\n* validity windows straddling the evaluation time, inclusive bounds\n* policy OIDs, mappings, inhibit/require counters\n* extension criticality and duplication\n\nThen compare pkix-path against openssl and pyca through the existing pkix-difftest oracle interface, and shrink any disagreement to a minimal chain.\n\n## Why this is worth more than it sounds\n\nEvery generated chain needs a valid signature, so the generator has to sign as it builds -- which means it doubles as a fixture factory. Several tests this session needed a fixture no generator could produce (an OID-valued commonName, a duplicated extension, a non-conformant GeneralSubtree) and each was hand-rolled DER. A chain generator with signing would have produced all three.\n\n## Relationship to PKIX-hbzo.3\n\nThat bead says the corpus gates pin disagreement as expected and so cannot detect being wrong. A generator has the same hazard in reverse: it has no ground truth, only oracle agreement. Majority vote is not truth -- all three oracles can be wrong together, and on the BetterTLS nameConstraints family two of them are. Record disagreements for classification; do not auto-accept agreement as correctness.",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T08:01:06.309596152Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T08:01:06.309596152Z"
+}

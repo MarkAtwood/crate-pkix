@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-ehqn",
+  "title": "CT logs as an unlabelled corpus for crash and divergence hunting",
+  "description": "## Why\n\nMillions of real-world certificates. Not labelled, so not ground truth, and not a conformance suite -- but the largest untapped source of shapes no corpus author invented. The method is to run three oracles over a sample and investigate every disagreement, which is the pkix-difftest design already.\n\nPKITS and x509-limbo already cover specified behaviour well (limbo has zero pkix-path false-reject bugs left once p384 is on). The unexplored territory is real-world weirdness, and this is where it lives.\n\n## Availability -- VERIFIED 2026-11-27\n\n* No canonical public corpus to download. You crawl.\n* RFC 6962 get-entries is the classic route; logs cap the batch size (one researcher measured 32 entries per request regardless of what was asked).\n* Modern logs are static/tiled -- clients fetch tiles rather than calling get-entries. Filippo Valsorda has an archiver that packs a static log into zips of 2^24-entry subtrees; a 2018 DigiCert archive is ~61 GiB for ~90.8M entries.\n* Scale: Google-tracked logs went from ~3B to \u003e7.5B entries over 2019. Sampling is mandatory, not optional.\n* Let's Encrypt has retired its RFC 6962 logs, so check which logs still serve get-entries before planning a crawl.\n\n## What\n\n1. A sampled fetcher (tiles where available) writing DER to a corpus directory. Out of tree -- this is harness input, not a repo fixture.\n2. Run the existing three-oracle harness over it; bucket by verdict class as the limbo baseline does.\n3. Triage: a panic or a hang is a bug outright; a verdict disagreement needs the same hand-classification the limbo baseline got.\n\n## Note\n\nExpect the dominant finding to be parse-level: real CAs emit encodings no test suite contains. That is the point.",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T08:00:30.723720868Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T08:00:30.723720868Z"
+}
