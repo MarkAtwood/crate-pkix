@@ -658,6 +658,20 @@ mod tests {
     /// Order is the part worth asserting: a helper that collected into a set
     /// or reversed the sequence would round-trip a one-element vector
     /// perfectly.
+    /// The second OID's hand-written DER is the oracle for its base64, so
+    /// the two constants check each other rather than both coming from the
+    /// helper under test.
+    #[test]
+    fn the_second_oids_der_and_base64_agree() {
+        let oid: ObjectIdentifier = SHA256_OID.parse().expect("hand-written OID parses");
+        assert_eq!(
+            oid.to_der().expect("an OID encodes").as_slice(),
+            SHA256_DER,
+            "the arc-by-arc encoding in the fixture table"
+        );
+        assert_eq!(Base64::encode_string(SHA256_DER), SHA256_BASE64);
+    }
+
     #[test]
     fn vec_wire_form_is_an_ordered_array_of_base64() {
         let w = VecWrapper {

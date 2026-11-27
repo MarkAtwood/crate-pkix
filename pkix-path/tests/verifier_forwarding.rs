@@ -31,7 +31,21 @@ use x509_cert::Certificate;
 /// The count is what distinguishes "the forwarding impl refused" from "the
 /// forwarding impl never called anything": a delegation replaced by
 /// `Err(..)` would also refuse, and would be just as wrong.
-struct RefusesEverything(std::cell::Cell<usize>);
+///
+/// The counter is atomic rather than a `Cell` so the type is `Sync`: an
+/// `Arc` around something that is not `Send + Sync` is pointless, and
+/// clippy says so.
+struct RefusesEverything(std::sync::atomic::AtomicUsize);
+
+impl RefusesEverything {
+    fn new() -> Self {
+        Self(std::sync::atomic::AtomicUsize::new(0))
+    }
+
+    fn calls(&self) -> usize {
+        self.0.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
 
 impl SignatureVerifier for RefusesEverything {
     fn verify_signature(
@@ -41,7 +55,7 @@ impl SignatureVerifier for RefusesEverything {
         _message: &[u8],
         _signature: &[u8],
     ) -> Result<(), VerificationError> {
-        self.0.set(self.0.get() + 1);
+        self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Err(VerificationError::invalid_signature())
     }
 }
@@ -82,14 +96,14 @@ fn an_arc_forwards_to_the_verifier() {
 /// A refusing verifier behind a reference still refuses, and was asked.
 #[test]
 fn a_reference_does_not_answer_for_the_verifier() {
-    let inner = RefusesEverything(std::cell::Cell::new(0));
+    let inner = RefusesEverything::new();
     let by_ref: &RefusesEverything = &inner;
     assert!(
         validate_with(&by_ref).is_err(),
         "the forwarding impl must not vouch for a signature itself"
     );
     assert!(
-        inner.0.get() > 0,
+        inner.calls() > 0,
         "and it must have asked: a delegation replaced by an error would \
          refuse without ever consulting the verifier"
     );
@@ -98,10 +112,10 @@ fn a_reference_does_not_answer_for_the_verifier() {
 /// A refusing verifier behind an `Arc` still refuses, and was asked.
 #[test]
 fn an_arc_does_not_answer_for_the_verifier() {
-    let shared = std::sync::Arc::new(RefusesEverything(std::cell::Cell::new(0)));
+    let shared = std::sync::Arc::new(RefusesEverything::new());
     assert!(
         validate_with(&shared).is_err(),
         "the forwarding impl must not vouch for a signature itself"
     );
-    assert!(shared.0.get() > 0, "and it must have asked");
+    assert!(shared.calls() > 0, "and it must have asked");
 }
