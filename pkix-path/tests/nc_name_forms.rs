@@ -118,3 +118,63 @@ fn an_undecodable_email_attribute_passes_with_no_mailbox_constraint() {
          is not under examination",
     );
 }
+
+/// A `registeredID` the matchers cannot evaluate is refused under an
+/// *excluded* subtree of that form.
+///
+/// Under a permitted subtree an unevaluable form is refused twice over:
+/// step (0) refuses it, and had step (0) not run, the generic permitted
+/// check refuses it anyway -- a name the matchers cannot decide matches no
+/// subtree, and a constrained type matching nothing is a violation. So
+/// `a_registered_id_is_refused_under_a_registered_id_constraint` above
+/// cannot tell whether step (0) ran at all.
+///
+/// An excluded subtree inverts that. The generic excluded check asks
+/// whether the name *matches* a subtree; a name it cannot decide matches
+/// none, so it raises no violation and the certificate passes. Step (0) is
+/// the only thing standing between a CA that said "never this
+/// registeredID" and a certificate carrying exactly that registeredID --
+/// RFC 5280 §4.2.1.10's requirement to reject rather than to shrug.
+#[test]
+fn a_registered_id_is_refused_under_an_excluded_registered_id_subtree() {
+    let err = run("leaf-regid-under-excl-regid.der", "ca-excl-regid.der")
+        .expect_err("an excluded registeredID subtree is in effect and cannot be evaluated");
+    assert!(
+        matches!(err, Error::NameConstraintViolation { .. }),
+        "expected a name-constraint violation, got {err:?}"
+    );
+}
+
+/// A `SmtpUTF8Mailbox` whose domain is not ASCII cannot be compared with an
+/// rfc822Name subtree, so it fails closed.
+///
+/// RFC 8398 §6 routes these through the rfc822Name constraints, and the
+/// comparison is over ASCII domains: a U-label domain is not the A-label
+/// one a constraint carries, and treating the two as comparable would be
+/// guessing. The excluded direction is what makes the guard load-bearing
+/// --- a mailbox that cannot be compared matches no excluded subtree, so
+/// dropping the ASCII requirement admits it.
+///
+/// Neither mailbox here is under the excluded `example.com`, so neither
+/// matches the exclusion. That is the point: the pair differs only in
+/// whether its domain is ASCII. A non-ASCII domain that *was* a subdomain
+/// of the excluded one would be refused by the comparison regardless, and
+/// would prove nothing about the guard.
+#[test]
+fn a_non_ascii_mailbox_domain_cannot_be_compared_and_is_refused() {
+    run(
+        "leaf-utf8mb-ascii-under-excl-rfc822.der",
+        "ca-excl-rfc822.der",
+    )
+    .expect("an ASCII mailbox outside the excluded subtree is comparable and permitted");
+
+    let err = run(
+        "leaf-utf8mb-nonascii-under-excl-rfc822.der",
+        "ca-excl-rfc822.der",
+    )
+    .expect_err("a U-label domain cannot be compared with an rfc822Name subtree");
+    assert!(
+        matches!(err, Error::NameConstraintViolation { .. }),
+        "expected a name-constraint violation, got {err:?}"
+    );
+}

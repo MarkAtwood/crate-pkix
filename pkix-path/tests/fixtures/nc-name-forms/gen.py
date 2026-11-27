@@ -62,6 +62,15 @@ NOT_AFTER = datetime.datetime(2050, 1, 1, tzinfo=datetime.timezone.utc)
 
 REG_ID = ObjectIdentifier("1.2.3.4")
 OTHER_ID = ObjectIdentifier("1.2.3.5")
+# id-on-SmtpUTF8Mailbox (RFC 8398 §3).
+SMTP_UTF8_MAILBOX = ObjectIdentifier("1.3.6.1.5.5.7.8.9")
+
+
+def utf8_string(text):
+    """DER UTF8String, the encoding RFC 8398 §3 requires for the value."""
+    body = text.encode("utf-8")
+    assert len(body) < 0x80, "short form only; these fixtures are small"
+    return bytes([0x0C, len(body)]) + body
 # DER INTEGER 7 -- deliberately not a UTF8String, so a mailbox reading of
 # this otherName fails rather than matching.
 OTHER_VALUE = bytes([0x02, 0x01, 0x07])
@@ -106,7 +115,7 @@ def main():
     )
     write("root.der", root)
 
-    def ca(cn, serial, permitted):
+    def ca(cn, serial, permitted, excluded=None):
         key = ec.generate_private_key(ec.SECP256R1())
         cert = (
             x509.CertificateBuilder()
@@ -122,7 +131,7 @@ def main():
             .add_extension(CA_KEY_USAGE, critical=True)
             .add_extension(
                 x509.NameConstraints(
-                    permitted_subtrees=permitted, excluded_subtrees=None
+                    permitted_subtrees=permitted, excluded_subtrees=excluded
                 ),
                 critical=True,
             )
@@ -207,6 +216,68 @@ def main():
             ),
         ),
     )
+
+
+    # ------------------------------------------------------------------
+    # Excluded subtrees: where failing to evaluate means failing to
+    # EXCLUDE.
+    #
+    # Under a permitted subtree an unevaluable form is refused twice
+    # over: step (0) refuses it, and if step (0) did not, the generic
+    # permitted check refuses it too, because a name the matchers cannot
+    # decide matches no subtree and a constrained type that matches
+    # nothing is a violation. So `leaf-regid-under-regid` above cannot
+    # tell whether step (0) ran.
+    #
+    # An excluded subtree inverts that. The generic excluded check asks
+    # whether the name matches a subtree, and a name the matchers cannot
+    # decide matches none -- so it raises no violation and the
+    # certificate passes. Only step (0) stands between a CA that said
+    # "never this registeredID" and a certificate carrying exactly it.
+    # ------------------------------------------------------------------
+    excl_regid_key, ca_excl_regid = ca(
+        "NC Forms CA Excl RegId", 0x1009, None, [x509.RegisteredID(REG_ID)]
+    )
+    write("ca-excl-regid.der", ca_excl_regid)
+    write(
+        "leaf-regid-under-excl-regid.der",
+        leaf(
+            "NC Forms Leaf E",
+            0x100A,
+            ca_excl_regid,
+            excl_regid_key,
+            [x509.RegisteredID(REG_ID)],
+        ),
+    )
+
+    # The same inversion for the RFC 8398 mailbox path. A
+    # SmtpUTF8Mailbox otherName is routed to the rfc822Name subtrees, and
+    # its domain part must be ASCII to be compared with one; a U-label
+    # domain cannot be, so the check fails closed.
+    #
+    # Neither mailbox below is under `example.com`, so neither matches
+    # the exclusion. That is deliberate: the pair differs only in
+    # whether the domain is ASCII, which is the one thing under test.
+    # Were the domain a subdomain of the excluded one, the comparison
+    # would refuse it anyway and the fixture would prove nothing.
+    excl_rfc822_key, ca_excl_rfc822 = ca(
+        "NC Forms CA Excl Rfc822", 0x100B, None, [x509.RFC822Name("example.com")]
+    )
+    write("ca-excl-rfc822.der", ca_excl_rfc822)
+    for fname, serial, mailbox in (
+        ("leaf-utf8mb-ascii-under-excl-rfc822.der", 0x100C, "leaf-f@other.example"),
+        ("leaf-utf8mb-nonascii-under-excl-rfc822.der", 0x100D, "leaf-g@\u00f6ther.example"),
+    ):
+        write(
+            fname,
+            leaf(
+                f"NC Forms Leaf {chr(0x46 + serial - 0x100C)}",
+                serial,
+                ca_excl_rfc822,
+                excl_rfc822_key,
+                [x509.OtherName(SMTP_UTF8_MAILBOX, utf8_string(mailbox))],
+            ),
+        )
 
 
 if __name__ == "__main__":
