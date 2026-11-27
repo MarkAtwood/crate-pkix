@@ -97,6 +97,10 @@ required-features = ["crl"]
 name = "serde_round_trip"
 required-features = ["serde"]
 
+[[test]]
+name = "freshness_window_boundaries"
+required-features = ["crl", "ocsp"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
