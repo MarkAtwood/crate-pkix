@@ -1614,3 +1614,29 @@ fn a_base_certificate_id_issuer_uid_must_match_the_holders() {
         "and an AC omitting it still matches a certificate that has one"
     );
 }
+
+/// §6: an AC may carry a revocation pointer *instead of* `noRevAvail`.
+///
+/// "An AC MUST NOT contain both a noRevAvail extension and a 'pointer in
+/// AC'." The two are alternatives -- one says no revocation information
+/// exists, the other says where to find it -- so an AC with only a
+/// pointer has chosen, and conforms.
+///
+/// Every other fixture pairs a pointer *with* `noRevAvail`, which left
+/// the scan for that extension indistinguishable from its own negation:
+/// for an AC holding both, "some extension is noRevAvail" and "some
+/// extension is not noRevAvail" are both true, so §6 fires either way
+/// and reports the same violation. This certificate is the one that
+/// changes -- negated, it is refused for holding both schemes when it
+/// holds one, and a conforming AC pointing at an OCSP responder stops
+/// validating.
+#[test]
+fn an_ocsp_pointer_without_no_rev_avail_conforms() {
+    let ac = ac("ac-ocsp-pointer-only.der");
+    assert!(
+        !ac.no_revocation_available(),
+        "precondition: this fixture carries no noRevAvail"
+    );
+    ac.check_profile()
+        .expect("§6 forbids both schemes at once, not the pointer on its own");
+}

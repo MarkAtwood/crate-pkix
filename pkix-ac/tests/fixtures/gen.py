@@ -509,6 +509,20 @@ def main() -> None:
     (HERE / "ac-norevavail-with-ocsp.der").write_bytes(
         attribute_certificate(info))
 
+    # An OCSP pointer and NO noRevAvail: §6's two schemes are
+    # alternatives and this AC has chosen the pointer, so it conforms.
+    #
+    # Every other fixture here pairs a pointer WITH noRevAvail, which
+    # leaves the noRevAvail scan unable to be told from its own negation:
+    # for an AC holding both extensions, "some extension is noRevAvail"
+    # and "some extension is not noRevAvail" are both true, so the §6
+    # test fires either way and reports the same violation. Negated, this
+    # certificate is the one that changes -- refused for holding both
+    # when it holds one.
+    info = with_exts(0x96, aia("1.3.6.1.5.5.7.48.1", "http://ocsp.example/"))
+    (HERE / "ac-ocsp-pointer-only.der").write_bytes(
+        attribute_certificate(info))
+
     # A targetCert as the ONLY target, which §4.3.2 forbids -- and whose
     # certDigestInfo carries otherObjectTypes(2), the value §4.1 forbids.
     # This was the route by which a profile-checked AC could still hold
