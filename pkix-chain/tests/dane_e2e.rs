@@ -388,3 +388,55 @@ fn a_misaligned_chain_der_is_rejected() {
         "a misaligned chain_der should be reported, got {result:?}"
     );
 }
+
+/// The `Pkix` variant's accessors, which nothing above reaches.
+///
+/// Every chain in this file fails PKIX deliberately -- that is what makes the
+/// DANE-EE cases meaningful -- so the only authorization any test here
+/// obtains is `DaneEndEntity`, whose `path()` is `None` and whose
+/// `used_dane()` is `true`. Both accessors could have been those constants
+/// and every assertion in the file would still have held, while a caller
+/// asking "did DANE decide this?" or "which path validated?" got the wrong
+/// answer for the common case.
+///
+/// So this one uses the crate's own chain fixtures, which do satisfy a name
+/// check, with DANE switched off at the call site.
+#[test]
+fn a_pkix_only_authorization_reports_its_path_and_no_dane() {
+    const FLAT_ROOT_DER: &[u8] = include_bytes!("fixtures/root.der");
+    const FLAT_LEAF_DER: &[u8] = include_bytes!("fixtures/leaf-san-www-example.der");
+
+    let chain = [load(FLAT_LEAF_DER)];
+    let anchors = [TrustAnchor::from_cert(load(FLAT_ROOT_DER))];
+    let dane = DaneConfig::disabled().with_policy(DaneFailurePolicy::Opportunistic);
+
+    let authorization = verify_tls_server_dane(
+        &chain,
+        &anchors,
+        &ServerName::dns_name("www.example.com").expect("valid dns name"),
+        &BasicTlsProfile,
+        PKITS_NOW,
+        &DefaultVerifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+        &dane,
+    )
+    .expect("the chain validates and no DANE applied");
+
+    assert!(
+        matches!(authorization, TlsAuthorization::Pkix(_)),
+        "expected Pkix, got {authorization:?}"
+    );
+    assert!(
+        authorization.path().is_some(),
+        "PKIX validated a path, so there is one to report"
+    );
+    assert!(
+        !authorization.used_dane(),
+        "DANE was disabled; it took no part in this decision"
+    );
+    assert!(
+        authorization.record().is_none(),
+        "no TLSA record applied, so there is none to report"
+    );
+}

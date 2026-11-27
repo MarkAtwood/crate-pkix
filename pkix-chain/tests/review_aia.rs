@@ -789,3 +789,43 @@ fn review_aia_runs_despite_a_same_named_anchor_with_the_wrong_key() {
         f.fetched()
     );
 }
+
+/// The total-fetch budget has to deplete across rounds, not only within
+/// one.
+///
+/// `review_aia_total_fetch_cap` above spends the whole budget in a single
+/// round: 64 URIs on one certificate hit the limit while they are being
+/// collected, before the counter is ever decremented. So it says nothing
+/// about the decrement, and an arithmetic error there -- a budget that grows
+/// instead of shrinking, or stays put -- left AIA fetching bounded only by
+/// `max_depth`.
+///
+/// The deep chain is the shape that shows it: each round resolves exactly
+/// one hop, so a budget of three against five hops must stop after three
+/// fetches. A budget that does not deplete reaches the anchor and returns
+/// `Ok`.
+#[test]
+fn review_aia_total_fetch_budget_depletes_across_rounds() {
+    let anchors = [TrustAnchor::from_cert(load("deep-root.der"))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+    let f = deep_fetcher();
+    let mut cfg = AiaConfig::new();
+    cfg.max_total_fetches = 3;
+
+    let r = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy, &f)
+        .with_aia_config(cfg)
+        .verify_one(&[load("deep-leaf.der")]);
+
+    assert!(
+        r.is_err(),
+        "five hops on a budget of three must not complete; got {r:?} after \
+         fetching {:?}",
+        f.fetched()
+    );
+    assert_eq!(
+        f.count(),
+        3,
+        "the budget bounds the fetches, one per round: {:?}",
+        f.fetched()
+    );
+}

@@ -145,4 +145,21 @@ mod tests {
         assert!(!is_http_scheme("http:/x")); // single slash
         assert!(!is_http_scheme("notascheme"));
     }
+
+    /// The scheme on its own names no resource, so the length test is
+    /// strictly greater and the bare prefix is refused.
+    ///
+    /// The cases above all differ from the prefix in more than length --
+    /// a wrong scheme, a missing slash, an empty string -- so none of them
+    /// distinguishes `>` from `>=`, and a fetcher would have been handed a
+    /// URI with nothing after the authority delimiter.
+    #[test]
+    fn http_scheme_rejects_the_bare_prefix() {
+        assert!(!is_http_scheme("http://"));
+        assert!(!is_http_scheme("https://"));
+        assert!(!is_http_scheme("HTTPS://"));
+        // One character further on is a URI, so this is the boundary and
+        // not a blanket refusal of short inputs.
+        assert!(is_http_scheme("http://x"));
+    }
 }

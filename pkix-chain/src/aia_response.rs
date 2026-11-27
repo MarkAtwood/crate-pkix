@@ -142,6 +142,51 @@ fn expect_context_tag(tag: Tag, number: u32) -> der::Result<()> {
 mod tests {
     use super::*;
 
+    fn ctx(number: u32, constructed: bool) -> Tag {
+        Tag::ContextSpecific {
+            constructed,
+            number: TagNumber(number),
+        }
+    }
+
+    /// All three parts of the tag have to agree.
+    ///
+    /// The CMS tests below feed well-formed input, so the predicate was only
+    /// ever asked questions it answered yes to: it could have returned `true`
+    /// unconditionally and the `certificates` branch would have been taken
+    /// for a `[1] crls` or a `signerInfos` field, handing arbitrary SET
+    /// content to the certificate decoder.
+    #[test]
+    fn a_context_tag_matches_only_on_class_number_and_construction() {
+        assert!(is_context_tag(ctx(0, true), 0));
+        assert!(is_context_tag(ctx(1, true), 1));
+
+        assert!(!is_context_tag(ctx(1, true), 0), "wrong number");
+        assert!(!is_context_tag(ctx(0, true), 1), "wrong number");
+        assert!(
+            !is_context_tag(ctx(0, false), 0),
+            "primitive, not constructed"
+        );
+        assert!(!is_context_tag(Tag::Sequence, 0), "universal class");
+        assert!(!is_context_tag(Tag::OctetString, 0), "universal class");
+    }
+
+    /// And the fallible wrapper refuses what the predicate rejects, rather
+    /// than passing everything through.
+    #[test]
+    fn expect_context_tag_refuses_a_tag_it_did_not_want() {
+        expect_context_tag(ctx(0, true), 0).expect("the matching tag is accepted");
+        assert!(expect_context_tag(ctx(1, true), 0).is_err(), "wrong number");
+        assert!(
+            expect_context_tag(ctx(0, false), 0).is_err(),
+            "primitive, not constructed"
+        );
+        assert!(
+            expect_context_tag(Tag::Sequence, 0).is_err(),
+            "universal class"
+        );
+    }
+
     const INT_DER: &[u8] = include_bytes!("../tests/fixtures/review/int.der");
     const INT_P7C: &[u8] = include_bytes!("../tests/fixtures/review/int.p7c");
 

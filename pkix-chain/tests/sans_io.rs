@@ -170,14 +170,32 @@ async fn an_async_caller_drives_the_same_reassembly() {
     // checks concurrently, which the synchronous per-certificate seam cannot.
     let targets = pkix_chain::sans_io::revocation_targets(&built, &anchors, &validated);
     assert_eq!(targets.len(), built.len(), "one target per certificate");
-    assert!(
-        matches!(targets[0], RevocationTarget::Issuer { .. }),
-        "the leaf is checked against its issuer"
-    );
-    assert!(
-        matches!(targets[1], RevocationTarget::Anchor { .. }),
-        "the top certificate is checked against the trust anchor"
-    );
+    // Which issuer, not merely that there is one: the variant alone would
+    // still be `Issuer` if a certificate were paired with itself, and a
+    // caller handed that pair asks a CA whether it has revoked itself.
+    match targets[0] {
+        RevocationTarget::Issuer { cert, issuer } => {
+            assert_eq!(cert, &built[0], "the leaf is the certificate in question");
+            assert_eq!(
+                issuer, &built[1],
+                "and its issuer is the next certificate up the chain"
+            );
+        }
+        other => panic!("the leaf must be checked against its issuer, got {other:?}"),
+    }
+    match targets[1] {
+        RevocationTarget::Anchor { cert, anchor } => {
+            assert_eq!(
+                cert, &built[1],
+                "the top certificate is the one in question"
+            );
+            assert_eq!(
+                anchor.subject, anchors[validated.anchor_index].subject,
+                "against the anchor the path validated against"
+            );
+        }
+        other => panic!("the top certificate must be checked against the anchor, got {other:?}"),
+    }
 }
 
 /// The bounds are enforced on this path, not merely on the convenience
