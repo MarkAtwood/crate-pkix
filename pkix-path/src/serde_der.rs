@@ -364,6 +364,17 @@ mod tests {
     // requires on decode.
     const ECDSA_WITH_SHA256_BASE64: &str = "BggqhkjOPQQDAg==";
 
+    // A second OID, so the sequence helpers can be tested with more than
+    // one element and with the elements in a known order.
+    // 2.16.840.1.101.3.4.2.1 is id-sha256. First two arcs 2 and 16 pack as
+    // 2*40+16 = 0x60; then 840 as 0x86 0x48, then 1, 101, 3, 4, 2, 1 as
+    // single bytes. Nine body bytes under tag 0x06.
+    const SHA256_OID: &str = "2.16.840.1.101.3.4.2.1";
+    const SHA256_DER: &[u8] = &[
+        0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01,
+    ];
+    const SHA256_BASE64: &str = "BglghkgBZQMEAgE=";
+
     /// Serialize a known OID to JSON; assert the emitted JSON matches a
     /// hand-computed base64 string. JSON is the human-readable oracle.
     #[test]
@@ -575,5 +586,152 @@ mod tests {
         };
         super::serialize(&oid, &mut cap).unwrap();
         assert_eq!(cap.captured, ECDSA_WITH_SHA256_DER);
+    }
+
+    // -----------------------------------------------------------------
+    // option, vec and option_vec
+    //
+    // The four tests above drive the single-value helpers only. The three
+    // submodules -- six more functions -- had nothing: their serializers
+    // could have emitted the wrong shape and their deserializers could
+    // have returned an empty collection, and no test would have noticed.
+    //
+    // JSON throughout, because that is the only serde format in this
+    // crate's dev-dependencies. The binary branch of each helper is
+    // exercised for the single-value form by
+    // `binary_serializer_emits_raw_der_bytes_not_base64`; doing the same
+    // for the sequence forms needs a hand-rolled Deserializer, which is
+    // noted here rather than left as an apparent oversight.
+    // -----------------------------------------------------------------
+
+    fn oid1() -> ObjectIdentifier {
+        ECDSA_WITH_SHA256_OID
+            .parse()
+            .expect("hand-written OID parses")
+    }
+
+    fn oid2() -> ObjectIdentifier {
+        SHA256_OID.parse().expect("hand-written OID parses")
+    }
+
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct OptWrapper {
+        #[serde(with = "super::option")]
+        oid: Option<ObjectIdentifier>,
+    }
+
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct VecWrapper {
+        #[serde(with = "super::vec")]
+        oids: Vec<ObjectIdentifier>,
+    }
+
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct OptVecWrapper {
+        #[serde(with = "super::option_vec")]
+        oids: Option<Vec<ObjectIdentifier>>,
+    }
+
+    /// `Some` carries the same base64 the single-value helper emits, and
+    /// `None` is JSON null rather than an empty string or a missing field.
+    #[test]
+    fn option_wire_form_is_base64_or_null() {
+        let some = serde_json::to_string(&OptWrapper { oid: Some(oid1()) }).expect("serialize");
+        assert_eq!(some, format!(r#"{{"oid":"{ECDSA_WITH_SHA256_BASE64}"}}"#));
+
+        let none = serde_json::to_string(&OptWrapper { oid: None }).expect("serialize");
+        assert_eq!(none, r#"{"oid":null}"#);
+    }
+
+    #[test]
+    fn option_round_trips_both_ways() {
+        for value in [Some(oid1()), None] {
+            let w = OptWrapper { oid: value };
+            let json = serde_json::to_string(&w).expect("serialize");
+            let back: OptWrapper = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(w, back, "round trip changed {json}");
+        }
+    }
+
+    /// A sequence is a JSON array of base64 strings, in order.
+    ///
+    /// Order is the part worth asserting: a helper that collected into a set
+    /// or reversed the sequence would round-trip a one-element vector
+    /// perfectly.
+    #[test]
+    fn vec_wire_form_is_an_ordered_array_of_base64() {
+        let w = VecWrapper {
+            oids: vec![oid1(), oid2()],
+        };
+        let json = serde_json::to_string(&w).expect("serialize");
+        assert_eq!(
+            json,
+            format!(r#"{{"oids":["{ECDSA_WITH_SHA256_BASE64}","{SHA256_BASE64}"]}}"#)
+        );
+
+        let back: VecWrapper = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(w, back);
+        assert_eq!(
+            back.oids.first().expect("two elements"),
+            &oid1(),
+            "the first element must still be first"
+        );
+    }
+
+    /// An empty sequence is an empty array, not null and not absent.
+    ///
+    /// This is the case a deserializer returning `Vec::new()` for
+    /// everything would also satisfy, so it is asserted alongside the
+    /// populated one rather than instead of it.
+    #[test]
+    fn an_empty_vec_round_trips_as_an_empty_array() {
+        let w = VecWrapper { oids: Vec::new() };
+        let json = serde_json::to_string(&w).expect("serialize");
+        assert_eq!(json, r#"{"oids":[]}"#);
+        let back: VecWrapper = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(w, back);
+    }
+
+    /// `option_vec` keeps all three states apart: absent, present-and-empty,
+    /// present-and-populated.
+    ///
+    /// Collapsing `Some(vec![])` into `None` is the plausible mistake, and
+    /// for a field like `policy_qualifiers` the two mean different things --
+    /// no qualifiers were supplied, against a qualifier list that was
+    /// supplied empty.
+    #[test]
+    fn option_vec_keeps_absent_and_empty_apart() {
+        let cases = [
+            (None, r#"{"oids":null}"#),
+            (Some(Vec::new()), r#"{"oids":[]}"#),
+            (Some(vec![oid2()]), r#"{"oids":["BglghkgBZQMEAgE="]}"#),
+        ];
+        for (value, expected) in cases {
+            let w = OptVecWrapper { oids: value };
+            let json = serde_json::to_string(&w).expect("serialize");
+            assert_eq!(json, expected);
+            let back: OptVecWrapper = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(w, back, "round trip changed {json}");
+        }
+    }
+
+    /// Malformed base64 and valid base64 that is not valid DER are both
+    /// errors, in every helper.
+    ///
+    /// Each deserializer decodes then parses, and a helper that swallowed
+    /// either failure would hand back a default value -- which for
+    /// `Option` is `None` and for `Vec` is empty, both of which read as
+    /// "nothing was there" rather than "the input was wrong".
+    #[test]
+    fn every_helper_refuses_garbage() {
+        assert!(serde_json::from_str::<OptWrapper>(r#"{"oid":"not base64!"}"#).is_err());
+        assert!(serde_json::from_str::<VecWrapper>(r#"{"oids":["not base64!"]}"#).is_err());
+        assert!(serde_json::from_str::<OptVecWrapper>(r#"{"oids":["not base64!"]}"#).is_err());
+
+        // "AAAA" is valid base64 for three zero bytes, which is not a DER
+        // OBJECT IDENTIFIER.
+        assert!(serde_json::from_str::<OptWrapper>(r#"{"oid":"AAAA"}"#).is_err());
+        assert!(serde_json::from_str::<VecWrapper>(r#"{"oids":["AAAA"]}"#).is_err());
+        assert!(serde_json::from_str::<OptVecWrapper>(r#"{"oids":["AAAA"]}"#).is_err());
     }
 }
