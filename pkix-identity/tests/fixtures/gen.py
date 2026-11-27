@@ -48,7 +48,7 @@ NOT_BEFORE = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
 NOT_AFTER = datetime.datetime(2050, 1, 1, tzinfo=datetime.timezone.utc)
 
 
-def build_leaf(sans, *, common_name="leaf", omit_san=False):
+def build_leaf(sans, *, common_name="leaf", omit_san=False, dn_email=None):
     """Build a self-signed leaf.
 
     `common_name=None` produces a subject with no commonName attribute at
@@ -58,9 +58,14 @@ def build_leaf(sans, *, common_name="leaf", omit_san=False):
     """
     key = ec.generate_private_key(ec.SECP256R1())
     if common_name is None:
-        subject = x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Test Org")])
+        attrs = [x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Test Org")]
     else:
-        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
+        attrs = [x509.NameAttribute(NameOID.COMMON_NAME, common_name)]
+    # `dn_email` puts a legacy PKCS#9 emailAddress in the subject DN. Used
+    # only to prove it is NOT consulted: see the note on the fixture below.
+    if dn_email is not None:
+        attrs.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, dn_email))
+    subject = x509.Name(attrs)
     builder = (
         x509.CertificateBuilder()
         .subject_name(subject)
@@ -139,6 +144,19 @@ fixtures = {
     ),
     # Neither a SAN nor a CN: no presented identity at all.
     "no-san-no-cn.der": build_leaf([], omit_san=True, common_name=None),
+    # A legacy PKCS#9 emailAddress in the subject DN, and no SAN at all.
+    #
+    # Exists to pin a negative: `verify_mailbox` must NOT fall back to the
+    # DN. RFC 5280 §4.2.1.10 applies rfc822Name name constraints "only to
+    # the corresponding name type in subjectAltName", so a DN-email
+    # fallback would be unconstrainable the same way the CN fallback is for
+    # dNSName -- which is the bug PKIX-skxt fixed in the SMTP DANE path.
+    # This crate already has a CN fallback for DNS names, so the precedent
+    # for adding the mail equivalent is right here; this fixture is what
+    # would catch it.
+    "dn-email-no-san.der": build_leaf(
+        [], omit_san=True, common_name="Alice", dn_email="alice@example.com"
+    ),
 
     # ----- Mailbox SAN fixtures (PKIX-fmtv.12.1) -----
     # Plain rfc822Name.

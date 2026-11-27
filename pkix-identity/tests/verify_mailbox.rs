@@ -197,6 +197,34 @@ fn missing_san_returns_missing_san() {
     );
 }
 
+/// A legacy `emailAddress` in the subject DN is not an identity.
+///
+/// `verify_mailbox` reads the SAN and nothing else, and this pins that as
+/// a decision rather than an accident. The fixture's DN carries exactly
+/// the mailbox being asked about, so a DN fallback would return `Ok`
+/// here — `missing_san_returns_missing_san` above cannot tell the
+/// difference, because its fixture has no DN email to fall back to.
+///
+/// Why it is worth pinning: RFC 5280 §4.2.1.10 applies `rfc822Name` name
+/// constraints "only to the corresponding name type in subjectAltName",
+/// so a DN-email fallback would be unenforceable against those
+/// constraints in exactly the way the `commonName` fallback is against
+/// `dNSName` constraints — which is the composition bug PKIX-skxt fixed
+/// in the SMTP DANE path. This crate already offers that CN fallback for
+/// DNS names ([`verify_dns_name_with_cn_fallback`]), so the precedent for
+/// adding a mail equivalent is in this very file's crate. If someone
+/// does, they should have to delete this test to do it.
+#[test]
+fn a_dn_email_address_is_not_consulted() {
+    let cert = load("dn-email-no-san.der");
+    let mailbox = MailboxName::parse("alice@example.com").unwrap();
+    assert_eq!(
+        verify_mailbox(&cert, &mailbox),
+        Err(IdentityError::MissingSan),
+        "the DN carries this exact mailbox; only the SAN may supply one"
+    );
+}
+
 #[test]
 fn dns_only_san_returns_no_matching_san_for_mailbox_target() {
     // san-exact-dns has only DnsName entries; a mailbox target must
