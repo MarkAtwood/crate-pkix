@@ -82,6 +82,18 @@ name = "review_crl"
 required-features = ["crl"]
 
 [[test]]
+name = "crl_dp_selection"
+required-features = ["crl"]
+
+[[test]]
+name = "crl_reason_partitions"
+required-features = ["crl"]
+
+[[test]]
+name = "crl_signer_revocation"
+required-features = ["crl"]
+
+[[test]]
 name = "serde_round_trip"
 required-features = ["serde"]
 
