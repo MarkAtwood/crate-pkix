@@ -172,3 +172,90 @@ fn error_aia_depth_exceeded_round_trips() {
     assert_eq!(err, back);
     assert_eq!(json, r#""AiaDepthExceeded""#);
 }
+
+/// Every `ProfileViolationKind` and `OcspDelegationKind` renders as
+/// something, and no two render alike.
+///
+/// These kinds are what an error message names the broken rule by, and the
+/// serde tests above compare the kinds themselves rather than their text,
+/// so both `Display` impls could have written nothing at all. An
+/// `Error::ProfileViolation` whose reason renders empty is a log line that
+/// says a profile was violated and not which rule -- and the variants are
+/// the RFC 3161 TSA rules, which is exactly what an operator reading the
+/// line needs.
+///
+/// Distinctness matters as much as non-emptiness: a `match` arm pointing at
+/// the wrong string is the likelier mistake, and one shared string would
+/// pass a non-emptiness check.
+#[test]
+fn every_kind_renders_distinctly() {
+    const PROFILE: [ProfileViolationKind; 6] = [
+        ProfileViolationKind::TsaEkuMissing,
+        ProfileViolationKind::TsaEkuNotCritical,
+        ProfileViolationKind::TsaEkuMalformed,
+        ProfileViolationKind::TsaEkuNotSoleTimeStamping,
+        ProfileViolationKind::TsaKeyUsageMalformed,
+        ProfileViolationKind::TsaKeyUsageNotSigningOnly,
+    ];
+    const DELEGATION: [OcspDelegationKind; 4] = [
+        OcspDelegationKind::EmptyChain,
+        OcspDelegationKind::IssuerDnMismatch,
+        OcspDelegationKind::TbsReencodeFailed,
+        OcspDelegationKind::SignatureNotVerified,
+    ];
+
+    let mut seen: Vec<String> = Vec::new();
+    for kind in PROFILE {
+        let text = kind.to_string();
+        assert!(!text.is_empty(), "{kind:?} renders as nothing");
+        assert!(
+            !seen.contains(&text),
+            "{kind:?} renders as {text:?}, which another kind already uses"
+        );
+        seen.push(text);
+    }
+
+    let mut seen: Vec<String> = Vec::new();
+    for kind in DELEGATION {
+        let text = kind.to_string();
+        assert!(!text.is_empty(), "{kind:?} renders as nothing");
+        assert!(
+            !seen.contains(&text),
+            "{kind:?} renders as {text:?}, which another kind already uses"
+        );
+        seen.push(text);
+    }
+}
+
+/// `AiaConfig`'s `max_response_bytes` defaults to the documented cap when
+/// the field is absent, not to zero.
+///
+/// `serde(default)` on a `usize` would give zero, which refuses every
+/// response, so the field names a function instead. Nothing asserted what
+/// that function returns -- a deserialized config could have carried a cap
+/// of 0 or 1 byte and every AIA fetch would have failed as oversize.
+#[test]
+fn an_absent_response_cap_deserializes_to_the_documented_default() {
+    // Only this field carries a `serde(default)`, so the rest have to be
+    // present. Dropping it from a serialized default is the way to ask
+    // what its absence produces.
+    let mut value = serde_json::to_value(pkix_chain::AiaConfig::new()).expect("serialize");
+    let removed = value
+        .as_object_mut()
+        .expect("AiaConfig serializes as a map")
+        .remove("max_response_bytes");
+    assert!(removed.is_some(), "the field is named as expected");
+
+    let cfg: pkix_chain::AiaConfig =
+        serde_json::from_value(value).expect("the remaining fields are all present");
+    assert_eq!(
+        cfg.max_response_bytes,
+        pkix_chain::AIA_MAX_RESPONSE_BYTES,
+        "the fail-safe value is the documented cap"
+    );
+    assert_eq!(
+        cfg.max_response_bytes,
+        pkix_chain::AiaConfig::new().max_response_bytes,
+        "and it agrees with the constructed default"
+    );
+}
