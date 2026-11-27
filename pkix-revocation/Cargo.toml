@@ -101,6 +101,10 @@ required-features = ["serde"]
 name = "freshness_window_boundaries"
 required-features = ["crl", "ocsp"]
 
+[[test]]
+name = "indirect_crl_crlsign"
+required-features = ["crl"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
