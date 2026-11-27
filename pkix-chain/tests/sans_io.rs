@@ -379,3 +379,39 @@ fn absorb_flags_a_fetcher_that_returns_too_many_results() {
         other => panic!("expected a Fetch step, got {other:?}"),
     }
 }
+
+/// A `Verifier` renders enough to be worth printing.
+///
+/// `Verifier` holds three caller-supplied trait objects that need not be
+/// `Debug`, so the impl is hand-written and reports what it can: how many
+/// anchors, the policy, the AIA configuration. Being hand-written, it can
+/// also report nothing at all -- which is what `{:?}` on a verifier in a
+/// log line or a panic message would then show.
+///
+/// The anchor count is the field worth asserting: it is the one that
+/// distinguishes two verifiers a caller might have mixed up, and the one
+/// that cannot be recovered from anywhere else in the output.
+#[test]
+fn a_verifier_renders_its_shape() {
+    use pkix_chain::{NoAiaFetcher, NoRevocation, Verifier};
+
+    let anchors = [
+        TrustAnchor::from_cert(load(TRUST_ANCHOR_DER)),
+        TrustAnchor::from_cert(load(GOOD_CA_DER)),
+    ];
+    let policy = policy();
+    let v = Verifier::new(
+        &anchors,
+        &DefaultVerifier,
+        &NoRevocation,
+        &policy,
+        &NoAiaFetcher,
+    );
+
+    let text = format!("{v:?}");
+    assert!(text.contains("Verifier"), "names the type: {text}");
+    assert!(
+        text.contains("anchors_len: 2"),
+        "reports how many anchors it holds: {text}"
+    );
+}
