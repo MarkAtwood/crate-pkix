@@ -13,16 +13,13 @@
 // runs under RUSTDOCFLAGS=-D warnings. Demoting the links to code spans
 // instead would cost every docs.rs reader a working link, to spare a
 // configuration nobody publishes documentation from.
-#![cfg_attr(
-    not(any(
-        feature = "p256",
-        feature = "p384",
-        feature = "p521",
-        feature = "rsa",
-        feature = "ed25519"
-    )),
-    allow(rustdoc::broken_intra_doc_links)
-)]
+// `RsaPssVerifier` and `RsaPkcs1v15Sha1Verifier` are gated on `rsa`,
+// and `rsa` is itself one of the features that brings `DefaultVerifier`
+// into existence — so every link in this crate's docs resolves exactly
+// when `rsa` is on, and the five-feature condition this replaced was
+// both wider than needed and, for a single-signature-feature build like
+// `--features p256`, not wide enough.
+#![cfg_attr(not(feature = "rsa"), allow(rustdoc::broken_intra_doc_links))]
 //! RFC 5280 X.509 certificate path validation — pure Rust, `no_std`.
 //!
 //! Implements certificate path building and validation per

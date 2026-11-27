@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-mta-sts-http"
 description = "MTA-STS (RFC 8461) policy fetching over HTTPS: §3.3 rules enforced, non-public destinations refused"
-version     = "0.1.0"
+version     = "0.1.1"
 edition.workspace      = true
 rust-version.workspace = true
 license.workspace      = true

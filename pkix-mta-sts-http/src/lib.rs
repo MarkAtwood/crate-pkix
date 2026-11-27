@@ -79,6 +79,11 @@
 
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+// `fetch_and_record` and `PolicyFetcher::fetch` are gated on
+// `client-ureq`, and the `client-reqwest` functions' documentation links
+// to them as the synchronous counterpart — so `--features client-reqwest`
+// alone cannot resolve them. Same shape as `pkix-path`'s attribute.
+#![cfg_attr(not(feature = "client-ureq"), allow(rustdoc::broken_intra_doc_links))]
 
 use pkix_mta_sts::discovery::{
     SUGGESTED_FETCH_TIMEOUT_SECS, SUGGESTED_MAX_POLICY_BYTES, WELL_KNOWN_PATH,

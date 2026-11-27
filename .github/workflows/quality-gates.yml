@@ -373,3 +373,52 @@ jobs:
       # everywhere it can tell a gated item from a typo.
       - name: Documentation builds with default features
         run: cargo doc --workspace --no-deps
+
+  per-feature-docs:
+    name: docs build under each feature
+    runs-on: ubuntu-latest
+    # 45, not the 30 the neighbouring jobs use: this is 138 rustdoc
+    # invocations, and a warm local run already takes several minutes.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
+
+      # WHY THIS JOB EXISTS
+      #
+      # The two rustdoc runs above cover --all-features and the default
+      # set, and between them they cannot see a doc link that resolves in
+      # neither: all-features resolves everything, and a default build
+      # never compiles an item behind a non-default feature, so the link
+      # inside its documentation is never examined. Anything gated in
+      # between is unchecked.
+      #
+      # That gap shipped a real break. pkix-chain's verify_attribute_cert
+      # gained a paragraph linking CrlChecker and OcspChecker, which are
+      # gated behind `crl` and `ocsp`, from documentation gated behind
+      # `attribute-certs` — so `cargo doc --features attribute-certs`
+      # failed with two unresolved links while both existing jobs stayed
+      # green. It was found by a reviewer, not by CI.
+      #
+      # --each-feature rather than --feature-powerset: the failure needs
+      # one feature on and another off, which every single-feature
+      # configuration already exercises, and the powerset would be 30-odd
+      # minutes of rustdoc for the same answer.
+      #
+      # Four crates needed a wider cfg-scoped allow when this went in —
+      # pkix-path, pkix-ct, pkix-aia-http and pkix-mta-sts-http each had
+      # one tuned for all-features and default only. In every case the
+      # allow is inactive under --all-features, so docs.rs-equivalent
+      # builds still deny the lint.
+      - name: Documentation builds under each feature
+        run: cargo hack doc --workspace --each-feature --no-deps

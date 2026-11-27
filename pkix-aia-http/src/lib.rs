@@ -1,4 +1,14 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
+// `AsyncHttpFetcher` and `GuardedAsyncResolver` are gated on
+// `client-reqwest-async`, and linked from documentation gated only on
+// `async` — so `--features async` alone cannot resolve them. Same shape
+// and same reasoning as the attribute at the top of `pkix-path`: the
+// links keep working on docs.rs, which builds all features, and the
+// lint stays denied wherever it can tell a gated item from a typo.
+#![cfg_attr(
+    not(feature = "client-reqwest-async"),
+    allow(rustdoc::broken_intra_doc_links)
+)]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
 

@@ -14,7 +14,13 @@
 // link — docs.rs builds all features — to spare a configuration nobody
 // publishes documentation from. Same reasoning, and same shape, as the
 // attribute at the top of `pkix-path`.
-#![cfg_attr(not(feature = "log-list"), allow(rustdoc::broken_intra_doc_links))]
+// Also `ocsp`, which gates `sct_list_from_ocsp_response`: a build with
+// `log-list` on and `ocsp` off resolves the first group of links and not
+// that one, so conditioning on `log-list` alone left it unresolved.
+#![cfg_attr(
+    any(not(feature = "log-list"), not(feature = "ocsp")),
+    allow(rustdoc::broken_intra_doc_links)
+)]
 
 //! Certificate Transparency SCT verification for `pkix-chain` (RFC 6962).
 //!

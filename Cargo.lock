@@ -1480,7 +1480,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-aia-http"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -1539,7 +1539,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-ct"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "base64 0.22.1",
  "der",
@@ -1660,7 +1660,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-mta-sts-http"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "pkix-mta-sts",
  "pkix-mta-sts-resolver",
@@ -1692,7 +1692,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-path"
-version = "0.4.5"
+version = "0.4.6"
 dependencies = [
  "base64ct",
  "der",
