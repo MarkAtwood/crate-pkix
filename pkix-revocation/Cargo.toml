@@ -105,6 +105,10 @@ required-features = ["crl", "ocsp"]
 name = "indirect_crl_crlsign"
 required-features = ["crl"]
 
+[[test]]
+name = "ocsp_certid_binding"
+required-features = ["ocsp"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
