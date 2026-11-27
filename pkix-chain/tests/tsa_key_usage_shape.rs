@@ -35,10 +35,17 @@ fn load(name: &str) -> Certificate {
 }
 
 fn run(leaf: &str) -> Result<pkix_chain::ValidatedPath, Error> {
+    run_under(leaf, &BasicTimeStampingProfile)
+}
+
+fn run_under<P: pkix_profiles::Profile>(
+    leaf: &str,
+    profile: &P,
+) -> Result<pkix_chain::ValidatedPath, Error> {
     verify_time_stamper(
         &[load(leaf)],
         &[TrustAnchor::from_cert(load("tsa-ku-root"))],
-        &BasicTimeStampingProfile,
+        profile,
         NOW,
         &DefaultVerifier,
         &NoRevocation,
@@ -89,4 +96,37 @@ fn the_refusal_cites_the_key_usage_rule() {
 fn digital_signature_alone_is_a_valid_tsa_key_shape() {
     run("tsa-ku-digital-signature")
         .expect("RFC 3161 permits a signing-only key; digitalSignature is exactly that");
+}
+
+/// RFC 3161 §2.3: timeStamping must be the *sole* EKU value, so a single
+/// value that is not timeStamping is refused.
+///
+/// The guard that decides this is `[oid] if *oid == ID_KP_TIME_STAMPING`,
+/// and nothing put it to the question. `leaf-timestamping.der` has the right
+/// single value, `leaf-timestamping-not-sole.der` has several,
+/// `leaf-timestamping-not-critical.der` fails one step earlier, and a leaf
+/// with no EKU fails the step before that. None of them distinguishes "the
+/// one value is timeStamping" from "there is exactly one value".
+///
+/// Reaching it takes a profile that does not already require the EKU.
+/// `BasicTimeStampingProfile` sets `required_leaf_eku`, so path validation
+/// refuses a serverAuth leaf with `Path(MissingEku)` before the wrapper runs
+/// -- but `verify_time_stamper` accepts any `Profile`, and under one that
+/// does not demand it the wrapper's own rule is all that stands between a
+/// serverAuth certificate and validating as a time-stamping authority. That
+/// is the rule's reason for living in the wrapper: it holds whatever profile
+/// the caller supplies.
+///
+/// The fixture's KeyUsage is digitalSignature alone, so the key-shape rule
+/// above cannot fire first and mask this verdict.
+#[test]
+fn a_single_eku_that_is_not_timestamping_is_refused() {
+    match run_under("tsa-eku-server-auth", &pkix_profiles::Rfc5280Profile) {
+        Err(Error::ProfileViolation { kind, .. }) => assert_eq!(
+            kind,
+            ProfileViolationKind::TsaEkuNotSoleTimeStamping,
+            "a sole EKU of serverAuth must be refused as not-sole-timeStamping"
+        ),
+        other => panic!("expected ProfileViolation, got {other:?}"),
+    }
 }

@@ -17,6 +17,12 @@ KeyUsage is assembled as raw DER rather than through `x509.KeyUsage`, because
 per RFC 5280 -- and that combination would trip the rule through
 `key_agreement` and prove nothing about `encipher_only`.
 
+Also here, because it shares the root: `tsa-eku-server-auth.der`, a leaf whose
+critical EKU holds exactly one value and that value is not timeStamping. The
+flat corpus has an EKU that is absent, non-critical, or holds several values,
+but never that one -- which is the case RFC 3161 §2.3's "sole value" guard
+decides.
+
 Self-contained root and leaves: this directory's parent generator randomises
 every key per run, so adding fixtures there rewrites all of them.
 """
@@ -111,9 +117,40 @@ def tsa_leaf(label, bit, serial):
     )
 
 
+def tsa_leaf_with_eku(label, eku_oids, serial):
+    """A leaf with a signing-only KeyUsage and the given critical EKU set.
+
+    For the RFC 3161 §2.3 "timeStamping MUST be the sole EKU value" rule.
+    The existing corpus covers an EKU that is absent, non-critical, or
+    holds several values; what it has never held is exactly one value that
+    is not timeStamping, which is the case the rule's guard decides. The
+    KeyUsage is digitalSignature alone so that the key-shape check cannot
+    fire first and mask the EKU verdict.
+    """
+    return (
+        x509.CertificateBuilder()
+        .subject_name(name(f"PKIX tsa-eku {label}"))
+        .issuer_name(root_name)
+        .public_key(leaf_key.public_key())
+        .serial_number(serial)
+        .not_valid_before(NOT_BEFORE)
+        .not_valid_after(NOT_AFTER)
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .add_extension(x509.ExtendedKeyUsage(eku_oids), critical=True)
+        .add_extension(
+            x509.UnrecognizedExtension(OID_KEY_USAGE, bit_string(0)), critical=True
+        )
+        .sign(root_key, hashes.SHA256())
+    )
+
+
 files = {"tsa-ku-root.der": root}
 for i, (label, bit) in enumerate(KU_BITS.items(), start=2):
     files[f"tsa-ku-{label}.der"] = tsa_leaf(label, bit, i)
+
+files["tsa-eku-server-auth.der"] = tsa_leaf_with_eku(
+    "server-auth", [ExtendedKeyUsageOID.SERVER_AUTH], 90
+)
 
 for fname, cert in files.items():
     (OUT / fname).write_bytes(cert.public_bytes(serialization.Encoding.DER))
