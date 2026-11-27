@@ -834,3 +834,58 @@ fn test_build_path_skips_malformed_bc_independent_of_pool_order() {
     pkix_path::validate_path(&path, &[anchor], &policy, &verifier)
         .expect("validate_path must succeed on the built chain");
 }
+
+// ---------------------------------------------------------------------------
+// CertPool's container API
+// ---------------------------------------------------------------------------
+
+/// `CertPool` is a collection, and reports itself as one.
+///
+/// `len`, `is_empty`, `Extend` and both `IntoIterator` impls are the
+/// crate's public container surface, and nothing inside the crate uses
+/// them -- path building goes through the private `as_slice`. So all
+/// seven had no test, and each fails in a way a caller discovers rather
+/// than a compiler does: a `len` that answers 0 or 1 whatever is in the
+/// pool, an `extend` that drops everything handed to it, an `into_iter`
+/// that yields nothing.
+///
+/// A caller that collected intermediates into a pool and got an empty
+/// one back would see "no valid path" for a chain whose certificates it
+/// had just loaded.
+#[test]
+fn a_cert_pool_reports_what_it_holds() {
+    let certs = [
+        pkits_cert("GoodCACert"),
+        pkits_cert("ValidCertificatePathTest1EE"),
+    ];
+
+    let empty = CertPool::default();
+    assert_eq!(empty.len(), 0);
+    assert!(empty.is_empty(), "a pool with nothing in it is empty");
+
+    let mut pool = CertPool::default();
+    pool.add(certs[0].clone());
+    assert_eq!(pool.len(), 1);
+    assert!(!pool.is_empty(), "a pool holding a certificate is not");
+
+    // `Extend` adds to what is already there rather than replacing it.
+    pool.extend(core::iter::once(certs[1].clone()));
+    assert_eq!(pool.len(), 2, "extend adds, and does not discard the first");
+
+    // Both `IntoIterator` impls yield the certificates, in order.
+    let by_ref: Vec<&Certificate> = (&pool).into_iter().collect();
+    assert_eq!(by_ref.len(), 2);
+    assert_eq!(by_ref[0], &certs[0]);
+    assert_eq!(by_ref[1], &certs[1]);
+
+    let owned: Vec<Certificate> = pool.into_iter().collect();
+    assert_eq!(owned, certs.to_vec(), "and by value likewise");
+
+    // `FromIterator` agrees with `add` plus `extend`.
+    let collected: CertPool = certs.iter().cloned().collect();
+    assert_eq!(collected.len(), 2);
+    assert_eq!(
+        collected.iter().collect::<Vec<_>>(),
+        certs.iter().collect::<Vec<_>>()
+    );
+}

@@ -749,6 +749,25 @@ impl<'a> PathCandidates<'a> {
 
     /// Does `child`'s signature verify under `issuer_spki`? Always `true`
     /// when no verifier is configured (topology-only mode).
+    ///
+    /// This is pruning, not a gate. Every candidate the iterator yields
+    /// is handed to `pkix_path::validate_path`, which makes the same
+    /// signature decision again, so nothing is accepted here that
+    /// validation would refuse -- the check exists so that hopeless
+    /// candidates are not validated, not so that they are rejected.
+    ///
+    /// A mutation sweep reports `-> true` as surviving, and it does.
+    /// With it, a chain whose signatures do not verify is yielded,
+    /// refused by `validate_path`, and the search moves on; without it
+    /// the search yields nothing and
+    /// `build_first_valid_path_with_config` falls back to a
+    /// topology-only pass over the same pool so it can still report
+    /// *why* the best candidate failed. Both arrive at the same
+    /// `NoValidPath`, carrying the same error and the same count. What
+    /// differs is how many candidates were validated to get there, and
+    /// on success that number is not in the result. Not untested --
+    /// unobservable through the public API, and harmless because the
+    /// boundary is `validate_path`.
     fn signed_by(&mut self, child: NodeId, issuer_spki: &spki::SubjectPublicKeyInfoOwned) -> bool {
         let Some(verifier) = self.verifier else {
             return true;
