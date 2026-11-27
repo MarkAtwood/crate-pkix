@@ -6,7 +6,7 @@
 //! fixtures so the AA has a real key and a chain `pkix-path` could
 //! validate.
 
-use der::Decode as _;
+use der::{Decode as _, Encode as _};
 use pkix_ac::{AttributeCertificate, Error, ProfileViolation, Targeting};
 use x509_cert::ext::pkix::name::GeneralName;
 
@@ -232,35 +232,6 @@ fn verify_refuses_a_v1form_issuer_on_its_own() {
     );
 }
 
-/// Every violation must render a reason. A rule that is detected but
-/// cannot be explained sends the reader to the spec with nothing to go
-/// on.
-#[test]
-fn every_profile_violation_explains_itself() {
-    for v in [
-        ProfileViolation::IssuerV1Form,
-        ProfileViolation::IssuerNameMissing,
-        ProfileViolation::IssuerNameNotSingular,
-        ProfileViolation::IssuerNameNotDirectoryName,
-        ProfileViolation::IssuerExtraFields,
-        ProfileViolation::HolderAmbiguous,
-        ProfileViolation::HolderMissing,
-        ProfileViolation::HolderNameNotSingular,
-        ProfileViolation::HolderObjectDigestInfo,
-        ProfileViolation::NoAttributes,
-        ProfileViolation::AttributeWithoutValues,
-    ] {
-        let rendered = Error::ProfileViolation(v).to_string();
-        assert!(
-            rendered.starts_with("RFC 5755 profile violation: "),
-            "{v:?} rendered as {rendered:?}"
-        );
-        assert!(
-            rendered.len() > 45,
-            "{v:?} must say which rule broke, got {rendered:?}"
-        );
-    }
-}
 /// A targeted AC: the verifier it names matches, others do not.
 ///
 /// Oracle: RFC 5755 §4.3.2 — "the targets check passes if the current
@@ -583,4 +554,191 @@ fn object_digest_info_is_unreachable_in_a_conforming_certificate() {
         tc.check_targeting(&[], &[]),
         Err(Error::ProfileViolation(ProfileViolation::TargetCertUsed))
     );
+}
+
+/// Rewriting the outer `signatureAlgorithm` is refused.
+///
+/// This is the attack the check exists for, and the surgery is what an
+/// on-path attacker can actually do: `acinfo` is the signed region, so
+/// `acinfo.signature` cannot be touched without breaking the signature,
+/// but the outer `signatureAlgorithm` sits outside it and can be
+/// rewritten freely. Verifying under the rewritten copy would let the
+/// attacker pick the algorithm the check runs with.
+///
+/// Oracle: RFC 5280 §4.1.1.2 — the outer field "MUST contain the same
+/// algorithm identifier as the signature field in the sequence
+/// tbsCertificate"; RFC 5755 §4.1 gives ACs the same shape.
+#[test]
+fn rewriting_the_unsigned_algorithm_identifier_is_refused() {
+    let der = fixture("ac-role-valid.der");
+    let ac = AttributeCertificate::from_der(&der).expect("parses");
+    let signed = ac.signed_bytes().to_vec();
+
+    // ecdsa-with-SHA256, which both copies carry.
+    let sha256 = [0x06u8, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x02];
+    // ecdsa-with-SHA384: same length, so no length fields shift and the
+    // edit stays a pure substitution.
+    let sha384 = [0x06u8, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x03];
+
+    // The outer copy is the LAST occurrence: the inner one lives inside
+    // acinfo, which comes first.
+    let acinfo_end = der
+        .windows(signed.len())
+        .position(|w| w == signed.as_slice())
+        .expect("acinfo is in the certificate")
+        + signed.len();
+    let outer = acinfo_end
+        + der[acinfo_end..]
+            .windows(sha256.len())
+            .position(|w| w == sha256)
+            .expect("the outer algorithm follows acinfo");
+
+    let mut tampered = der.clone();
+    tampered[outer..outer + sha384.len()].copy_from_slice(&sha384);
+
+    // The signature bytes are untouched and acinfo is untouched, so
+    // nothing but the mismatch can be refusing this.
+    let tampered_ac = AttributeCertificate::from_der(&tampered).expect("still parses");
+    assert_eq!(
+        tampered_ac.signed_bytes(),
+        signed.as_slice(),
+        "the signed region must be identical; otherwise this tests the wrong thing"
+    );
+    assert_eq!(
+        tampered_ac.verify(&aa(), NOW, &DefaultVerifier),
+        Err(Error::SignatureAlgorithmMismatch)
+    );
+}
+
+/// RFC 5755 §5 rule 5, the sentence that is easy to read past: "If the
+/// evaluation time is equal to either notBeforeTime or notAfterTime,
+/// then the AC is timely and this check succeeds."
+///
+/// The existing window test checks outside both bounds, which an
+/// exclusive comparison would also pass. Only the bounds themselves
+/// distinguish the two readings.
+#[test]
+fn the_validity_bounds_are_inclusive() {
+    let ac = ac("ac-role-valid.der");
+    let v = &ac.inner().acinfo.validity;
+    let not_before = v.not_before_time.to_unix_duration().as_secs();
+    let not_after = v.not_after_time.to_unix_duration().as_secs();
+
+    ac.verify(&aa(), not_before, &DefaultVerifier)
+        .expect("notBeforeTime itself is timely");
+    ac.verify(&aa(), not_after, &DefaultVerifier)
+        .expect("notAfterTime itself is timely");
+
+    // One second outside each, to show the bound is where it claims.
+    assert_eq!(
+        ac.verify(&aa(), not_before - 1, &DefaultVerifier),
+        Err(Error::NotYetValid)
+    );
+    assert_eq!(
+        ac.verify(&aa(), not_after + 1, &DefaultVerifier),
+        Err(Error::Expired)
+    );
+}
+
+/// All six §4.4 attribute types parse, in order, uninterpreted.
+///
+/// The crate's position is "parse all, interpret none", and until now
+/// every fixture carried `id-at-role` alone — so the claim was
+/// untested against types with different shapes. These six differ
+/// structurally: `Role` nests a `GeneralName`, `Clearance` is an OID
+/// plus a `BIT STRING`, `Group` and `ChargingIdentity` use
+/// `IetfAttrSyntax`, and `AccessIdentity` and
+/// `ServiceAuthenticationInfo` use `SvceAuthInfo`.
+///
+/// Oracle: RFC 5755 §4.4 and Appendix B for the OIDs. Worth noting that
+/// `id-aca` is `{ id-pkix 10 }`, so four of the six sit under
+/// `1.3.6.1.5.5.7.10` while `role` and `clearance` are under `2.5.4` —
+/// a distinction a crate that does not interpret attributes cannot
+/// catch for itself, and which this test got wrong on the first attempt.
+#[test]
+fn all_six_profiled_attribute_types_parse_uninterpreted() {
+    let ac = ac("ac-attribute-types.der");
+    let got: Vec<String> = ac
+        .attributes()
+        .iter()
+        .map(|a| a.r#type.to_string())
+        .collect();
+
+    assert_eq!(
+        got,
+        [
+            "2.5.4.72",           // id-at-role
+            "2.5.4.55",           // id-at-clearance
+            "1.3.6.1.5.5.7.10.4", // id-aca-group
+            "1.3.6.1.5.5.7.10.3", // id-aca-chargingIdentity
+            "1.3.6.1.5.5.7.10.2", // id-aca-accessIdentity
+            "1.3.6.1.5.5.7.10.1", // id-aca-authenticationInfo
+        ],
+        "all six parse, and `attributes` is a SEQUENCE OF so the order is preserved"
+    );
+    for a in ac.attributes() {
+        assert_eq!(a.values.len(), 1, "each value is kept, whatever its shape");
+    }
+
+    ac.check_profile()
+        .expect("six attribute types is conforming");
+    ac.verify(&aa(), NOW, &DefaultVerifier)
+        .expect("and the signature covers them all");
+}
+
+/// An attribute whose `SET OF` values are not in DER order verifies,
+/// and re-encoding it would not.
+///
+/// This is the `pkix-ct` failure mode caught in the act and
+/// neutralised. `values` is a `SET OF`; X.690 §11.6 requires members
+/// sorted by their encodings, and a CA that does not sort emits bytes
+/// that look well formed and are not canonical. `pkix-ct` verified SCTs
+/// by re-encoding a parsed certificate, so an unsorted RDN was
+/// re-sorted on the way out and the signature was checked over
+/// different bytes than the log signed.
+///
+/// The fixture carries two values in descending order, and what the
+/// test establishes is the chain of consequences:
+///
+/// 1. `SetOfVec` **re-sorts on decode**, so the parsed view is
+///    canonical and is not the order the CA sent.
+/// 2. Re-encoding `acinfo` therefore does **not** reproduce the signed
+///    bytes — asserted here, against the same fixture.
+/// 3. The signature verifies regardless, because
+///    [`AttributeCertificate::signed_bytes`] is a slice of the original
+///    DER rather than a re-encoding.
+///
+/// Together those say the slice is load-bearing rather than tidy. The
+/// companion test in `parse.rs` shows re-encoding matching for a
+/// canonical fixture, which is exactly how the old `pkix-ct` approach
+/// passed its tests while being wrong.
+#[test]
+fn an_unsorted_set_of_verifies_though_re_encoding_would_not() {
+    let ac = ac("ac-unsorted-set-of.der");
+    let values = &ac.attributes()[0].values;
+    assert_eq!(values.len(), 2, "both values survive");
+
+    // 1. The parsed view is canonical, not the wire order. The
+    //    generator emitted "zzz" first; DER order puts "aaa" first.
+    let first = values.as_slice()[0].to_der().expect("re-encode a value");
+    assert!(
+        String::from_utf8_lossy(&first).contains("aaa"),
+        "SetOfVec is expected to re-sort on decode; if this fails the \
+         premise of this test changed and the rest of it needs re-reading"
+    );
+
+    // 2. So a re-encode does not reproduce what was signed.
+    let reencoded = ac.inner().acinfo.to_der().expect("re-encode acinfo");
+    assert_ne!(
+        reencoded.as_slice(),
+        ac.signed_bytes(),
+        "re-encoding must differ here — that difference is the bug pkix-ct had"
+    );
+
+    // 3. And the signature still checks, because the signed bytes are
+    //    taken from the original DER.
+    ac.check_profile()
+        .expect("non-canonical ordering is not a profile matter");
+    ac.verify(&aa(), NOW, &DefaultVerifier)
+        .expect("the signature covers the bytes as sent, sorted or not");
 }

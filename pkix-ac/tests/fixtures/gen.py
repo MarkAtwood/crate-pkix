@@ -421,6 +421,72 @@ def main() -> None:
     info = with_exts(0x3A, extension(ID_PE_AC_AUDIT_IDENTITY, True, too_long))
     (HERE / "ac-audit-too-long.der").write_bytes(attribute_certificate(info))
 
+    # ---- §4.4 attribute types, uninterpreted ------------------------
+    #
+    # The crate's stated position is "parse all, interpret none". Every
+    # other fixture carries id-at-role only, so nothing showed the claim
+    # holds for types with different shapes.
+    #
+    # OIDs from RFC 5755 §4.4 and Appendix B. id-aca is { id-pkix 10 },
+    # so the four id-aca attributes are 1.3.6.1.5.5.7.10.n -- NOT under
+    # 2.5.4 like role and clearance, which is easy to get wrong and
+    # invisible in a crate that does not interpret them.
+    ID_ACA_AUTHENTICATION_INFO = "1.3.6.1.5.5.7.10.1"
+    ID_ACA_ACCESS_IDENTITY = "1.3.6.1.5.5.7.10.2"
+    ID_ACA_CHARGING_IDENTITY = "1.3.6.1.5.5.7.10.3"
+    ID_ACA_GROUP = "1.3.6.1.5.5.7.10.4"
+    ID_AT_ROLE_OID = "2.5.4.72"
+    ID_AT_CLEARANCE = "2.5.4.55"
+
+    def attr(oid_dotted, *values):
+        return seq(oid(oid_dotted), tlv(0x31, b"".join(values)))
+
+    def utf8(s):
+        return tlv(0x0C, s.encode())
+
+    # SvceAuthInfo ::= SEQUENCE { service GeneralName, ident GeneralName,
+    #                             authInfo OCTET STRING OPTIONAL }
+    def svce_auth_info(service, ident):
+        return seq(general_name_dns(service), general_name_dns(ident))
+
+    # IetfAttrSyntax ::= SEQUENCE { policyAuthority [0] GeneralNames
+    #   OPTIONAL, values SEQUENCE OF CHOICE { OCTET STRING, OID,
+    #   UTF8String } }
+    def ietf_attr(*values):
+        return seq(seq(*values))
+
+    # Clearance ::= SEQUENCE { policyId OID, classList BIT STRING
+    #   DEFAULT {unmarked}, securityCategories SET OF ... OPTIONAL }
+    clearance = seq(oid("1.3.6.1.4.1.99.7"), bitstring(b"\x20"))
+
+    # All six §4.4 types in one certificate.
+    info = acinfo(leaf_subject, aa_subject, 0x50, *window, seq(
+        attr(ID_AT_ROLE_OID, seq(tlv(0xA1, tlv(0x86, b"urn:example:role:auditor")))),
+        attr(ID_AT_CLEARANCE, clearance),
+        attr(ID_ACA_GROUP, ietf_attr(utf8("auditors"))),
+        attr(ID_ACA_CHARGING_IDENTITY, ietf_attr(utf8("cost-centre-7"))),
+        attr(ID_ACA_ACCESS_IDENTITY,
+             svce_auth_info("svc.example.com", "user.example.com")),
+        attr(ID_ACA_AUTHENTICATION_INFO,
+             svce_auth_info("auth.example.com", "user.example.com")),
+    ))
+    (HERE / "ac-attribute-types.der").write_bytes(attribute_certificate(info))
+
+    # Two values under ONE attribute type, in descending DER order.
+    #
+    # `values` is a SET OF, and DER requires members sorted by their
+    # encodings (X.690 §11.6). A CA that does not sort emits
+    # well-formed-looking bytes in the wrong order -- the exact shape
+    # that broke pkix-ct's SCT verification, where re-encoding re-sorted
+    # an unsorted RDN and so changed the bytes the signature covered.
+    # This asks whether such an AC is readable at all, and whether its
+    # signature still checks.
+    hi = seq(tlv(0xA1, tlv(0x86, b"zzz:example:role:second")))
+    lo = seq(tlv(0xA1, tlv(0x86, b"aaa:example:role:first")))
+    info = acinfo(leaf_subject, aa_subject, 0x51, *window,
+                  seq(attr(ID_AT_ROLE_OID, hi, lo)))
+    (HERE / "ac-unsorted-set-of.der").write_bytes(attribute_certificate(info))
+
     # ---- §4.2 profile rules, one fixture each -----------------------
     #
     # Each of these was an implemented rule with nothing but a Display
