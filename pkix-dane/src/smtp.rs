@@ -28,6 +28,22 @@
 //!    an optimization. [`verify_smtp_name`] takes the usage so this cannot be
 //!    forgotten by a caller.
 //!
+//! # The CN-ID rule outruns `dNSName` name constraints
+//!
+//! For DANE-TA(2) there is a certification path, and that path's `dNSName`
+//! name constraints do not reach the CN this module may match on. RFC 5280
+//! §4.2.1.10 applies them "only to the corresponding name type in
+//! subjectAltName", so a leaf with no SAN passes them vacuously, and rule 2
+//! above then consults its CN. An intermediate constrained to one subtree
+//! can therefore vouch for a name outside it by putting that name only in
+//! the CN.
+//!
+//! This module cannot fix it: it is handed a certificate and a set of
+//! reference identifiers, never the path. RFC 5280's answer for a CA is to
+//! use `directoryName` constraints, which do apply to the subject field.
+//! A relying party that needs more has to refuse a no-SAN leaf itself.
+//! PKIX-skxt.
+//!
 //! # What this module deliberately does not decide
 //!
 //! Whether DANE applies at all, whether the MX lookup was secure, and which

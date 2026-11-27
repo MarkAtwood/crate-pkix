@@ -442,3 +442,90 @@ fn dane_ta_with_an_unrelated_anchor_fails_path_building() {
     }
     assert!(!verdict.rfc7672_permits_delivery());
 }
+
+// ---------------------------------------------------------------------------
+// PKIX-skxt: a constrained path plus a leaf with no DNS-ID
+// ---------------------------------------------------------------------------
+
+// A CA constrained to `DNS:good.example`, and a leaf it issued carrying
+// CN=evil.example and no subjectAltName at all. See
+// tests/fixtures/constrained-no-san/gen.sh.
+const CONSTRAINED_CA_DER: &[u8] = include_bytes!("fixtures/constrained-no-san/ca-constrained.der");
+const CN_ONLY_LEAF_DER: &[u8] = include_bytes!("fixtures/constrained-no-san/leaf-cn-only.der");
+
+/// A `dNSName` name constraint must not be escaped by omitting the SAN.
+///
+/// RFC 5280 §4.2.1.10 applies `dNSName` constraints "only to the
+/// corresponding name type in subjectAltName", so this leaf passes path
+/// validation vacuously — there is no SAN to constrain. RFC 7672 §3.2.3 then
+/// says to consult the CN when no DNS-ID is present. Following both rules
+/// would authenticate `evil.example` against a CA permitted only
+/// `good.example`, which is precisely what name constraints exist to stop.
+///
+/// Both halves are correct about their own specification and neither can see
+/// the problem alone: `verify_smtp_name` is handed a certificate, not a path.
+/// Only this function holds both, so the refusal lives here.
+#[test]
+fn dane_ta_refuses_a_constrained_path_when_the_leaf_has_no_dns_id() {
+    let leaf = load(CN_ONLY_LEAF_DER);
+    let ca = load(CONSTRAINED_CA_DER);
+
+    // The reference identity is the CN, so without the refusal this call
+    // would report Authenticated: the CN matches, and the constraint was
+    // never applied to it.
+    let target = target_for(
+        "evil.example",
+        vec![full_cert_record(TlsaUsage::DaneTa, CONSTRAINED_CA_DER)],
+    );
+
+    let verdict = verify_at(
+        &target,
+        &[leaf, ca],
+        &[CN_ONLY_LEAF_DER, CONSTRAINED_CA_DER],
+        FIXTURE_NOW,
+    )
+    .expect("well-formed call");
+
+    assert!(
+        matches!(
+            verdict,
+            SmtpDaneVerdict::Failed(SmtpDaneFailure::ConstrainedPathWithoutDnsId)
+        ),
+        "a constrained path with no DNS-ID must be refused, got {verdict:?}"
+    );
+}
+
+/// The same CA authenticates nothing by this route even when the CN is
+/// *inside* the permitted subtree.
+///
+/// The refusal is about the constraint being unenforceable against a CN, not
+/// about this particular CN being outside the subtree — so it must fire
+/// either way. Were it conditional on the name, a CA could still be made to
+/// vouch for a name it was forbidden, by choosing one the check happened to
+/// allow.
+#[test]
+fn the_refusal_does_not_depend_on_which_name_the_cn_carries() {
+    let leaf = load(CN_ONLY_LEAF_DER);
+    let ca = load(CONSTRAINED_CA_DER);
+    let target = target_for(
+        "good.example",
+        vec![full_cert_record(TlsaUsage::DaneTa, CONSTRAINED_CA_DER)],
+    );
+
+    let verdict = verify_at(
+        &target,
+        &[leaf, ca],
+        &[CN_ONLY_LEAF_DER, CONSTRAINED_CA_DER],
+        FIXTURE_NOW,
+    )
+    .expect("well-formed call");
+
+    assert!(
+        matches!(
+            verdict,
+            SmtpDaneVerdict::Failed(SmtpDaneFailure::ConstrainedPathWithoutDnsId)
+        ),
+        "the refusal is unconditional once the path constrains dNSName names \
+         and the leaf presents none, got {verdict:?}"
+    );
+}

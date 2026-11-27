@@ -210,7 +210,19 @@ hostname-binding decision that should live in a separate `pkix-tls` /
 `pkix-rfc6125` layer, not in `pkix-path`.
 
 Documented in `pkix-path/src/lib.rs` (NameConstraints handling).
-**No follow-up bead filed** — the divergence is by design.
+The divergence is by design.
+
+**One follow-up does exist, and it is about the hand-off, not the
+reading.** "CN-as-dNSName extraction should live in a separate layer"
+only holds if that layer applies the path's constraints to the CN it
+extracts. `pkix_identity::verify_dns_name_with_cn_fallback` — RFC 7672
+§3.2.3, for SMTP DANE — does consult the CN, and does not, because it is
+handed a certificate rather than a path. `pkix-chain`'s
+`verify_smtp_dane` composes exactly that with DANE-TA(2) path
+validation, so for that one caller these 748 cases are not merely a
+documented divergence: the constraint is bypassable by omitting the SAN.
+PKIX-skxt has the analysis. It does not change the position taken above,
+which is still right for `pkix-path`.
 
 ### Other LooserThanWild buckets
 

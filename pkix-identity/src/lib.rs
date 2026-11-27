@@ -717,6 +717,29 @@ pub fn verify_dns_name(cert: &Certificate, name: &ServerName<'_>) -> Result<(), 
 /// so that no caller gets CN fallback by default or by accident, and so the
 /// Web PKI path cannot be loosened by passing an argument.
 ///
+/// # A `dNSName` name constraint does not reach the CN
+///
+/// Composing this with RFC 5280 path validation leaves a gap, and a caller
+/// doing so should know about it. RFC 5280 §4.2.1.10 applies `dNSName`
+/// name constraints "only to the corresponding name type in
+/// subjectAltName" — so a leaf with **no SAN** has nothing for such a
+/// constraint to test, and path validation passes it. This function then
+/// matches on the CN. The net effect is that an intermediate constrained
+/// to one `dNSName` subtree can vouch for a name outside it, by issuing a
+/// certificate that carries the name only in the CN.
+///
+/// Both halves are following their own specification: §4.2.1.10 is
+/// explicit, and RFC 7672 §3.2.3 is explicit the other way. RFC 5280's own
+/// answer for a CA is `directoryName` constraints, which it requires be
+/// "applied to the subject field in the certificate (when the certificate
+/// includes a non-empty subject field)" — a CA that constrained only
+/// `dNSName` has not constrained the subject DN.
+///
+/// Nothing here can close it: this function is handed a certificate, not a
+/// path, so it cannot know what constraints the path carried. A caller that
+/// needs the constraint honoured against the CN has to refuse a no-SAN leaf
+/// itself. PKIX-skxt.
+///
 /// # Matching
 ///
 /// - **DNS-ID present** (any `dNSName` entry in the SAN): identical to

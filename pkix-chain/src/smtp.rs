@@ -154,6 +154,23 @@ pub enum SmtpDaneFailure {
     /// name check.
     NameCheckFailed(SmtpNameError),
 
+    /// The chain matched a DANE-TA(2) record, a certificate in it constrains
+    /// `dNSName` names, and the server's certificate carries no DNS-ID — so
+    /// the name could only be taken from the Subject CN, where that
+    /// constraint does not reach.
+    ///
+    /// RFC 5280 §4.2.1.10 applies `dNSName` name constraints "only to the
+    /// corresponding name type in subjectAltName", and RFC 7672 §3.2.3
+    /// consults the CN when no DNS-ID is present. Following both would let a
+    /// certificate issued under a constrained CA be accepted for a name
+    /// outside that constraint, by carrying the name only in the CN.
+    ///
+    /// Refused rather than reported as a name mismatch, because the
+    /// certificate's CN may well match: what is wrong is that matching it
+    /// would ignore a constraint the path imposed. An operator seeing this
+    /// should add a SAN to the server certificate. PKIX-skxt.
+    ConstrainedPathWithoutDnsId,
+
     /// Only PKIX-TA(0) or PKIX-EE(1) records were published.
     ///
     /// RFC 7672 §3.1.3 leaves client treatment of these undefined and permits
@@ -161,6 +178,73 @@ pub enum SmtpDaneFailure {
     /// domain has published records that cannot authenticate an SMTP
     /// connection, which is worth telling its postmaster.
     OnlyPkixUsages,
+}
+
+/// Does any certificate in `chain` impose a `dNSName` name constraint?
+///
+/// Permitted and excluded subtrees both count: either one is a statement
+/// about which DNS names the subordinate CAs may vouch for, and neither
+/// reaches a name carried only in the Subject CN.
+///
+/// A `nameConstraints` extension that will not decode is treated as
+/// constraining. It cannot be read, so it cannot be shown harmless, and
+/// `validate_path` would already have refused a chain carrying a malformed
+/// one — reaching here with an undecodable extension means the chain
+/// validated and this is reading it a second time, so the conservative
+/// answer is the only safe one.
+fn path_constrains_dns_names(chain: &[Certificate]) -> bool {
+    use der::Decode as _;
+    use x509_cert::ext::pkix::name::GeneralName;
+
+    const ID_CE_NAME_CONSTRAINTS: der::asn1::ObjectIdentifier =
+        der::asn1::ObjectIdentifier::new_unwrap("2.5.29.30");
+
+    chain.iter().any(|cert| {
+        cert.tbs_certificate()
+            .extensions()
+            .into_iter()
+            .flatten()
+            .filter(|e| e.extn_id == ID_CE_NAME_CONSTRAINTS)
+            .any(|e| {
+                match x509_cert::ext::pkix::NameConstraints::from_der(e.extn_value.as_bytes()) {
+                    Err(_) => true,
+                    Ok(nc) => nc
+                        .permitted_subtrees
+                        .iter()
+                        .flatten()
+                        .chain(nc.excluded_subtrees.iter().flatten())
+                        .any(|st| matches!(st.base, GeneralName::DnsName(_))),
+                }
+            })
+    })
+}
+
+/// Does `cert` present at least one `dNSName` in its SAN?
+///
+/// This is the condition RFC 7672 §3.2.3 turns on: "if the server
+/// certificate contains a Subject Alternative Name extension with at least
+/// one DNS-ID, then only the DNS-IDs are matched". When it holds, the CN is
+/// never consulted and the constraint gap does not arise.
+///
+/// A SAN that will not decode answers `false`, which routes a constrained
+/// path to a refusal. `verify_smtp_name` would report `MalformedSan` for the
+/// same certificate, so the outcome is a refusal either way.
+fn has_dns_id(cert: &Certificate) -> bool {
+    use der::Decode as _;
+    use x509_cert::ext::pkix::name::GeneralName;
+
+    const ID_CE_SUBJECT_ALT_NAME: der::asn1::ObjectIdentifier =
+        der::asn1::ObjectIdentifier::new_unwrap("2.5.29.17");
+
+    cert.tbs_certificate()
+        .extensions()
+        .into_iter()
+        .flatten()
+        .filter(|e| e.extn_id == ID_CE_SUBJECT_ALT_NAME)
+        .any(|e| {
+            x509_cert::ext::pkix::SubjectAltName::from_der(e.extn_value.as_bytes())
+                .is_ok_and(|san| san.0.iter().any(|n| matches!(n, GeneralName::DnsName(_))))
+        })
 }
 
 /// Verify an SMTP server against the TLSA records discovery found for it.
@@ -323,6 +407,21 @@ where
                     ))
                 }
             };
+
+            // Before the name check, not after: if the name can only come
+            // from the CN and the path constrained dNSName names, matching
+            // it would ignore that constraint. See
+            // `SmtpDaneFailure::ConstrainedPathWithoutDnsId`.
+            //
+            // This belongs here rather than in `pkix-dane` or
+            // `pkix-identity`: both are handed a certificate, and only this
+            // function holds the path as well, which is what makes the
+            // question answerable. PKIX-skxt.
+            if path_constrains_dns_names(chain) && !has_dns_id(&chain[0]) {
+                return Ok(SmtpDaneVerdict::Failed(
+                    SmtpDaneFailure::ConstrainedPathWithoutDnsId,
+                ));
+            }
 
             // §3.2.2 / §3.2.3. The identity set is narrower when the MX RRset
             // was insecure; DeliveryTarget has already applied that.
@@ -519,5 +618,177 @@ pub fn combine_smtp_transport_security(
         // know cannot be claimed to have authenticated anything. All three
         // permit delivery without protection.
         SmtpTransportSecurity::Unprotected
+    }
+}
+
+#[cfg(test)]
+mod constraint_gap_tests {
+    use super::{has_dns_id, path_constrains_dns_names};
+    use der::Decode as _;
+    use x509_cert::Certificate;
+
+    fn cert(bytes: &[u8]) -> Certificate {
+        Certificate::from_der(bytes).expect("fixture parses")
+    }
+
+    // Permitted and excluded dNSName constraints, from pkix-path's anchor-nc
+    // set; a leaf carrying a dNSName SAN; and a leaf carrying its name only
+    // in the CN, from pkix-identity's CN-fallback set. Reused rather than
+    // regenerated so these cannot drift from the fixtures whose behaviour
+    // they are about.
+    const NC_PERMITTED_DNS: &[u8] =
+        include_bytes!("../../pkix-path/tests/fixtures/anchor-nc/anchor_permitted_dns.der");
+    const NC_EXCLUDED_DNS: &[u8] =
+        include_bytes!("../../pkix-path/tests/fixtures/anchor-nc/anchor_excluded_dns.der");
+    const LEAF_WITH_DNS_SAN: &[u8] =
+        include_bytes!("../../pkix-path/tests/fixtures/anchor-nc/leaf_good_dns.der");
+    const LEAF_CN_ONLY: &[u8] =
+        include_bytes!("../../pkix-identity/tests/fixtures/cn-hostname.der");
+
+    #[test]
+    fn a_permitted_dns_subtree_counts_as_constraining() {
+        assert!(path_constrains_dns_names(&[
+            cert(LEAF_WITH_DNS_SAN),
+            cert(NC_PERMITTED_DNS)
+        ]));
+    }
+
+    /// Excluded subtrees count too. Either form is a statement about which
+    /// DNS names the subordinate CAs may vouch for, and neither reaches a
+    /// name carried only in the CN — so checking only `permittedSubtrees`
+    /// would leave the excluded case bypassable.
+    #[test]
+    fn an_excluded_dns_subtree_counts_as_constraining() {
+        assert!(path_constrains_dns_names(&[
+            cert(LEAF_WITH_DNS_SAN),
+            cert(NC_EXCLUDED_DNS)
+        ]));
+    }
+
+    #[test]
+    fn a_chain_with_no_name_constraints_does_not_constrain() {
+        assert!(!path_constrains_dns_names(&[
+            cert(LEAF_WITH_DNS_SAN),
+            cert(LEAF_CN_ONLY)
+        ]));
+    }
+
+    #[test]
+    fn an_empty_chain_does_not_constrain() {
+        assert!(!path_constrains_dns_names(&[]));
+    }
+
+    // A SAN that exists but carries no dNSName. RFC 7672 §3.2.3 turns on
+    // DNS-IDs specifically, so these must NOT count — otherwise a leaf
+    // whose only SAN is an address would skip the refusal and have its CN
+    // matched under a constrained path, which is the whole bug.
+    const LEAF_SAN_EMAIL_ONLY: &[u8] =
+        include_bytes!("../../pkix-identity/tests/fixtures/san-rfc822.der");
+    const LEAF_SAN_IP_PLUS_CN: &[u8] =
+        include_bytes!("../../pkix-identity/tests/fixtures/san-ip-plus-cn.der");
+
+    /// Corrupt the `nameConstraints` extension value in place, keeping every
+    /// DER length identical, so the certificate still parses while the
+    /// extension value does not.
+    ///
+    /// The extension's value is stored as an opaque OCTET STRING, so
+    /// retagging its inner SEQUENCE as a SET makes
+    /// `NameConstraints::from_der` fail without disturbing anything around
+    /// it. Done at test time rather than committed: a fixture that cannot be
+    /// regenerated by `openssl` is one nobody can check.
+    fn with_corrupt_name_constraints(der: &[u8]) -> Vec<u8> {
+        // 06 03 55 1D 1E = OID 2.5.29.30, then an optional critical BOOLEAN,
+        // then 04 <len> <SEQUENCE ...>.
+        const NC_OID: &[u8] = &[0x06, 0x03, 0x55, 0x1D, 0x1E];
+        let at = der
+            .windows(NC_OID.len())
+            .position(|w| w == NC_OID)
+            .expect("the fixture carries a nameConstraints extension");
+        let mut out = der.to_vec();
+        let seq = out[at..]
+            .iter()
+            .position(|&b| b == 0x04)
+            .map(|o| at + o)
+            .expect("an OCTET STRING follows the OID");
+        // Skip 04 and its length octets to reach the inner SEQUENCE tag.
+        let len = out[seq + 1];
+        let inner = if len & 0x80 == 0 {
+            seq + 2
+        } else {
+            seq + 2 + (len & 0x7f) as usize
+        };
+        assert_eq!(out[inner], 0x30, "expected the NameConstraints SEQUENCE");
+        out[inner] = 0x31; // SET — same length, no longer a NameConstraints
+        out
+    }
+
+    /// An undecodable `nameConstraints` is treated as constraining.
+    ///
+    /// It cannot be read, so it cannot be shown harmless. Nothing exercised
+    /// this branch until a mutation flipping it to `false` left every test
+    /// green.
+    #[test]
+    fn an_undecodable_name_constraints_is_treated_as_constraining() {
+        let corrupt = with_corrupt_name_constraints(NC_PERMITTED_DNS);
+
+        // Precondition: the certificate still parses, and only the extension
+        // value is broken. Otherwise this would prove nothing.
+        let parsed = cert(&corrupt);
+        assert!(
+            x509_cert::ext::pkix::NameConstraints::from_der(
+                parsed
+                    .tbs_certificate()
+                    .extensions()
+                    .into_iter()
+                    .flatten()
+                    .find(|e| e.extn_id.to_string() == "2.5.29.30")
+                    .expect("the extension is still present")
+                    .extn_value
+                    .as_bytes()
+            )
+            .is_err(),
+            "the extension value must be undecodable for this test to mean anything"
+        );
+
+        assert!(path_constrains_dns_names(&[cert(LEAF_CN_ONLY), parsed]));
+    }
+
+    #[test]
+    fn a_san_without_a_dns_name_is_not_a_dns_id() {
+        assert!(
+            !has_dns_id(&cert(LEAF_SAN_EMAIL_ONLY)),
+            "an rfc822Name SAN is not a DNS-ID"
+        );
+        assert!(
+            !has_dns_id(&cert(LEAF_SAN_IP_PLUS_CN)),
+            "an iPAddress SAN is not a DNS-ID, and this one has a CN to fall back to"
+        );
+    }
+
+    #[test]
+    fn a_dns_san_is_a_dns_id_and_a_bare_cn_is_not() {
+        assert!(has_dns_id(&cert(LEAF_WITH_DNS_SAN)));
+        assert!(
+            !has_dns_id(&cert(LEAF_CN_ONLY)),
+            "a name in the CN is not a DNS-ID — this is the whole condition \
+             RFC 7672 §3.2.3 turns on"
+        );
+    }
+
+    /// The two together are what the refusal tests, so assert the
+    /// combination rather than trusting that reading them side by side is
+    /// enough: a constrained path plus a leaf with no DNS-ID is the one
+    /// case where matching the CN would ignore the constraint.
+    #[test]
+    fn the_refused_combination_is_exactly_constrained_path_plus_no_dns_id() {
+        let constrained = [cert(LEAF_CN_ONLY), cert(NC_PERMITTED_DNS)];
+        assert!(path_constrains_dns_names(&constrained) && !has_dns_id(&constrained[0]));
+
+        // And each half alone is not refused.
+        let unconstrained_no_dns_id = [cert(LEAF_CN_ONLY)];
+        assert!(!path_constrains_dns_names(&unconstrained_no_dns_id));
+
+        let constrained_with_dns_id = [cert(LEAF_WITH_DNS_SAN), cert(NC_PERMITTED_DNS)];
+        assert!(has_dns_id(&constrained_with_dns_id[0]));
     }
 }
