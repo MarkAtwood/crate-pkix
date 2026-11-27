@@ -144,6 +144,47 @@ fn a_crl_is_not_current_one_second_outside_either_end() {
 }
 
 // ---------------------------------------------------------------------------
+// The delta CRL's own window
+// ---------------------------------------------------------------------------
+
+/// A delta CRL carries its own `thisUpdate` and `nextUpdate`, checked
+/// separately from the base's, and the boundaries are inclusive for the
+/// same reason.
+///
+/// `delta-crl-leaf-4.der` is revoked in `delta-crl-mixed.der` and in
+/// neither of the CRLs used here, so inside the window the answer is
+/// `Ok(())` and a refusal can only have come from the window check.
+#[test]
+fn a_delta_crl_is_current_at_both_ends_of_its_own_window() {
+    let (this, next) = crl_window("delta-crl-delta-add.der");
+    let ca = load_cert("delta-crl-ca.der");
+    let leaf = load_cert("delta-crl-leaf-4.der");
+
+    let at = |now: u64| {
+        CrlChecker::with_delta(
+            fixture("delta-crl-base.der"),
+            fixture("delta-crl-delta-add.der"),
+            now,
+            DefaultVerifier,
+        )
+        .expect("the fixtures are a valid base and delta pair")
+    };
+
+    for now in [this, next] {
+        at(now)
+            .check_revocation(&leaf, &ca)
+            .unwrap_or_else(|e| panic!("delta must be current at {now}, got {e:?}"));
+    }
+    for now in [this - 1, next + 1] {
+        let r = at(now).check_revocation(&leaf, &ca);
+        assert!(
+            matches!(r, Err(Error::CrlExpired)),
+            "delta must be out of window at {now}, got {r:?}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
 // OCSP, both entry points
 // ---------------------------------------------------------------------------
 
