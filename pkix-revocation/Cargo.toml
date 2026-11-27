@@ -110,6 +110,10 @@ name = "ocsp_certid_binding"
 required-features = ["ocsp"]
 
 [[test]]
+name = "ocsp_produced_at_bounds"
+required-features = ["ocsp"]
+
+[[test]]
 name = "dp_scope_guards"
 required-features = ["crl"]
 
