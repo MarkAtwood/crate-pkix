@@ -11,8 +11,9 @@ use pkix_ac::{AttributeCertificate, Error, ProfileViolation};
 use pkix_path::DefaultVerifier;
 use x509_cert::Certificate;
 
-/// Inside the fixtures' window, which runs 2025-01-01 to 2026-01-01.
-const NOW: u64 = 1_767_225_600; // 2026-01-01T00:00:00Z minus a day
+/// Inside every fixture's window: the valid ACs run 2025-01-01 to
+/// 2034-01-01, and the authority's certificate 2025-01-01 to 2035-01-01.
+const NOW: u64 = 1_767_225_600; // 2025-12-31T12:00:00Z
 
 fn fixture(name: &str) -> Vec<u8> {
     let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -30,8 +31,13 @@ fn ct_fixture(name: &str) -> Certificate {
 }
 
 /// The Attribute Authority: the certificate whose key signed the ACs.
+///
+/// Built by `tests/fixtures/make_aa.sh`, and deliberately not
+/// `pkix-ct`'s `precert-issuer`: that is a CA, which RFC 5755 §4.5
+/// forbids an AC issuer from being. See [`pkix_ac::check_issuer_profile`].
 fn aa() -> Certificate {
-    ct_fixture("precert-issuer.der")
+    let der = fixture("aa-cert.der");
+    Certificate::from_der(&der).expect("the authority certificate parses")
 }
 
 /// The holder: the entity the ACs name in `entityName`.

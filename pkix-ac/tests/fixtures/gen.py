@@ -31,8 +31,18 @@ import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
 CT = HERE.parent.parent.parent / "pkix-ct" / "tests" / "fixtures" / "sct-oracle"
-AA_CERT = CT / "precert-issuer.der"
-AA_KEY = CT / "precert-issuer-key.pem"
+# The Attribute Authority, built by make_aa.sh. NOT pkix-ct's
+# precert-issuer: that is CA:TRUE with keyUsage "Certificate Sign, CRL
+# Sign", and RFC 5755 §4.5 forbids both for an AC issuer ("an AC issuer
+# cannot be a CA as well", and keyUsage must not exclude
+# digitalSignature). ACs signed by it verify arithmetically and can
+# never pass a conforming end-to-end validation, which is what the
+# pkix-chain wrapper exposed.
+AA_CERT = HERE / "aa-cert.der"
+AA_KEY = HERE / "aa-key.pem"
+# The root that issued the authority, and the holder. Shared with
+# pkix-ct so the same self-signed root is the single trust anchor.
+ROOT_CERT = CT / "precert-issuer.der"
 LEAF_CERT = CT / "precert-leaf-final.der"
 
 # ---------------------------------------------------------------- DER ---
@@ -203,14 +213,14 @@ def main() -> None:
     # entityName, issuer in v2Form with a directoryName. Valid for the
     # same window the borrowed certificates use.
     info = acinfo(leaf_subject, aa_subject, 0x2A,
-                  "20250101000000Z", "20260101000000Z",
+                  "20250101000000Z", "20340101000000Z",
                   seq(role_attribute("urn:example:role:auditor")))
     (HERE / "ac-role-valid.der").write_bytes(attribute_certificate(info))
 
     # Two attributes, to pin that `attributes` is a SEQUENCE OF and the
     # parser keeps the order.
     info = acinfo(leaf_subject, aa_subject, 0x2B,
-                  "20250101000000Z", "20260101000000Z",
+                  "20250101000000Z", "20340101000000Z",
                   seq(role_attribute("urn:example:role:auditor"),
                       role_attribute("urn:example:role:approver")))
     (HERE / "ac-two-roles.der").write_bytes(attribute_certificate(info))
@@ -226,13 +236,13 @@ def main() -> None:
     # to reject. Both parse: the syntax permits what the profile does
     # not, which is why parsing and profile checking are separate.
     info = acinfo(leaf_subject, aa_subject, 0x2D,
-                  "20250101000000Z", "20260101000000Z",
+                  "20250101000000Z", "20340101000000Z",
                   seq(role_attribute("urn:example:role:auditor")),
                   issuer_v1_form=True)
     (HERE / "ac-issuer-v1form.der").write_bytes(attribute_certificate(info))
 
     info = acinfo(leaf_subject, aa_subject, 0x2E,
-                  "20250101000000Z", "20260101000000Z",
+                  "20250101000000Z", "20340101000000Z",
                   seq(role_attribute("urn:example:role:auditor")),
                   holder_both_forms=True)
     (HERE / "ac-holder-both.der").write_bytes(attribute_certificate(info))

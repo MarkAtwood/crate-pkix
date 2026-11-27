@@ -1494,10 +1494,11 @@ dependencies = [
 
 [[package]]
 name = "pkix-chain"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "der",
  "mockito",
+ "pkix-ac",
  "pkix-aia",
  "pkix-aia-http",
  "pkix-dane",

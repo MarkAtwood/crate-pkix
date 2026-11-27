@@ -1,6 +1,22 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
+// `verify_attribute_cert` and the pkix_ac types it names only exist
+// behind `attribute-certs`, and the crate docs link to them. With the
+// feature off those items are gone, so a default-feature rustdoc run
+// cannot resolve the links.
+//
+// Allowed only in that configuration, which loses no signal: a mistyped
+// link is broken with the feature on too, and the quality gate's
+// all-features doc build runs under RUSTDOCFLAGS=-D warnings. Same shape
+// and same reasoning as the attributes in pkix-path, pkix-ct and
+// pkix-revocation-http — docs.rs builds all features, so demoting these
+// to code spans would cost every reader a working link to spare a
+// configuration nobody publishes documentation from.
+#![cfg_attr(
+    not(feature = "attribute-certs"),
+    allow(rustdoc::broken_intra_doc_links)
+)]
 
 //! High-level X.509 certificate chain verification.
 //!
@@ -101,10 +117,14 @@
 //!   `verify_time_stamper`, and `verify_ocsp_responder` compose chain
 //!   validation with the matching `pkix-identity` binding and
 //!   `pkix-profiles` EKU rules, each taking the same `A: AiaFetcher`
-//!   parameter as [`Verifier`]. Niche cases (e.g. attribute-certificate
-//!   verification, CT-anchored validation, DANE TLSA matching) are out
-//!   of scope for this crate and live in `pkix-ac`, `pkix-ct`, and
-//!   `pkix-dane` respectively.
+//!   parameter as [`Verifier`].
+//! - **Composed capabilities.** The mechanism for each lives in its own
+//!   crate and the composition lives here, because composing is where
+//!   the trust decisions are. DANE TLSA matching is on by default via
+//!   the `dane` feature over `pkix-dane`; RFC 5755 attribute
+//!   certificates come with `attribute-certs` over `pkix-ac`, through
+//!   [`verify_attribute_cert`]. CT-anchored validation is not composed
+//!   here and lives in `pkix-ct`.
 
 // Upstream vocabulary, re-exported by name.
 //
@@ -433,6 +453,15 @@ pub enum Error {
     /// [`verify_chain_default`] entry points do not perform identity
     /// binding and never return this variant.
     Identity(pkix_identity::IdentityError),
+    /// RFC 5755 attribute certificate validation failed.
+    ///
+    /// Only produced by [`verify_attribute_cert`]. Carries the
+    /// `pkix-ac` error, which names the rule: a §4.2/§4.3 profile
+    /// violation, an expired AC, a bad signature, an authority that is
+    /// not the issuer the AC names, or a holder mismatch.
+    #[cfg(feature = "attribute-certs")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "attribute-certs")))]
+    AttributeCert(pkix_ac::Error),
     /// A wrapper-side post-validation profile check failed.
     ///
     /// Used by use-case wrappers for spec-mandated invariants that the
@@ -555,6 +584,8 @@ impl core::fmt::Display for Error {
             Self::Path(e) => write!(f, "path validation: {e}"),
             Self::Revocation(e) => write!(f, "revocation: {e}"),
             Self::Identity(e) => write!(f, "identity binding: {e}"),
+            #[cfg(feature = "attribute-certs")]
+            Self::AttributeCert(e) => write!(f, "attribute certificate: {e}"),
             Self::ProfileViolation { kind } => write!(f, "profile violation: {kind}"),
             Self::OcspDelegation { kind } => write!(f, "ocsp responder delegation: {kind}"),
             Self::Aia(e) => write!(f, "aia fetch: {e}"),
@@ -576,6 +607,8 @@ impl std::error::Error for Error {
             Self::Path(e) => Some(e),
             Self::Revocation(e) => Some(e),
             Self::Identity(e) => Some(e),
+            #[cfg(feature = "attribute-certs")]
+            Self::AttributeCert(e) => Some(e),
             Self::Aia(e) => Some(e),
             #[cfg(feature = "dane")]
             Self::Dane(e) => Some(e),
@@ -604,6 +637,13 @@ impl From<pkix_revocation::Error> for Error {
 impl From<pkix_identity::IdentityError> for Error {
     fn from(e: pkix_identity::IdentityError) -> Self {
         Self::Identity(e)
+    }
+}
+
+#[cfg(feature = "attribute-certs")]
+impl From<pkix_ac::Error> for Error {
+    fn from(e: pkix_ac::Error) -> Self {
+        Self::AttributeCert(e)
     }
 }
 
@@ -1607,6 +1647,147 @@ where
     verify_responder_is_delegated_by(&chain[0], issuer, verifier)?;
 
     Ok(validated)
+}
+
+/// What an attribute certificate verification established — RFC 5755 §5.
+///
+/// Both certification paths are returned because both were validated and
+/// a caller may need either: the holder's to know who presented the
+/// credential, the authority's to know who granted it.
+#[cfg(feature = "attribute-certs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "attribute-certs")))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ValidatedAttributeCert {
+    /// The validated path of the entity that presented the AC.
+    pub holder: ValidatedPath,
+    /// The validated path of the Attribute Authority that issued it.
+    pub authority: ValidatedPath,
+    /// Whether the AC named this verifier among its targets — RFC 5755
+    /// §4.3.2. [`pkix_ac::Targeting::Untargeted`] means the AC carries no
+    /// `targetInformation` and any verifier may use it.
+    pub targeting: pkix_ac::Targeting,
+}
+
+/// Verify an RFC 5755 attribute certificate, end to end.
+///
+/// This is the composition `pkix-ac` deliberately does not do: that
+/// crate takes no trust anchors and validates no certification path, so
+/// on its own it will happily check a signature against whatever
+/// authority certificate it is handed. Here both paths are validated
+/// first, which is what makes the answer mean anything.
+///
+/// # What is checked, against RFC 5755 §5
+///
+/// 1. **Rule 1** — the holder's certificate path. `holder_chain[0]` is
+///    the entity presenting the AC, and its whole path is validated.
+/// 2. **Rule 2** — the AC's signature, and the authority's certificate
+///    path. `aa_chain[0]` is the Attribute Authority.
+/// 3. **Rule 3** — §4.5's profile on the authority's own certificate,
+///    via [`pkix_ac::check_issuer_profile`]. This is where a CA is
+///    refused as an authority.
+/// 4. **Rule 5** — the evaluation time against the AC's validity, bounds
+///    inclusive.
+/// 5. **Rule 6** — the targeting check, from `my_names` and `my_groups`.
+/// 6. **Rule 7** — unsupported critical extensions, with the §4.2 and
+///    §4.3 profile, via [`pkix_ac::AttributeCertificate::check_profile`].
+/// 7. **Holder binding** — the AC's holder field against
+///    `holder_chain[0]`. An AC that is validly signed but names someone
+///    else is refused.
+///
+/// # Rule 4 is yours
+///
+/// §5 rule 4 requires the AC issuer to be "directly trusted as an AC
+/// issuer (by configuration or otherwise)", and no library can decide
+/// that. Supplying `aa_chain` is the decision: a CA that your trust
+/// anchors accept for TLS is **not** thereby an authority entitled to
+/// grant roles, and nothing here can tell the difference between an
+/// authority you chose and one an attacker chose for you.
+///
+/// §4.5 narrows the damage rather than fixing it. Because an AC issuer
+/// may not be a CA, an ordinary CA certificate is refused as an
+/// authority whatever `aa_chain` says — so the specific mistake of
+/// reusing a PKI CA as an authority cannot happen silently. A non-CA
+/// certificate chosen wrongly still can.
+///
+/// # Targeting is not a verdict
+///
+/// [`Targeting::NotATarget`](pkix_ac::Targeting::NotATarget) is returned,
+/// not raised as an error. The AC is valid; it is simply not for this
+/// verifier, and whether that is fatal is the caller's policy. Treating
+/// it as success without reading the field is the mistake this shape
+/// makes visible instead of hiding.
+///
+/// # Errors
+///
+/// - [`Error::Path`], [`Error::PathBuild`] or [`Error::Revocation`] from
+///   either path validation, the holder's checked first.
+/// - [`Error::AttributeCert`] for every RFC 5755 failure: a broken
+///   profile rule, an expired AC, a bad signature, an authority that is
+///   not the issuer named, or a holder mismatch.
+#[cfg(feature = "attribute-certs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "attribute-certs")))]
+#[allow(clippy::too_many_arguments)]
+pub fn verify_attribute_cert<V, P, R, A>(
+    ac: &pkix_ac::AttributeCertificate,
+    holder_chain: &[Certificate],
+    aa_chain: &[Certificate],
+    anchors: &[TrustAnchor],
+    my_names: &[x509_cert::ext::pkix::name::GeneralName],
+    my_groups: &[x509_cert::ext::pkix::name::GeneralName],
+    profile: &P,
+    now_unix: u64,
+    verifier: &V,
+    revocation: &R,
+    aia: &A,
+) -> crate::Result<ValidatedAttributeCert>
+where
+    V: SignatureVerifier,
+    P: Profile,
+    R: RevocationChecker,
+    A: AiaFetcher,
+{
+    let policy = profile.policy(now_unix);
+
+    // Rule 1, then rule 2's path half. Both before any AC check: an AC
+    // signed by an authority whose own certificate is expired or revoked
+    // establishes nothing, and reporting the AC's problems first would
+    // send a caller after the wrong thing.
+    let holder = verify_chain(holder_chain, anchors, &policy, verifier, revocation, aia)?;
+    let authority = verify_chain(aa_chain, anchors, &policy, verifier, revocation, aia)?;
+
+    debug_assert!(
+        !holder_chain.is_empty() && !aa_chain.is_empty(),
+        "verify_chain must reject empty chains"
+    );
+    let holder_cert = &holder_chain[0];
+    let aa_cert = &aa_chain[0];
+
+    // Rule 3. Before the signature check, because "this is not an
+    // attribute authority" is a better answer than "the signature did
+    // not verify" when a caller has passed a CA by mistake.
+    pkix_ac::check_issuer_profile(aa_cert)?;
+
+    // Rules 7, and the §4.2/§4.3 profile.
+    ac.check_profile()?;
+
+    // Rule 2's signature half, and rule 5.
+    ac.verify(aa_cert, now_unix, verifier)?;
+
+    // Holder binding. Without this the result would mean "some authority
+    // you trust issued this AC to someone", which is not a question
+    // anybody asks.
+    if !ac.matches_holder(holder_cert) {
+        return Err(Error::AttributeCert(pkix_ac::Error::HolderMismatch));
+    }
+
+    // Rule 6.
+    let targeting = ac.check_targeting(my_names, my_groups)?;
+
+    Ok(ValidatedAttributeCert {
+        holder,
+        authority,
+        targeting,
+    })
 }
 
 /// RFC 6960 §4.2.2.2: enforce that the responder cert at `chain[0]` is

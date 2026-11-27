@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-chain"
 description = "High-level X.509 certificate chain verification (pkix-path + pkix-revocation)"
-version               = "0.9.0"
+version               = "0.9.1"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
@@ -36,6 +36,16 @@ dane-resolver = ["dane", "dep:pkix-dane-resolver"]
 # override a failing DANE validation — without a DANE verdict there is
 # nothing to combine, and the precedence rule has no meaning.
 mta-sts     = ["dane", "dep:pkix-mta-sts"]
+
+# RFC 5755 attribute certificates. Off by default: authorization via
+# attribute certificates is a deployment choice, and a consumer doing
+# ordinary PKIX should not compile the machinery. `pkix-ac` is no_std
+# with no I/O, so the cost of enabling it is small.
+# `pkix-ac/std` comes with it: pkix-chain's Error implements
+# std::error::Error and returns the inner error from source(), which
+# needs the inner type to implement it too. pkix-chain is std-only
+# already, so this adds nothing a consumer was avoiding.
+attribute-certs = ["dep:pkix-ac", "pkix-ac/std"]
 rustcrypto  = ["pkix-path/rustcrypto"]
 crl         = ["pkix-revocation/crl"]
 ocsp        = ["pkix-revocation/ocsp"]
@@ -52,6 +62,7 @@ serde = [
     "pkix-identity/serde",
     "pkix-aia/serde",
     "pkix-dane?/serde",
+    "pkix-ac?/serde",
 ]
 
 [dependencies]
@@ -77,6 +88,7 @@ pkix-aia          = { workspace = true }
 # DaneError implements core::error::Error unconditionally, so Error::Dane
 # can expose it through source() with no feature needed.
 pkix-dane         = { workspace = true, optional = true }
+pkix-ac           = { workspace = true, optional = true }
 
 # DNSSEC-validating resolution, behind `dane-resolver`. Pulls the DNS
 # stack, which is why it is not default-on.

@@ -607,6 +607,69 @@ fn header(input: &[u8]) -> Option<(usize, usize)> {
     Some((len, 2 + count))
 }
 
+/// Check an Attribute Authority's own certificate — RFC 5755 §4.5.
+///
+/// §4.5 constrains the AC issuer's public-key certificate two ways, and
+/// the second matters more than it looks:
+///
+/// - `keyUsage` "MUST NOT explicitly indicate that the AC issuer's
+///   public key cannot be used to validate a digital signature", so a
+///   `keyUsage` that is present and omits `digitalSignature` is a
+///   refusal. An absent extension constrains nothing.
+/// - **"An AC issuer MUST NOT also be a PKC Issuer. That is, an AC
+///   issuer cannot be a CA as well."** So `basicConstraints.cA` must not
+///   be TRUE.
+///
+/// RFC 5755 §5 rule 4 separately requires the AC issuer to be "directly
+/// trusted as an AC issuer (by configuration or otherwise)" — a decision
+/// no library can make for a caller. The obvious way to satisfy it by
+/// accident is to validate the authority's certificate against the same
+/// trust anchors used for everything else, and a CA trusted to issue TLS
+/// certificates is not thereby trusted to grant roles.
+///
+/// Refusing CA certificates as authorities closes that by construction:
+/// an ordinary CA has `cA` TRUE and cannot be used here whatever the
+/// caller intended. The RFC gives its own reason — "to avoid confusion
+/// regarding serial numbers and revocations" — but the authorization
+/// consequence is the useful one.
+///
+/// This does not validate `aa_cert`'s certification path; that remains
+/// the caller's, per the crate documentation.
+///
+/// # Errors
+///
+/// [`Error::ProfileViolation`] carrying [`ProfileViolation::IssuerIsACa`],
+/// [`ProfileViolation::IssuerCannotSign`] or
+/// [`ProfileViolation::IssuerExtensionMalformed`].
+pub fn check_issuer_profile(aa_cert: &Certificate) -> Result<()> {
+    const OID_BASIC_CONSTRAINTS: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.19");
+    const OID_KEY_USAGE: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.15");
+
+    let Some(exts) = aa_cert.tbs_certificate().extensions() else {
+        // No extensions: no cA assertion and no keyUsage, so neither
+        // §4.5 rule has anything to bite on.
+        return Ok(());
+    };
+
+    if let Some(ext) = exts.iter().find(|e| e.extn_id == OID_BASIC_CONSTRAINTS) {
+        let bc = x509_cert::ext::pkix::BasicConstraints::from_der(ext.extn_value.as_bytes())
+            .map_err(|_| Error::ProfileViolation(ProfileViolation::IssuerExtensionMalformed))?;
+        if bc.ca {
+            return Err(Error::ProfileViolation(ProfileViolation::IssuerIsACa));
+        }
+    }
+
+    if let Some(ext) = exts.iter().find(|e| e.extn_id == OID_KEY_USAGE) {
+        let ku = x509_cert::ext::pkix::KeyUsage::from_der(ext.extn_value.as_bytes())
+            .map_err(|_| Error::ProfileViolation(ProfileViolation::IssuerExtensionMalformed))?;
+        if !ku.digital_signature() {
+            return Err(Error::ProfileViolation(ProfileViolation::IssuerCannotSign));
+        }
+    }
+
+    Ok(())
+}
+
 /// Which RFC 5755 §4.2 profile rule a certificate broke.
 ///
 /// Separate from [`Error`] so a profile failure says which rule, not
@@ -656,6 +719,17 @@ pub enum ProfileViolation {
     NoRevAvailCritical,
     /// §4.3.2: a target used `targetCert`, which MUST NOT be used.
     TargetCertUsed,
+    /// §4.5: the Attribute Authority's certificate is a CA
+    /// (`basicConstraints.cA` is TRUE). An AC issuer must not also be a
+    /// PKC issuer.
+    IssuerIsACa,
+    /// §4.5: the Attribute Authority's `keyUsage` excludes
+    /// `digitalSignature`, so its key may not be used to validate the
+    /// signature it just made.
+    IssuerCannotSign,
+    /// §4.5: the Attribute Authority's `basicConstraints` or `keyUsage`
+    /// extension will not decode.
+    IssuerExtensionMalformed,
 }
 
 impl core::fmt::Display for ProfileViolation {
@@ -688,6 +762,15 @@ impl core::fmt::Display for ProfileViolation {
                 "noRevAvail is critical, though RFC 5755 §4.3.6 requires it not to be"
             }
             Self::TargetCertUsed => "a target used targetCert, which RFC 5755 §4.3.2 forbids",
+            Self::IssuerIsACa => {
+                "the attribute authority's certificate is a CA, which RFC 5755 §4.5 forbids"
+            }
+            Self::IssuerCannotSign => {
+                "the attribute authority's keyUsage excludes digitalSignature (RFC 5755 §4.5)"
+            }
+            Self::IssuerExtensionMalformed => {
+                "the attribute authority's basicConstraints or keyUsage will not decode"
+            }
         };
         f.write_str(s)
     }
@@ -712,6 +795,16 @@ pub enum Error {
     Expired,
     /// The signature did not verify under the AA's public key.
     SignatureInvalid,
+    /// The attribute certificate names a different holder than the
+    /// entity presenting it.
+    ///
+    /// [`AttributeCertificate::matches_holder`] answers this as a
+    /// `bool`, because "not for this entity" is an ordinary answer. This
+    /// variant exists for the composed check — RFC 5755 §5 rule 1 — where
+    /// a mismatch is a failure rather than a question: an AC that is
+    /// validly signed by a trusted authority but issued to somebody else
+    /// grants the presenter nothing.
+    HolderMismatch,
     /// A critical extension this crate cannot act on — RFC 5755 §5
     /// rule 7. Carries the offending OID so a caller can say which.
     UnsupportedCriticalExtension(
@@ -730,6 +823,9 @@ impl core::fmt::Display for Error {
             Self::NotYetValid => f.write_str("attribute certificate is not yet valid"),
             Self::Expired => f.write_str("attribute certificate has expired"),
             Self::SignatureInvalid => f.write_str("attribute certificate signature invalid"),
+            Self::HolderMismatch => {
+                f.write_str("attribute certificate was issued to a different holder")
+            }
             Self::UnsupportedCriticalExtension(oid) => {
                 write!(f, "unsupported critical extension {oid}")
             }
