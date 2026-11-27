@@ -3259,10 +3259,14 @@ mod tests_constraint_forms {
     /// `ip_constraint_within` accepts both lengths it documents.
     ///
     /// The guard is `a.len() != b.len() || !(a.len() == 8 || a.len() == 32)`.
-    /// Flipping the `== 8` to `!=` makes the negation reject exactly the
-    /// 8-byte IPv4 case the function is most used for.
+    /// Either comparison flipped to `!=` turns the negation into a refusal
+    /// of exactly the family that comparison names, so both families are
+    /// here: 8 bytes is the IPv4 case the function is most used for, and 32
+    /// the IPv6 one, where the refusal would be silent because an
+    /// `ip_constraint_within` that answers `false` reports "not contained"
+    /// rather than "could not tell".
     #[test]
-    fn an_ipv4_constraint_is_within_a_shorter_prefix() {
+    fn an_ip_constraint_is_within_a_shorter_prefix_of_either_family() {
         // 192.0.2.0/24 inside 192.0.0.0/16: b's mask bits are a subset of
         // a's, and the addresses agree under b's mask.
         let a = [192, 0, 2, 0, 255, 255, 255, 0];
@@ -3270,9 +3274,48 @@ mod tests_constraint_forms {
         assert!(ip_constraint_within(&a, &b));
         assert!(!ip_constraint_within(&b, &a), "the wider one is not inside");
 
+        // 2001:db8:1::/48 inside 2001:db8::/32, the same relation in the
+        // 32-byte form.
+        let mut a6 = [0u8; 32];
+        a6[..6].copy_from_slice(&[0x20, 0x01, 0x0d, 0xb8, 0x00, 0x01]);
+        a6[16..22].copy_from_slice(&[0xff; 6]);
+        let mut b6 = [0u8; 32];
+        b6[..4].copy_from_slice(&[0x20, 0x01, 0x0d, 0xb8]);
+        b6[16..20].copy_from_slice(&[0xff; 4]);
+        assert!(ip_constraint_within(&a6, &b6));
+        assert!(
+            !ip_constraint_within(&b6, &a6),
+            "the wider one is not inside"
+        );
+
         // Mismatched family lengths are not comparable.
         let v6 = [0u8; 32];
         assert!(!ip_constraint_within(&a, &v6));
+    }
+
+    /// Only 8 and 32 bytes are iPAddress *constraints*.
+    ///
+    /// A 16-byte value is a bare IPv6 address with no mask, and a 4-byte
+    /// one a bare IPv4 address. Accepted, the function would read the
+    /// second half of the value as the mask: two all-zero 16-byte blobs
+    /// would then contain each other, which is the widest possible
+    /// subtree. The guard refuses them, and the length it rejects them for
+    /// is why both `== 8` and `== 32` have to be comparisons against the
+    /// lengths they name.
+    #[test]
+    fn an_address_without_a_mask_is_not_a_constraint() {
+        fn refused<const N: usize>() {
+            let bare = [0u8; N];
+            assert!(
+                !ip_constraint_within(&bare, &bare),
+                "{N} bytes is not an address-plus-mask constraint"
+            );
+        }
+        refused::<0>();
+        refused::<4>();
+        refused::<16>();
+        refused::<17>();
+        refused::<64>();
     }
 
     /// `subtree_within` routes two `directoryName`s to the DN comparison.
@@ -6239,6 +6282,49 @@ mod tests_policy_fields {
                 Err(Error::ValidityPeriodExceedsMax { index: 0 })
             ),
             "1-cert chain: long-validity cert with 1-day cap must return ValidityPeriodExceedsMax {{ index: 0 }}"
+        );
+    }
+
+    /// The cap is a maximum, so a cert whose validity is exactly the cap
+    /// passes and one second more fails.
+    ///
+    /// Both bounds come from the fixture rather than from a constant here:
+    /// the test asks "is the comparison inclusive at the documented end",
+    /// and a hard-coded duration would make it ask whether the fixture
+    /// still has the duration it had when the test was written. The other
+    /// tests in this section are all orders of magnitude away from the
+    /// boundary, so `>` read as `>=` left them all passing.
+    #[test]
+    fn max_validity_admits_a_cert_exactly_at_the_cap() {
+        let cert = Certificate::from_der(include_bytes!("../tests/fixtures/ec-p256-sha256.der"))
+            .expect("parse ec-p256-sha256.der");
+        let validity = cert.tbs_certificate().validity();
+        let exact = validity.not_after.to_unix_duration().as_secs()
+            - validity.not_before.to_unix_duration().as_secs();
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+
+        let mut policy = ValidationPolicy::new(1_780_272_000); // 2026-06-01
+        policy.max_validity_secs = Some(exact);
+        validate_path(
+            core::slice::from_ref(&cert),
+            &anchors,
+            &policy,
+            &EcdsaP256Verifier,
+        )
+        .expect("a validity period equal to the cap is within the cap");
+
+        policy.max_validity_secs = Some(exact - 1);
+        assert!(
+            matches!(
+                validate_path(
+                    core::slice::from_ref(&cert),
+                    &anchors,
+                    &policy,
+                    &EcdsaP256Verifier
+                ),
+                Err(Error::ValidityPeriodExceedsMax { index: 0 })
+            ),
+            "one second over the cap must be refused"
         );
     }
 
