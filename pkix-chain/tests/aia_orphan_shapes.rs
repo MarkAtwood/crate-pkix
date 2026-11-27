@@ -174,3 +174,82 @@ fn the_untrusted_self_signed_root_cannot_reach_the_anchor_alone() {
         "an untrusted self-signed root must not terminate the path"
     );
 }
+
+/// `verify_one`'s fast path refuses a certificate-correctness failure
+/// without attempting a fetch.
+///
+/// The rustdoc on `verify_one` promises exactly this -- an expired leaf,
+/// a wrong KeyUsage or a name-constraint violation surfaces directly,
+/// "without ever attempting AIA fetching that cannot help" -- and nothing
+/// asserted it. `is_aia_recoverable` is what keeps the promise; widened to
+/// admit a validity failure, every expired certificate in a batch would
+/// cost a round trip to its CA's AIA endpoint, which can only return a
+/// certificate that changes nothing.
+///
+/// The leaf's validity ended in 2010, and the intermediate carries a
+/// `caIssuers` URI the fetcher would serve, so a fetch would be visible.
+#[test]
+fn a_certificate_correctness_failure_costs_no_fetch() {
+    let anchors = [TrustAnchor::from_cert(load("anchored-root.der"))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+    let f = MapFetcher::new(&[("http://aia.test/anchored-root.der", "anchored-root.der")]);
+
+    let r = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy, &f)
+        .verify_one(&[load("anchored-leaf-expired.der"), load("anchored-int.der")]);
+
+    assert!(r.is_err(), "an expired leaf must not validate; got {r:?}");
+    assert_eq!(
+        f.fetched(),
+        Vec::<String>::new(),
+        "nothing should have been fetched: the intermediate's issuer is the \
+         anchor, so its caIssuers URI cannot contribute"
+    );
+}
+
+/// The orphan walk does not ask a certificate the trust anchor issued for
+/// its `caIssuers` URIs.
+///
+/// Fetching there can only produce a certificate the anchor set already
+/// supersedes: the request tells the CA's AIA endpoint which certificate is
+/// being validated and buys nothing.
+///
+/// Reaching the predicate with an anchor-issued certificate takes the
+/// sans-I/O surface rather than `verify_one`. The walk only visits a
+/// certificate it has a verified issuer link to, so an anchor-issued one is
+/// visited only when the pool holds a complete, signature-valid path --
+/// and `verify_one`'s fast path answers that case before reassembly starts,
+/// because a validity failure is not AIA-recoverable. Driving `next_step`
+/// directly skips the fast path, which is what a caller doing its own I/O
+/// does.
+///
+/// The anchor-issued intermediate here carries a `caIssuers` URI so that a
+/// wrongly-included orphan shows up as a `Fetch`. `deep-i5.der`, the
+/// corpus's only other anchor-issued intermediate, carries no AIA
+/// extension, which is why this conjunct had no test.
+#[test]
+fn the_orphan_walk_skips_an_anchor_issued_certificate() {
+    use pkix_chain::sans_io::{BuildStep, ChainBuildState, ChainBuilder};
+    use pkix_chain::AiaConfig;
+
+    let anchors = [TrustAnchor::from_cert(load("anchored-root.der"))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+    let config = AiaConfig::default();
+    let builder = ChainBuilder {
+        anchors: &anchors,
+        sig_verifier: &DefaultVerifier,
+        policy: &policy,
+        config: &config,
+    };
+
+    let chain = [load("anchored-leaf-expired.der"), load("anchored-int.der")];
+    let mut state = ChainBuildState::new(&chain, &config);
+
+    match builder.next_step(&mut state, &chain[0]) {
+        BuildStep::Failed(_) => {}
+        BuildStep::Fetch(uris) => panic!(
+            "nothing is missing: the intermediate's issuer is the anchor, so \
+             its caIssuers URI cannot contribute, yet {uris:?} was requested"
+        ),
+        BuildStep::Built(_) => panic!("the leaf is expired; this must not build"),
+    }
+}

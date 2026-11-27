@@ -74,6 +74,6 @@ it builds and why the shape matters:
 |---|---|
 | `constrained-no-san/` | a path asserting `nameConstraints` over a leaf with no DNS-ID (RFC 7672 §3.2.3) |
 | `tsa-ku/` | one certificate per non-signing KeyUsage bit (RFC 3161 §2.3) |
-| `aia-orphan-shapes/` | pool shapes the AIA orphan predicate must exclude: an issuer namesake with no `basicConstraints`, and an untrusted self-signed root reachable only through its cross-certificate |
+| `aia-orphan-shapes/` | pool shapes the AIA orphan predicate must exclude: an issuer namesake with no `basicConstraints`, an untrusted self-signed root reachable only through its cross-certificate, and an anchor-issued intermediate carrying `caIssuers` |
 | `ocsp-depth2/` | a depth-2 delegated OCSP responder chain, with a deliberate serial collision (RFC 6960 §4.2.2.2.1) |
 | `review/` | AIA fetching and path building: sequential-discovery depth chains, 64-way issuer fan-out, and a topological path to the anchor that does not validate (`review_aia.rs`, `review_*.rs`) |

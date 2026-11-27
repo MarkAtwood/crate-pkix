@@ -196,6 +196,65 @@ def gen_xsign():
     write("xsign-leaf.der", leaf)
 
 
+def gen_anchored():
+    """anchored-*: an intermediate the anchor issued, carrying caIssuers.
+
+    `orphans_on_paths` must not ask a certificate for its caIssuers URIs
+    when its issuer is already a trust anchor: fetching there can only
+    produce a certificate the anchor set already supersedes, so the request
+    tells the CA's AIA endpoint which certificate is being validated and
+    buys nothing.
+
+    Showing that needs three things at once, and no existing fixture has
+    all three: a complete topological path (so the orphan walk reaches the
+    top of the chain), a validation that fails anyway (so the walk runs at
+    all rather than the build simply succeeding), and a caIssuers URI on
+    the anchor-issued certificate (so a wrongly-included orphan is
+    visible as a fetch). `deep-i5.der`, the only anchor-issued intermediate
+    in the corpus, carries no AIA extension.
+
+    The leaf's validity ends in 2010, so the chain is complete and refused.
+    """
+    root_key = ec.generate_private_key(ec.SECP256R1())
+    int_key = ec.generate_private_key(ec.SECP256R1())
+    leaf_key = ec.generate_private_key(ec.SECP256R1())
+
+    root_name = name("AIA Anchored Root")
+    int_name = name("AIA Anchored Int")
+
+    root = (
+        base(root_name, root_name, root_key.public_key(), 0xA001)
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .add_extension(CA_KEY_USAGE, critical=True)
+        .sign(root_key, hashes.SHA256())
+    )
+
+    intermediate = (
+        base(int_name, root_name, int_key.public_key(), 0xA002)
+        .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+        .add_extension(CA_KEY_USAGE, critical=True)
+        .add_extension(ca_issuers("http://aia.test/anchored-root.der"), critical=False)
+        .sign(root_key, hashes.SHA256())
+    )
+
+    leaf = (
+        x509.CertificateBuilder()
+        .subject_name(name("AIA Anchored Leaf"))
+        .issuer_name(int_name)
+        .public_key(leaf_key.public_key())
+        .serial_number(0xA003)
+        .not_valid_before(NOT_BEFORE)
+        .not_valid_after(datetime.datetime(2010, 1, 1, tzinfo=datetime.timezone.utc))
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .sign(int_key, hashes.SHA256())
+    )
+
+    write("anchored-root.der", root)
+    write("anchored-int.der", intermediate)
+    write("anchored-leaf-expired.der", leaf)
+
+
 if __name__ == "__main__":
     gen_noca()
     gen_xsign()
+    gen_anchored()
