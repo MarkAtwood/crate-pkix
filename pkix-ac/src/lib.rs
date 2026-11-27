@@ -1206,6 +1206,10 @@ fn header(input: &[u8]) -> Option<(usize, usize)> {
     }
     let mut len = 0usize;
     for &b in octets {
+        // `|` and `^` are the same operation here, because the shift
+        // leaves the low eight bits zero and `b` touches only those. A
+        // mutation sweep reports the `^` form as surviving; it is
+        // equivalent, not untested.
         len = (len << 8) | b as usize;
     }
     if len < 0x80 {
@@ -1777,5 +1781,243 @@ mod tests {
                 "{name} must say which rule broke, got {rendered:?}"
             );
         }
+    }
+    // -----------------------------------------------------------------
+    // general_names_match
+    // -----------------------------------------------------------------
+    //
+    // This decides whether an AC's holder `entityName`, or a target
+    // name, is the same name as one the verifier presents. RFC 5755
+    // §4.2.2 and §4.3.2 say "the same as", and sameness differs by name
+    // form: a DN compares under RFC 4518 prep, a dNSName and the domain
+    // half of an rfc822Name are case-insensitive, and nothing else gives
+    // a basis to relax byte equality. Each arm is its own rule, and
+    // deleting any of them silently falls through to byte equality --
+    // which fails closed, so the AC stops matching the holder it was
+    // issued for.
+
+    fn dns(name: &str) -> GeneralName {
+        GeneralName::DnsName(der::asn1::Ia5String::new(name).expect("ASCII"))
+    }
+
+    fn email(addr: &str) -> GeneralName {
+        GeneralName::Rfc822Name(der::asn1::Ia5String::new(addr).expect("ASCII"))
+    }
+
+    fn uri(value: &str) -> GeneralName {
+        GeneralName::UniformResourceIdentifier(der::asn1::Ia5String::new(value).expect("ASCII"))
+    }
+
+    fn dn(rdn: &str) -> GeneralName {
+        use core::str::FromStr as _;
+        GeneralName::DirectoryName(x509_cert::name::Name::from_str(rdn).expect("RFC 4514 DN"))
+    }
+
+    /// A `dNSName` compares without regard to case.
+    ///
+    /// Deleting the arm leaves byte equality, and a verifier presenting
+    /// the same host in different case is told it is not the target.
+    #[test]
+    fn dns_names_compare_case_insensitively() {
+        assert!(general_names_match(
+            &dns("Holder.Example"),
+            &dns("holder.example")
+        ));
+        assert!(!general_names_match(
+            &dns("holder.example"),
+            &dns("other.example")
+        ));
+    }
+
+    /// A `directoryName` compares under the DN rules, not byte equality.
+    ///
+    /// RFC 4518 case-folds, so two DNs that differ only in the case of an
+    /// attribute value are one name. Byte equality says otherwise.
+    #[test]
+    fn directory_names_compare_as_distinguished_names() {
+        assert!(general_names_match(
+            &dn("CN=Holder One"),
+            &dn("cn=holder one")
+        ));
+        assert!(!general_names_match(
+            &dn("CN=Holder One"),
+            &dn("CN=Holder Two")
+        ));
+    }
+
+    /// An `rfc822Name` is case-sensitive in its local part and
+    /// case-insensitive in its domain.
+    ///
+    /// The local part belongs to the destination host and nothing lets a
+    /// verifier fold it; the domain is DNS and does. Both halves are
+    /// asserted, because one comparison decides them together: `&&`
+    /// loosened to `||` matches any two addresses sharing either half,
+    /// which is a different mailbox.
+    #[test]
+    fn mailbox_domains_fold_case_and_local_parts_do_not() {
+        assert!(general_names_match(
+            &email("Holder@Example.COM"),
+            &email("Holder@example.com")
+        ));
+        assert!(
+            !general_names_match(&email("holder@example.com"), &email("Holder@example.com")),
+            "the local part is not case-folded"
+        );
+        assert!(
+            !general_names_match(&email("holder@example.com"), &email("holder@other.com")),
+            "a shared local part is not a shared mailbox"
+        );
+        assert!(
+            !general_names_match(&email("holder@example.com"), &email("other@example.com")),
+            "a shared domain is not a shared mailbox"
+        );
+        assert!(general_names_match(
+            &email("holder@example.com"),
+            &email("holder@example.com")
+        ));
+    }
+
+    /// An `rfc822Name` with no `@` has no domain half to fold, so it
+    /// compares whole.
+    ///
+    /// Splitting on a separator that is not there would mean guessing
+    /// which half is the domain. These are malformed addresses, and the
+    /// comparison neither accepts nor invents a reading of them.
+    #[test]
+    fn a_mailbox_without_an_at_sign_compares_whole() {
+        assert!(general_names_match(&email("holder"), &email("holder")));
+        assert!(!general_names_match(&email("holder"), &email("Holder")));
+        assert!(!general_names_match(
+            &email("holder"),
+            &email("holder@example.com")
+        ));
+    }
+
+    /// Every other name form falls back to byte equality.
+    ///
+    /// There is no relaxation to apply, but the fallback still has to
+    /// answer `true` for a name equal to itself -- a URI target that
+    /// stopped matching itself would make the AC unusable by the
+    /// verifier it names.
+    #[test]
+    fn other_name_forms_compare_byte_for_byte() {
+        assert!(general_names_match(
+            &uri("https://holder.example/"),
+            &uri("https://holder.example/")
+        ));
+        assert!(!general_names_match(
+            &uri("https://holder.example/"),
+            &uri("https://Holder.Example/")
+        ));
+        assert!(
+            !general_names_match(&dns("holder.example"), &email("holder@example.com")),
+            "two different forms are never the same name"
+        );
+    }
+    // -----------------------------------------------------------------
+    // header / acinfo_range
+    // -----------------------------------------------------------------
+    //
+    // A hand-rolled DER length reader, used to take `acinfo` as a byte
+    // range out of the original encoding rather than re-encoding it --
+    // those are the bytes the Attribute Authority signed. It is
+    // deliberately stricter than it needs to be: a length that `der`
+    // would refuse must be refused here too, or the range handed to the
+    // signature check covers bytes no AA ever signed.
+    //
+    // Only the length matters to these, so the tag byte below is an
+    // arbitrary 0x30 and the value bytes are mostly absent. `header`
+    // reports what the encoding claims; it is the callers that check the
+    // claim against the buffer.
+
+    /// A short-form length is the byte itself.
+    #[test]
+    fn a_short_form_length_is_the_length() {
+        assert_eq!(header(&[0x30, 0x00]), Some((0, 2)));
+        assert_eq!(header(&[0x30, 0x7F]), Some((0x7F, 2)));
+    }
+
+    /// 0x80 is not the length 128.
+    ///
+    /// It is the long form with no length octets, which DER does not
+    /// define (BER's indefinite length). Read as a short form it claims
+    /// 128 bytes; read as the long form it is a count of zero, which the
+    /// count check refuses.
+    #[test]
+    fn an_indefinite_length_marker_is_refused() {
+        assert_eq!(header(&[0x30, 0x80]), None);
+        assert_eq!(header(&[0x30, 0x80, 0x01, 0x02]), None);
+    }
+
+    /// The long form carries one to four length octets.
+    ///
+    /// Four is the most this accepts; five is refused rather than
+    /// truncated into a `usize`, because a length that large cannot
+    /// describe a certificate anyone signed and silently narrowing it
+    /// would produce a range into the middle of the value.
+    #[test]
+    fn the_long_form_accepts_up_to_four_length_octets() {
+        assert_eq!(header(&[0x30, 0x81, 0x80]), Some((0x80, 3)));
+        assert_eq!(header(&[0x30, 0x82, 0x01, 0x00]), Some((0x100, 4)));
+        assert_eq!(
+            header(&[0x30, 0x84, 0x01, 0x00, 0x00, 0x00]),
+            Some((0x0100_0000, 6)),
+            "four octets is the widest accepted, not the first rejected"
+        );
+        assert_eq!(
+            header(&[0x30, 0x85, 0x01, 0x00, 0x00, 0x00, 0x00]),
+            None,
+            "five is over-long"
+        );
+    }
+
+    /// The long form must be minimal.
+    ///
+    /// A leading zero octet, or a value under 0x80 that the short form
+    /// could have carried, is a non-canonical encoding. `der` refuses
+    /// both, so accepting them here could only produce a byte range no
+    /// Attribute Authority ever signed.
+    #[test]
+    fn a_non_minimal_long_form_length_is_refused() {
+        assert_eq!(
+            header(&[0x30, 0x82, 0x00, 0x80]),
+            None,
+            "a leading zero length octet"
+        );
+        assert_eq!(
+            header(&[0x30, 0x81, 0x7F]),
+            None,
+            "0x7F fits the short form"
+        );
+        assert_eq!(
+            header(&[0x30, 0x81, 0x80]),
+            Some((0x80, 3)),
+            "0x80 does not, so the long form is minimal for it"
+        );
+    }
+
+    /// `acinfo_range` refuses an inner element that claims more bytes
+    /// than the outer `SEQUENCE` holds.
+    ///
+    /// The range it returns is used to slice the signed bytes, so a
+    /// claim the buffer cannot support has to be refused and not clamped
+    /// -- clamping would hand the signature check a prefix of `acinfo`
+    /// and call it the whole.
+    #[test]
+    fn acinfo_range_refuses_an_inner_length_past_the_outer_value() {
+        // Outer SEQUENCE of 3 bytes holding an element claiming 5.
+        assert_eq!(acinfo_range(&[0x30, 0x03, 0x30, 0x05, 0x00]), None);
+    }
+
+    /// An inner element exactly filling the outer value is in range.
+    ///
+    /// The comparison is `total > body.len()`, and the boundary is
+    /// reachable: it is an outer `SEQUENCE` whose first element is also
+    /// its last. Read as `>=` it refuses that, which is one byte of
+    /// slack between "fits" and "does not".
+    #[test]
+    fn acinfo_range_accepts_an_inner_length_that_exactly_fills_the_outer() {
+        // Outer SEQUENCE of 2 bytes holding a 2-byte element (tag, len 0).
+        assert_eq!(acinfo_range(&[0x30, 0x02, 0x05, 0x00]), Some(2..4));
     }
 }
