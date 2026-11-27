@@ -126,6 +126,10 @@ required-features = ["rsa", "ed25519", "std"]
 name = "gentime_validity"
 required-features = ["p256", "std"]
 
+[[test]]
+name = "leaf_only_checks"
+required-features = ["p256", "std"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
