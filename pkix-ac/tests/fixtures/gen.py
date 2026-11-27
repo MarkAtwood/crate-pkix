@@ -231,11 +231,31 @@ def issuer_serial_contents(name_der: bytes, serial: int) -> bytes:
     return general_names(general_name_directory(name_der)) + integer(serial)
 
 
+def enumerated(n: int) -> bytes:
+    return tlv(0x0A, bytes([n]))
+
+
+SHA256_ALGID = seq(oid("2.16.840.1.101.3.4.2.1"))
+
+
+def object_digest_info_contents(digested_object_type: int = 0) -> bytes:
+    """ObjectDigestInfo contents -- RFC 5755 §4.1.
+
+    Unwrapped so a caller can apply an IMPLICIT context tag, which
+    replaces the SEQUENCE tag. `digestedObjectType` 2 is otherObjectTypes,
+    which §4.1 says MUST NOT be used.
+    """
+    return (enumerated(digested_object_type) + SHA256_ALGID
+            + bitstring(bytes(32)))
+
+
 def acinfo(holder_name: bytes, issuer_name: bytes, serial: int,
            not_before: str, not_after: str, attrs: bytes,
            issuer_v1_form: bool = False,
            holder_both_forms: bool = False,
-           exts: bytes = b"") -> bytes:
+           exts: bytes = b"",
+           holder_override: bytes = b"",
+           issuer_override: bytes = b"") -> bytes:
     version = integer(1)  # AttCertVersion v2
     # IMPLICIT tagging: [1] REPLACES the SEQUENCE OF tag of GeneralNames,
     # so the GeneralName sits directly inside [1] with no inner SEQUENCE.
@@ -262,6 +282,10 @@ def acinfo(holder_name: bytes, issuer_name: bytes, serial: int,
         issuer = general_names(general_name_directory(issuer_name))
     else:
         issuer = tlv(0xA0, general_names(general_name_directory(issuer_name)))
+    if holder_override:
+        holder = holder_override
+    if issuer_override:
+        issuer = issuer_override
     validity = seq(gen_time(not_before), gen_time(not_after))
     # `extensions` is the last field of AttributeCertificateInfo, after
     # the optional issuerUniqueID, and is itself OPTIONAL -- so an empty
@@ -396,6 +420,84 @@ def main() -> None:
     too_long = tlv(0x04, bytes(21))
     info = with_exts(0x3A, extension(ID_PE_AC_AUDIT_IDENTITY, True, too_long))
     (HERE / "ac-audit-too-long.der").write_bytes(attribute_certificate(info))
+
+    # ---- §4.2 profile rules, one fixture each -----------------------
+    #
+    # Each of these was an implemented rule with nothing but a Display
+    # test behind it. All of them parse: §4.1's syntax permits what the
+    # §4.2 profile forbids, which is why parsing and profile checking
+    # are separate steps.
+
+    def info_with(serial, **kw):
+        return acinfo(leaf_subject, aa_subject, serial, *window, role, **kw)
+
+    # §4.2.3: issuerName is required. A v2Form with none at all.
+    (HERE / "ac-issuer-no-name.der").write_bytes(attribute_certificate(
+        info_with(0x40, issuer_override=tlv(0xA0, b""))))
+
+    # §4.2.3: and it must carry one and only one name.
+    two_names = general_names(general_name_directory(aa_subject),
+                              general_name_directory(leaf_subject))
+    (HERE / "ac-issuer-two-names.der").write_bytes(attribute_certificate(
+        info_with(0x41, issuer_override=tlv(0xA0, two_names))))
+
+    # §4.2.3: a non-directoryName issuerName cannot be compared against
+    # a certificate subject.
+    (HERE / "ac-issuer-dns-name.der").write_bytes(attribute_certificate(
+        info_with(0x42, issuer_override=tlv(
+            0xA0, general_names(general_name_dns("aa.example.com"))))))
+
+    # §4.2.3: v2Form must carry neither baseCertificateID nor
+    # objectDigestInfo. [0] IssuerSerial, implicit.
+    (HERE / "ac-issuer-extra-fields.der").write_bytes(attribute_certificate(
+        info_with(0x43, issuer_override=tlv(
+            0xA0,
+            general_names(general_name_directory(aa_subject))
+            + tlv(0xA0, issuer_serial_contents(aa_subject, 0x11))))))
+
+    # §4.2.2: entityName must be a single name. [1] is IMPLICIT, so it
+    # replaces the SEQUENCE OF tag and both names sit directly inside.
+    (HERE / "ac-holder-two-names.der").write_bytes(attribute_certificate(
+        info_with(0x44, holder_override=seq(tlv(
+            0xA1,
+            general_name_directory(leaf_subject)
+            + general_name_directory(aa_subject))))))
+
+    # §4.1/§4.2.2: objectDigestInfo is not profiled for the holder.
+    (HERE / "ac-holder-digest-info.der").write_bytes(attribute_certificate(
+        info_with(0x45, holder_override=seq(
+            tlv(0xA2, object_digest_info_contents())))))
+
+    # §4.1: at least one attribute is required.
+    (HERE / "ac-no-attributes.der").write_bytes(attribute_certificate(
+        acinfo(leaf_subject, aa_subject, 0x46, *window, seq())))
+
+    # §4.1: and each attribute needs at least one value.
+    empty_attr = seq(oid(ID_AT_ROLE), tlv(0x31, b""))
+    (HERE / "ac-attribute-no-values.der").write_bytes(attribute_certificate(
+        acinfo(leaf_subject, aa_subject, 0x47, *window, seq(empty_attr))))
+
+    # §4.2.3: "all AC issuers MUST have non-empty distinguished names".
+    # A directoryName wrapping an empty RDNSequence satisfies every
+    # count-based check and none of the content-based one.
+    (HERE / "ac-issuer-empty-dn.der").write_bytes(attribute_certificate(
+        info_with(0x49, issuer_override=tlv(
+            0xA0, general_names(general_name_directory(seq()))))))
+
+    # The other optional trailing field. issuerUniqueID and extensions
+    # are both OPTIONAL and neither is context-tagged, so they are
+    # distinguishable only because one is a BIT STRING and the other a
+    # SEQUENCE. This fixture carries BOTH, which is the only way to show
+    # the disambiguation actually works.
+    info = seq(integer(1),
+               seq(tlv(0xA1, general_name_directory(leaf_subject))),
+               tlv(0xA0, general_names(general_name_directory(aa_subject))),
+               ECDSA_SHA256, integer(0x48),
+               seq(gen_time(window[0]), gen_time(window[1])),
+               role,
+               bitstring(b"\x2a\x2b\x2c"),
+               seq(extension(ID_CE_NO_REV_AVAIL, False, b"\x05\x00")))
+    (HERE / "ac-issuer-unique-id.der").write_bytes(attribute_certificate(info))
 
     for f in sorted(HERE.glob("ac-*.der")):
         print(f"{f.name}: {f.stat().st_size} bytes")

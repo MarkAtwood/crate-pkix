@@ -46,6 +46,7 @@ const HOLDER_DER: &[u8] =
 const AA_DER: &[u8] = include_bytes!("../../pkix-ac/tests/fixtures/aa-cert.der");
 const AC_VALID: &[u8] = include_bytes!("../../pkix-ac/tests/fixtures/ac-role-valid.der");
 const AC_EXPIRED: &[u8] = include_bytes!("../../pkix-ac/tests/fixtures/ac-expired.der");
+const AC_TARGETED: &[u8] = include_bytes!("../../pkix-ac/tests/fixtures/ac-targeted.der");
 
 fn load(der: &[u8]) -> Certificate {
     Certificate::from_der(der).expect("fixture parses")
@@ -60,14 +61,24 @@ fn run(
     holder: &[Certificate],
     aa: &[Certificate],
 ) -> Result<pkix_chain::ValidatedAttributeCert, Error> {
+    run_as(ac_der, holder, aa, &[], &[])
+}
+
+fn run_as(
+    ac_der: &[u8],
+    holder: &[Certificate],
+    aa: &[Certificate],
+    my_names: &[x509_cert::ext::pkix::name::GeneralName],
+    my_groups: &[x509_cert::ext::pkix::name::GeneralName],
+) -> Result<pkix_chain::ValidatedAttributeCert, Error> {
     let ac = AttributeCertificate::from_der(ac_der).expect("AC parses");
     verify_attribute_cert(
         &ac,
         holder,
         aa,
         &anchors(),
-        &[],
-        &[],
+        my_names,
+        my_groups,
         &Rfc5280Profile,
         NOW,
         &DefaultVerifier,
@@ -179,4 +190,57 @@ fn an_unanchored_authority_is_refused() {
         matches!(err, Error::Path(_) | Error::PathBuild(_)),
         "must fail on the certification path, not as an AC error: {err:?}"
     );
+}
+
+/// Targeting reaches the caller through the wrapper, in all three
+/// states.
+///
+/// The end-to-end test above only ever saw `Untargeted`, because every
+/// fixture it used was untargeted -- so the field was returned and
+/// never shown to carry anything else. A targeted AC validates
+/// identically whether or not this verifier is a target: the AC is
+/// valid, and whether being outside its targets is fatal is the
+/// caller's policy, not an error from here.
+#[test]
+fn targeting_is_reported_through_the_wrapper() {
+    let holder = vec![load(HOLDER_DER)];
+    let aa = vec![load(AA_DER)];
+    let dns = |h: &str| {
+        x509_cert::ext::pkix::name::GeneralName::DnsName(
+            x509_cert::der::asn1::Ia5String::new(h).expect("host"),
+        )
+    };
+
+    let named = run_as(
+        AC_TARGETED,
+        &holder,
+        &aa,
+        std::slice::from_ref(&dns("verifier.example.com")),
+        &[],
+    )
+    .expect("a targeted AC is still a valid AC");
+    assert_eq!(named.targeting, Targeting::Matched);
+
+    let by_group = run_as(
+        AC_TARGETED,
+        &holder,
+        &aa,
+        &[],
+        std::slice::from_ref(&dns("printers.example.com")),
+    )
+    .expect("matching by group is still valid");
+    assert_eq!(by_group.targeting, Targeting::Matched);
+
+    // Not a target: Ok, with the fact reported. A caller that ignores
+    // the field treats this as success, which is why it is a field and
+    // not a silent pass.
+    let stranger = run_as(
+        AC_TARGETED,
+        &holder,
+        &aa,
+        std::slice::from_ref(&dns("elsewhere.example.com")),
+        &[],
+    )
+    .expect("being outside the targets is not a validation failure");
+    assert_eq!(stranger.targeting, Targeting::NotATarget);
 }

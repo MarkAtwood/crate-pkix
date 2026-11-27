@@ -479,3 +479,108 @@ fn a_ca_is_refused_as_an_attribute_authority() {
         other => panic!("a CA must be refused as an authority, got {other:?}"),
     }
 }
+
+/// Every §4.2 profile rule, driven by a fixture rather than asserted
+/// about its own error message.
+///
+/// Each of these parses: §4.1's syntax permits what the §4.2 profile
+/// forbids, which is why the two are separate steps. Before these
+/// fixtures existed, eight of these rules were implemented and had only
+/// a Display test behind them -- enough to prove the message read well,
+/// nothing about whether the rule fired.
+#[test]
+fn each_profile_rule_is_driven_by_a_fixture() {
+    use ProfileViolation as V;
+    for (name, expected) in [
+        // §4.2.3, which is four requirements in one sentence: one and
+        // only one GeneralName, containing a non-empty distinguished
+        // name, in the directoryName field.
+        ("ac-issuer-no-name", V::IssuerNameMissing),
+        ("ac-issuer-two-names", V::IssuerNameNotSingular),
+        ("ac-issuer-dns-name", V::IssuerNameNotDirectoryName),
+        ("ac-issuer-empty-dn", V::IssuerNameEmptyDn),
+        ("ac-issuer-extra-fields", V::IssuerExtraFields),
+        ("ac-issuer-v1form", V::IssuerV1Form),
+        // §4.2.2 and §4.1 on the holder.
+        ("ac-holder-two-names", V::HolderNameNotSingular),
+        ("ac-holder-digest-info", V::HolderObjectDigestInfo),
+        ("ac-holder-both", V::HolderAmbiguous),
+        // §4.1 on the attributes.
+        ("ac-no-attributes", V::NoAttributes),
+        ("ac-attribute-no-values", V::AttributeWithoutValues),
+    ] {
+        let ac = ac(&format!("{name}.der"));
+        assert_eq!(
+            ac.check_profile(),
+            Err(Error::ProfileViolation(expected)),
+            "{name} must be refused as {expected:?}"
+        );
+    }
+}
+
+/// `issuerUniqueID` and `extensions` are told apart by tag alone.
+///
+/// Both are the trailing OPTIONAL fields of
+/// `AttributeCertificateInfo` and neither is context-tagged, so the
+/// only thing distinguishing them is that one is a `BIT STRING` and the
+/// other a `SEQUENCE`. types.rs has said so since it was written and
+/// nothing checked it: no fixture carried `issuerUniqueID` at all, so a
+/// parser that mixed the two up would have passed every test.
+///
+/// This fixture carries both, which is the only arrangement that can
+/// tell a working disambiguation from a lucky one.
+#[test]
+fn issuer_unique_id_and_extensions_are_both_read() {
+    let ac = ac("ac-issuer-unique-id.der");
+    let info = &ac.inner().acinfo;
+
+    assert_eq!(
+        info.issuer_unique_id.as_ref().and_then(|b| b.as_bytes()),
+        Some(&[0x2a, 0x2b, 0x2c][..]),
+        "the BIT STRING must land in issuerUniqueID"
+    );
+    assert_eq!(
+        info.extensions.as_ref().map(std::vec::Vec::len),
+        Some(1),
+        "and the SEQUENCE in extensions"
+    );
+    assert!(
+        ac.no_revocation_available(),
+        "the extension must be readable, not merely counted"
+    );
+    ac.check_profile()
+        .expect("carrying issuerUniqueID is conforming");
+}
+
+/// `otherObjectTypes` MUST NOT be used (§4.1), and cannot be reached.
+///
+/// There is no check for it, deliberately, because every position an
+/// `ObjectDigestInfo` can occupy is already refused: the holder's by
+/// [`ProfileViolation::HolderObjectDigestInfo`], the v2Form issuer's by
+/// [`ProfileViolation::IssuerExtraFields`], and a `TargetCert`'s by
+/// [`ProfileViolation::TargetCertUsed`] -- `targetCert` being forbidden
+/// outright. So a profile-checked certificate can carry no
+/// `ObjectDigestInfo` at all, and its `digestedObjectType` is
+/// unreachable rather than unchecked.
+///
+/// This test pins the three refusals that argument rests on. If any of
+/// them is relaxed, `otherObjectTypes` becomes reachable and needs its
+/// own check, and this test is where that should be noticed.
+#[test]
+fn object_digest_info_is_unreachable_in_a_conforming_certificate() {
+    assert_eq!(
+        ac("ac-holder-digest-info.der").check_profile(),
+        Err(Error::ProfileViolation(
+            ProfileViolation::HolderObjectDigestInfo
+        ))
+    );
+    assert_eq!(
+        ac("ac-issuer-extra-fields.der").check_profile(),
+        Err(Error::ProfileViolation(ProfileViolation::IssuerExtraFields))
+    );
+    let tc = ac("ac-target-cert.der");
+    assert_eq!(
+        tc.check_targeting(&[], &[]),
+        Err(Error::ProfileViolation(ProfileViolation::TargetCertUsed))
+    );
+}

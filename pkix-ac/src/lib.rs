@@ -142,12 +142,25 @@ impl AttributeCertificate {
         let AttCertIssuer::V2Form(v2) = &info.issuer else {
             return Err(Error::ProfileViolation(ProfileViolation::IssuerV1Form));
         };
-        // §4.2.3: issuerName MUST be present and carry exactly one name.
+        // §4.2.3, which is four requirements in one sentence: the
+        // issuerName "MUST contain one and only one GeneralName ...
+        // which MUST contain a non-empty distinguished name in the
+        // directoryName field". Checking only the count accepts a
+        // dNSName, and checking only the form accepts an empty DN.
         match v2.issuer_name.as_deref() {
             None | Some([]) => {
                 return Err(Error::ProfileViolation(ProfileViolation::IssuerNameMissing))
             }
-            Some([_]) => {}
+            Some([GeneralName::DirectoryName(dn)]) => {
+                if dn.is_empty() {
+                    return Err(Error::ProfileViolation(ProfileViolation::IssuerNameEmptyDn));
+                }
+            }
+            Some([_]) => {
+                return Err(Error::ProfileViolation(
+                    ProfileViolation::IssuerNameNotDirectoryName,
+                ))
+            }
             Some(_) => {
                 return Err(Error::ProfileViolation(
                     ProfileViolation::IssuerNameNotSingular,
@@ -159,8 +172,18 @@ impl AttributeCertificate {
             return Err(Error::ProfileViolation(ProfileViolation::IssuerExtraFields));
         }
 
-        // §4.2.2: exactly one of baseCertificateID or entityName.
+        // §4.2.2. objectDigestInfo is checked first on purpose: a
+        // holder carrying only objectDigestInfo has neither of the two
+        // profiled forms, so the exactly-one check below would report
+        // HolderMissing — true, but it names what is absent instead of
+        // the unprofiled thing that is present, which is the part the
+        // caller has to remove.
         let holder = &info.holder;
+        if holder.object_digest_info.is_some() {
+            return Err(Error::ProfileViolation(
+                ProfileViolation::HolderObjectDigestInfo,
+            ));
+        }
         match (
             holder.base_certificate_id.is_some(),
             holder.entity_name.is_some(),
@@ -168,11 +191,6 @@ impl AttributeCertificate {
             (true, false) | (false, true) => {}
             (true, true) => return Err(Error::ProfileViolation(ProfileViolation::HolderAmbiguous)),
             (false, false) => return Err(Error::ProfileViolation(ProfileViolation::HolderMissing)),
-        }
-        if holder.object_digest_info.is_some() {
-            return Err(Error::ProfileViolation(
-                ProfileViolation::HolderObjectDigestInfo,
-            ));
         }
         if let Some(names) = holder.entity_name.as_deref() {
             if names.len() != 1 {
@@ -686,6 +704,10 @@ pub enum ProfileViolation {
     IssuerNameMissing,
     /// §4.2.3: `issuerName` carries more than one name.
     IssuerNameNotSingular,
+    /// §4.2.3: `issuerName`'s `directoryName` is an empty distinguished
+    /// name, where the profile requires a non-empty one — "all AC
+    /// issuers MUST have non-empty distinguished names".
+    IssuerNameEmptyDn,
     /// §4.2.3: `issuerName` is not a `directoryName`, the only form that
     /// can be compared against a certificate's subject.
     IssuerNameNotDirectoryName,
@@ -738,6 +760,10 @@ impl core::fmt::Display for ProfileViolation {
             Self::IssuerV1Form => "issuer uses v1Form, which RFC 5755 §4.2.3 forbids",
             Self::IssuerNameMissing => "issuerName is absent or empty (RFC 5755 §4.2.3)",
             Self::IssuerNameNotSingular => "issuerName carries more than one name",
+            Self::IssuerNameEmptyDn => {
+                "issuerName's directoryName is empty, though RFC 5755 §4.2.3 requires \
+                 a non-empty distinguished name"
+            }
             Self::IssuerNameNotDirectoryName => "issuerName is not a directoryName",
             Self::IssuerExtraFields => {
                 "v2Form carries baseCertificateID or objectDigestInfo, which §4.2.3 forbids"
