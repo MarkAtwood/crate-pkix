@@ -109,6 +109,10 @@ required-features = ["crl"]
 name = "ocsp_certid_binding"
 required-features = ["ocsp"]
 
+[[test]]
+name = "dp_scope_guards"
+required-features = ["crl"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
