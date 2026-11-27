@@ -1762,7 +1762,7 @@ pub struct ValidatedAttributeCert {
 /// separate question with its own two schemes, and which nothing in
 /// this crate answers.
 ///
-/// So supplying a real [`CrlChecker`] or [`OcspChecker`] does not let
+/// So supplying a real `CrlChecker` or `OcspChecker` does not let
 /// you pass [`AcRevocation::CallerChecks`]: that checker never looks at
 /// the AC. Choosing `CallerChecks` on the strength of it is fail-open
 /// on §6's MUST, which is the mistake this parameter exists to make

@@ -497,13 +497,18 @@ fn check_extensions_stands_alone() {
 fn a_ca_is_refused_as_an_attribute_authority() {
     pkix_ac::check_issuer_profile(&aa()).expect("the purpose-built authority conforms");
 
+    // Exactly IssuerIsACa, not an alternation. §4.5's two rules are
+    // tested in order — basicConstraints before keyUsage — so a loose
+    // `IssuerIsACa | IssuerCannotSign` here was satisfiable by either,
+    // and once `aa-nosign-cert.der` arrived to cover the keyUsage side
+    // it left the CA rule with no in-crate pin at all: deleting
+    // `if bc.ca` outright kept all 41 tests green.
     let ca = ct_fixture("precert-issuer.der");
-    match pkix_ac::check_issuer_profile(&ca) {
-        Err(Error::ProfileViolation(
-            ProfileViolation::IssuerIsACa | ProfileViolation::IssuerCannotSign,
-        )) => {}
-        other => panic!("a CA must be refused as an authority, got {other:?}"),
-    }
+    assert_eq!(
+        pkix_ac::check_issuer_profile(&ca),
+        Err(Error::ProfileViolation(ProfileViolation::IssuerIsACa)),
+        "a CA must be refused as an authority, by the CA rule"
+    );
 }
 
 /// Every §4.2 profile rule, driven by a fixture rather than asserted
@@ -1008,13 +1013,28 @@ fn the_revocation_schemes_are_mutually_exclusive_and_typed() {
     );
 
     // An AIA the pointer test cannot decode must not read as "no
-    // pointer": that let an AC carry noRevAvail beside a pointer.
+    // pointer". This is a SYNTAX refusal, not a §6 one, and it fires
+    // whether or not noRevAvail is present — the fixture carries one,
+    // but that is incidental and this assertion does not pin §6. What
+    // it pins is that an unreadable AIA is refused rather than
+    // silently counted as absent, which is what the §6 pointer test
+    // depends on.
     assert_eq!(
         ac("ac-norevavail-with-bad-aia.der").check_profile(),
         Err(Error::ProfileViolation(
             ProfileViolation::AuthorityInfoAccessMalformed
         )),
         "an undecodable AIA is refused rather than treated as absent"
+    );
+
+    // An empty AIA violates SEQUENCE SIZE (1..MAX), which der does not
+    // enforce.
+    assert_eq!(
+        ac("ac-norevavail-with-empty-aia.der").check_profile(),
+        Err(Error::ProfileViolation(
+            ProfileViolation::AuthorityInfoAccessMalformed
+        )),
+        "an empty AIA is malformed under RFC 5280 §4.2.2.1"
     );
 }
 
@@ -1152,9 +1172,7 @@ fn validate_runs_the_rules_the_obvious_pair_skips() {
             AcRevocation::CallerChecks,
             &DefaultVerifier
         ),
-        Err(Error::ProfileViolation(
-            ProfileViolation::IssuerIsACa | ProfileViolation::IssuerCannotSign
-        ))
+        Err(Error::ProfileViolation(ProfileViolation::IssuerIsACa))
     ));
 }
 
@@ -1241,8 +1259,16 @@ fn an_authority_that_cannot_sign_is_refused() {
 fn a_zero_serial_is_not_positive() {
     assert_eq!(
         ac("ac-serial-zero.der").check_profile(),
-        Err(Error::ProfileViolation(ProfileViolation::SerialNotPositive)),
+        Err(Error::ProfileViolation(ProfileViolation::SerialZero)),
         "DER content 00 is zero, which §4.2.5 does not permit"
+    );
+
+    // Distinct from a sign-bit violation, which zero is not: reporting
+    // zero as "negative" would tell a caller the opposite of the truth.
+    assert_eq!(
+        ac("ac-serial-negative.der").check_profile(),
+        Err(Error::ProfileViolation(ProfileViolation::SerialNotPositive)),
+        "content 80 has the sign bit set"
     );
 
     // The minimal conforming case on the other side of the same rule:

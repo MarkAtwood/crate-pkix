@@ -558,12 +558,21 @@ def main() -> None:
     (HERE / "ac-serial-zero.der").write_bytes(
         attribute_certificate(acinfo_raw_serial(tlv(0x02, b"\x00"))))
 
-    # noRevAvail beside a non-critical AIA whose value will not decode.
-    # §6's "MUST NOT contain both" should refuse it; a pointer test that
-    # cannot read the AIA sees no pointer.
+    # A non-critical AIA whose value will not decode. Refused on
+    # SYNTAX, before the §6 pointer test that depends on being able to
+    # read it -- an unreadable AIA must not count as "no pointer". The
+    # noRevAvail here is incidental: the refusal does not depend on it.
     info = with_exts(0x96, extension(ID_CE_NO_REV_AVAIL, False, b"\x05\x00")
                      + extension("1.3.6.1.5.5.7.1.1", False, b"\x30\x03\x02\x01\x00"))
     (HERE / "ac-norevavail-with-bad-aia.der").write_bytes(
+        attribute_certificate(info))
+
+    # An empty AIA. AuthorityInfoAccessSyntax is
+    # SEQUENCE SIZE (1..MAX) OF AccessDescription, and der does not
+    # enforce the lower bound, so `30 00` decodes Ok.
+    info = with_exts(0x97, extension(ID_CE_NO_REV_AVAIL, False, b"\x05\x00")
+                     + extension("1.3.6.1.5.5.7.1.1", False, b"\x30\x00"))
+    (HERE / "ac-norevavail-with-empty-aia.der").write_bytes(
         attribute_certificate(info))
 
     # §4.2.2: an entityName present but carrying no names. `A1 00`.

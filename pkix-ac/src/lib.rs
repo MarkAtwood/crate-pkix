@@ -299,7 +299,7 @@ impl AttributeCertificate {
         // empty magnitude — which is the only way to get one, so this
         // is exactly the zero case.
         if magnitude.is_empty() {
-            return Err(Error::ProfileViolation(ProfileViolation::SerialNotPositive));
+            return Err(Error::ProfileViolation(ProfileViolation::SerialZero));
         }
         if magnitude.len() > 20 {
             return Err(Error::ProfileViolation(ProfileViolation::SerialTooLong));
@@ -519,6 +519,15 @@ impl AttributeCertificate {
     ///
     /// # Errors
     ///
+    /// Any error from the calls it makes, in the order above —
+    /// [`Error::ProfileViolation`], [`Error::IssuerMismatch`],
+    /// [`Error::NotYetValid`], [`Error::Expired`],
+    /// [`Error::SignatureInvalid`],
+    /// [`Error::UnsupportedCriticalExtension`] or
+    /// [`Error::ParseError`].
+    ///
+    /// Then the three this function raises itself, the predicates
+    /// behind them returning `bool` rather than `Result`:
     /// [`Error::RevocationUnsupported`] when `ac_revocation` is
     /// [`AcRevocation::NeverRevokeOnly`] and the AC carries no
     /// `noRevAvail`, [`Error::HolderMismatch`] when the AC names
@@ -554,8 +563,16 @@ impl AttributeCertificate {
         // whole hazard `validate` exists to remove, reproduced inside
         // `validate`: `pkix-chain`'s wrapper enforced the rule while
         // this did not.
-        if ac_revocation == AcRevocation::NeverRevokeOnly && !self.no_revocation_available() {
-            return Err(Error::RevocationUnsupported);
+        // A `match`, not an equality test: `AcRevocation` is
+        // `#[non_exhaustive]`, and `== NeverRevokeOnly` would let a
+        // third variant added later skip §6 silently with no compile
+        // error. Fail-open by default is the failure mode this whole
+        // parameter exists to prevent.
+        match ac_revocation {
+            AcRevocation::NeverRevokeOnly if !self.no_revocation_available() => {
+                return Err(Error::RevocationUnsupported);
+            }
+            AcRevocation::NeverRevokeOnly | AcRevocation::CallerChecks => {}
         }
 
         if !self.matches_holder(holder_cert) {
@@ -735,7 +752,8 @@ impl AttributeCertificate {
             .find(|e| &e.extn_id == oid)
     }
 
-    /// Apply RFC 5755 §5 rule 7 and the §4.3 criticality rules.
+    /// Apply RFC 5755 §5 rule 7, the §4.3 criticality rules, and the
+    /// §4.3/§6 extension-value rules.
     ///
     /// Rule 7 is the security-relevant one: *"If the AC contains an
     /// unsupported critical extension, the AC MUST be rejected."* The
@@ -749,7 +767,11 @@ impl AttributeCertificate {
     /// - [`Error::UnsupportedCriticalExtension`] — a critical extension
     ///   this crate cannot act on.
     /// - [`Error::ProfileViolation`] — an extension carries the wrong
-    ///   criticality, or an `auditIdentity` of illegal length.
+    ///   criticality, or a malformed value. The value rules: an
+    ///   `auditIdentity` of illegal length, a `noRevAvail` that is not
+    ///   NULL, a duplicate extension, a `targetCert` used as a target,
+    ///   a malformed `authorityInfoAccess`, and §6's refusal of
+    ///   `noRevAvail` beside a revocation pointer.
     pub fn check_extensions(&self) -> Result<()> {
         let Some(exts) = self.inner.acinfo.extensions.as_ref() else {
             return Ok(());
@@ -775,6 +797,43 @@ impl AttributeCertificate {
         // reading only the first it looks at would differ from one
         // reading the other.
         let has_no_rev_avail = exts.iter().any(|e| e.extn_id == ID_CE_NO_REV_AVAIL);
+
+        // Every AIA value is decoded BEFORE the §6 pointer test below,
+        // because that test has to read the extension to tell a
+        // revocation pointer from a `caIssuers`-only AIA, and a value
+        // it cannot decode would read as "no pointer".
+        //
+        // This check used to sit in the per-extension loop further
+        // down — after the pointer test, not before it. The AC was
+        // still refused, both being in this one function, but by the
+        // syntax rule rather than §6's, so `NoRevAvailWithPointer` was
+        // never the reported error and the ordering the safety
+        // argument rested on was the reverse of the real one. Hoisted
+        // so the mechanism matches the claim.
+        //
+        // The grammar is RFC 5280 §4.2.2.1. RFC 5755 §4.3.4 says only
+        // that AIA "MAY be used" and makes `id-ad-caIssuers` support
+        // OPTIONAL; it states no syntax rule.
+        for e in exts.iter() {
+            if e.extn_id == ID_PE_AUTHORITY_INFO_ACCESS {
+                let aia = x509_cert::ext::pkix::AuthorityInfoAccessSyntax::from_der(
+                    e.extn_value.as_bytes(),
+                )
+                .map_err(|_| {
+                    Error::ProfileViolation(ProfileViolation::AuthorityInfoAccessMalformed)
+                })?;
+                // `AuthorityInfoAccessSyntax` is
+                // `SEQUENCE SIZE (1..MAX) OF AccessDescription`, and
+                // `der` does not enforce the lower bound: an empty
+                // SEQUENCE decodes Ok. Same class as the empty-DN and
+                // empty-GeneralNames cases this crate already rejects.
+                if aia.0.is_empty() {
+                    return Err(Error::ProfileViolation(
+                        ProfileViolation::AuthorityInfoAccessMalformed,
+                    ));
+                }
+            }
+        }
         // A revocation pointer specifically — and this is an
         // interpretation that relaxes a literal MUST, not a reading of
         // what §6 says. §6 defines the scheme at EXTENSION
@@ -875,13 +934,17 @@ impl AttributeCertificate {
                         return Err(Error::ProfileViolation(ProfileViolation::NoRevAvailNotNull));
                     }
                 }
-                // Profiled by §4.3.3/§4.3.4/§4.3.5 and not acted on
-                // here: they assist a verifier in finding the issuer's
-                // certificate or its revocation data, which is the
-                // caller's job in this workspace. None of them may be
-                // critical in a conforming AC, and if one is, the rule
-                // below refuses it rather than this arm waving it
-                // through.
+                // Profiled by §4.3.3 and §4.3.5, and not acted on
+                // beyond criticality: they assist a verifier in
+                // finding the issuer's certificate or its revocation
+                // data, which is the caller's job in this workspace.
+                // Neither may be critical in a conforming AC, and if
+                // one is, the rule below refuses it rather than this
+                // arm waving it through.
+                //
+                // §4.3.4's authorityInfoAccess was once in this arm
+                // and now has its own, because the §6 pointer test
+                // made its value significant.
                 ID_CE_AUTHORITY_KEY_IDENTIFIER | ID_CE_CRL_DISTRIBUTION_POINTS => {
                     if e.critical {
                         return Err(Error::UnsupportedCriticalExtension(e.extn_id));
@@ -891,22 +954,8 @@ impl AttributeCertificate {
                     if e.critical {
                         return Err(Error::UnsupportedCriticalExtension(e.extn_id));
                     }
-                    // The value, not just the criticality. §6's pointer
-                    // test has to decode this extension to tell a
-                    // revocation pointer from a `caIssuers`-only AIA,
-                    // and a value it cannot decode read as "no
-                    // pointer" — so an AC carrying `noRevAvail` beside
-                    // an undecodable non-critical AIA slipped past
-                    // §6's "MUST NOT contain both".
-                    if x509_cert::ext::pkix::AuthorityInfoAccessSyntax::from_der(
-                        e.extn_value.as_bytes(),
-                    )
-                    .is_err()
-                    {
-                        return Err(Error::ProfileViolation(
-                            ProfileViolation::AuthorityInfoAccessMalformed,
-                        ));
-                    }
+                    // The value is checked above, before the §6
+                    // pointer test that depends on it.
                 }
                 other => {
                     if e.critical {
@@ -1058,12 +1107,17 @@ fn subject_alt_names(cert: &Certificate) -> Option<alloc::vec::Vec<GeneralName>>
 /// `id-ad-caIssuers` points at the issuer's certificate instead, which
 /// §4.3.4 treats as a separate and optional feature.
 ///
-/// A value that will not decode names nothing, so it is not a pointer.
-/// That is safe only because [`AttributeCertificate::check_extensions`]
-/// rejects an undecodable AIA before this runs; without that, an AC
-/// could carry `noRevAvail` beside a pointer this could not see. An
-/// earlier version of this comment asserted that arm existed when it
-/// did not.
+/// Only ever called on a value already decoded once:
+/// [`AttributeCertificate::check_extensions`] rejects an undecodable
+/// AIA in a pass that runs before the §6 pointer test, so by here a
+/// `false` means "decodes, and names no OCSP access method" rather
+/// than "could not be read".
+///
+/// That ordering is load-bearing, and two earlier versions of this
+/// comment got it wrong — the first asserting a check that did not
+/// exist, the second asserting an order that was reversed. If the
+/// pointer test is ever moved out of `check_extensions`, the
+/// validation pass has to move with it.
 fn aia_names_ocsp(value: &[u8]) -> bool {
     const ID_AD_OCSP: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.48.1");
     x509_cert::ext::pkix::AuthorityInfoAccessSyntax::from_der(value)
@@ -1309,6 +1363,13 @@ pub enum ProfileViolation {
     /// where "AC issuers MUST force the serialNumber to be a positive
     /// integer".
     SerialNotPositive,
+    /// §4.2.5: the serial number is zero, though the field "MUST be a
+    /// positive integer".
+    ///
+    /// Distinct from [`Self::SerialNotPositive`], which is a sign-bit
+    /// violation. Zero's sign bit is clear, so reporting it as
+    /// negative would tell a caller the opposite of what happened.
+    SerialZero,
     /// §4.2.5: the serial number is longer than 20 octets, where
     /// "conformant ACs MUST NOT contain serialNumber values longer than
     /// 20 octets".
@@ -1366,8 +1427,12 @@ pub enum ProfileViolation {
     /// `basicConstraints` or `keyUsage` more than once, so which copy
     /// §4.5 applies to is not determined.
     IssuerDuplicateExtension,
-    /// §4.3.4: the AC's `authorityInfoAccess` value is not a
-    /// well-formed `AuthorityInfoAccessSyntax`.
+    /// RFC 5280 §4.2.2.1: the AC's `authorityInfoAccess` value is not
+    /// a well-formed, non-empty `AuthorityInfoAccessSyntax`.
+    ///
+    /// The grammar is RFC 5280's. RFC 5755 §4.3.4 only says AIA "MAY
+    /// be used" and makes `id-ad-caIssuers` support OPTIONAL; it
+    /// states no syntax rule, so citing it here was wrong.
     ///
     /// Checked because §6's pointer test must decode it to tell a
     /// revocation pointer from a `caIssuers`-only AIA. A value that
@@ -1398,6 +1463,9 @@ impl core::fmt::Display for ProfileViolation {
             Self::HolderMissing => "holder gives neither baseCertificateID nor entityName",
             Self::HolderNameNotSingular => "holder carries more than one name",
             Self::HolderObjectDigestInfo => "holder uses objectDigestInfo, which is not profiled",
+            Self::SerialZero => {
+                "the serial number is zero, though RFC 5755 §4.2.5 requires a positive integer"
+            }
             Self::SerialNotPositive => {
                 "the serial number is negative, though RFC 5755 §4.2.5 requires a \
                  positive integer"
@@ -1449,7 +1517,7 @@ impl core::fmt::Display for ProfileViolation {
                 "the attribute authority's basicConstraints or keyUsage will not decode"
             }
             Self::AuthorityInfoAccessMalformed => {
-                "the authorityInfoAccess extension value is malformed (RFC 5755 §4.3.4)"
+                "the authorityInfoAccess extension value is malformed (RFC 5280 §4.2.2.1)"
             }
             Self::IssuerDuplicateExtension => {
                 "the attribute authority's certificate repeats basicConstraints or keyUsage"
@@ -1659,6 +1727,7 @@ mod tests {
             V::IssuerExtensionMalformed,
             V::IssuerDuplicateExtension,
             V::AuthorityInfoAccessMalformed,
+            V::SerialZero,
         ];
 
         for v in all {
@@ -1696,6 +1765,7 @@ mod tests {
                 V::IssuerExtensionMalformed => "IssuerExtensionMalformed",
                 V::IssuerDuplicateExtension => "IssuerDuplicateExtension",
                 V::AuthorityInfoAccessMalformed => "AuthorityInfoAccessMalformed",
+                V::SerialZero => "SerialZero",
             };
             let rendered = Error::ProfileViolation(v).to_string();
             assert!(
