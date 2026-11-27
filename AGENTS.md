@@ -352,6 +352,16 @@ I/O wait with 2.9 GB of swap in use, and the rate fell from 556 mutants in
 column and a long `b` queue mean adding jobs makes it slower. Keep the count at
 4 or below, and do not run heavy `cargo test --workspace` builds beside one.
 
+What is on the disk is mostly linker output, and the multiplier is the crate's
+integration test count. `pkix-path` has thirty files in `tests/`, so every
+mutant relinks thirty binaries before a single assertion runs, and the whole
+crate's 541 mutants do not finish in an afternoon. Scope the run when the
+question is scoped: `-f "**/verifiers.rs"` cuts 541 to 68, and `--` passes
+arguments through to `cargo test`, so `-- --lib` or a named `--test` restricts
+what gets built per mutant. Narrowing the tests narrows the sweep's authority
+too -- a mutant only the excluded tests would catch now reads as missed -- so
+say which subset ran when recording the result.
+
 A mutation that turns a bounded loop into an unbounded one leaves a runaway
 process behind when verified by hand. `reaches_self_signed`'s step counter is
 one: with `+= 1` mutated to `*= 1` the walk never terminates, and the test
