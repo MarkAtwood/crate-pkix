@@ -7,7 +7,7 @@
 //! validate.
 
 use der::{Decode as _, Encode as _};
-use pkix_ac::{AttributeCertificate, Error, ProfileViolation, Targeting};
+use pkix_ac::{AcRevocation, AttributeCertificate, Error, ProfileViolation, Targeting};
 use x509_cert::ext::pkix::name::GeneralName;
 
 /// A `GeneralName` dNSName, which is what the targeting fixtures use.
@@ -589,12 +589,22 @@ fn issuer_unique_id_and_extensions_are_both_read() {
     // issuer's PKC" is violated. This fixture is deliberately on the
     // wrong side of that rule, and an earlier version of this test
     // called it conforming.
+    //
+    // What this does NOT guard: the rule reads the authority's
+    // `subjectUniqueID`, because the authority is its own certificate's
+    // subject. It once read `issuerUniqueID`, which belongs to the
+    // authority's CA — and this fixture has neither, so it satisfies
+    // both readings and would pass if the field were reverted.
+    // Distinguishing them needs an authority certificate carrying a
+    // subjectUniqueID, which OpenSSL will not emit (RFC 5280 §4.1.2.8
+    // deprecates the field), so the regression is unguarded and said so
+    // rather than implied to be covered.
     assert_eq!(
         ac.verify(&aa(), NOW, &DefaultVerifier),
         Err(Error::ProfileViolation(
             ProfileViolation::IssuerUniqueIdMismatch
         )),
-        "the authority has no issuerUniqueID, so the AC must not carry one"
+        "the authority has no unique identifier, so the AC must not carry one"
     );
 }
 
@@ -980,6 +990,22 @@ fn the_revocation_schemes_are_mutually_exclusive_and_typed() {
     ok.check_profile()
         .expect("a NULL-valued noRevAvail conforms");
     assert!(ok.no_revocation_available());
+
+    // §6's "pointer in AC" points at REVOCATION status, so inside an
+    // AIA it is `id-ad-ocsp`. An AIA holding only `id-ad-caIssuers`
+    // points at the issuer's certificate — §4.3.4 treats that as a
+    // separate, optional feature — so such an AC has chosen one scheme
+    // and conforms. Treating any AIA as a pointer refused it.
+    ac("ac-norevavail-with-caissuers.der")
+        .check_profile()
+        .expect("a caIssuers-only AIA is not a revocation pointer");
+    assert_eq!(
+        ac("ac-norevavail-with-ocsp.der").check_profile(),
+        Err(Error::ProfileViolation(
+            ProfileViolation::NoRevAvailWithPointer
+        )),
+        "an OCSP accessMethod is a revocation pointer, and §6 forbids the pair"
+    );
 }
 
 /// `targetCert` is refused by the profile check, not only by
@@ -1013,7 +1039,15 @@ fn a_target_cert_is_refused_by_the_profile_check() {
 
     // validate() runs both, so it refuses.
     assert_eq!(
-        ac.validate(&aa(), &holder(), NOW, &[], &[], &DefaultVerifier),
+        ac.validate(
+            &aa(),
+            &holder(),
+            NOW,
+            &[],
+            &[],
+            AcRevocation::CallerChecks,
+            &DefaultVerifier
+        ),
         Err(Error::ProfileViolation(ProfileViolation::TargetCertUsed))
     );
 }
@@ -1061,7 +1095,15 @@ fn validate_runs_the_rules_the_obvious_pair_skips() {
 
     // The conforming AC passes, and reports its targeting.
     assert_eq!(
-        ac("ac-role-valid.der").validate(&aa(), &holder, NOW, &[], &[], &DefaultVerifier),
+        ac("ac-role-valid.der").validate(
+            &aa(),
+            &holder,
+            NOW,
+            &[],
+            &[],
+            AcRevocation::CallerChecks,
+            &DefaultVerifier
+        ),
         Ok(Targeting::Untargeted)
     );
 
@@ -1074,7 +1116,15 @@ fn validate_runs_the_rules_the_obvious_pair_skips() {
         .verify(&aa(), NOW, &DefaultVerifier)
         .expect("nor does verify");
     assert_eq!(
-        targeted.validate(&aa(), &holder, NOW, &[], &[], &DefaultVerifier),
+        targeted.validate(
+            &aa(),
+            &holder,
+            NOW,
+            &[],
+            &[],
+            AcRevocation::CallerChecks,
+            &DefaultVerifier
+        ),
         Err(Error::NotATarget),
         "validate must catch what the pair misses"
     );
@@ -1083,26 +1133,93 @@ fn validate_runs_the_rules_the_obvious_pair_skips() {
     // §4.5 is about the authority's certificate rather than the AC.
     let ca = ct_fixture("precert-issuer.der");
     assert!(matches!(
-        ac("ac-role-valid.der").validate(&ca, &holder, NOW, &[], &[], &DefaultVerifier),
+        ac("ac-role-valid.der").validate(
+            &ca,
+            &holder,
+            NOW,
+            &[],
+            &[],
+            AcRevocation::CallerChecks,
+            &DefaultVerifier
+        ),
         Err(Error::ProfileViolation(
             ProfileViolation::IssuerIsACa | ProfileViolation::IssuerCannotSign
         ))
     ));
 }
 
-/// §4.5 forbids a `keyUsage` that excludes signature validation — not
+/// §4.5 forbids a `keyUsage` that *excludes* signature validation, not
 /// one that permits it by a different bit.
 ///
 /// `nonRepudiation` (contentCommitment) denotes verifying signatures per
-/// RFC 5280 §4.2.1.3, just for a different purpose, so an authority
-/// asserting only that bit is permitted. Requiring `digitalSignature`
-/// specifically refused it.
+/// RFC 5280 §4.2.1.3, differing from `digitalSignature` in purpose
+/// rather than capability, so an authority asserting only that bit is
+/// permitted. Requiring `digitalSignature` specifically refused it.
+///
+/// The fixture carries `keyUsage = critical, nonRepudiation` and
+/// nothing else. The first version of this test called
+/// `check_issuer_profile` on a certificate asserting
+/// `digitalSignature`, so `non_repudiation()` was never evaluated by
+/// the short circuit — it passed identically before the change, while
+/// its name claimed to cover it.
 #[test]
 fn an_authority_with_only_non_repudiation_is_permitted() {
-    // The purpose-built authority asserts digitalSignature, so this
-    // checks the bit that was wrongly required is not the only one
-    // accepted. The holder certificate also asserts digitalSignature and
-    // is not a CA, which makes it a stand-in for a conforming authority.
-    pkix_ac::check_issuer_profile(&holder())
-        .expect("a non-CA with digitalSignature is a permissible authority shape");
+    let der = fixture("aa-nonrep-cert.der");
+    let aa = Certificate::from_der(&der).expect("the fixture parses");
+
+    // Precondition: the fixture really does lack digitalSignature,
+    // otherwise this test would pass for the old reason.
+    let exts = aa
+        .tbs_certificate()
+        .extensions()
+        .expect("the fixture has extensions");
+    let ku_der = exts
+        .iter()
+        .find(|e| e.extn_id.to_string() == "2.5.29.15")
+        .expect("and a keyUsage");
+    let ku = x509_cert::ext::pkix::KeyUsage::from_der(ku_der.extn_value.as_bytes())
+        .expect("which decodes");
+    assert!(
+        !ku.digital_signature() && ku.non_repudiation(),
+        "the fixture must assert nonRepudiation and NOT digitalSignature"
+    );
+
+    pkix_ac::check_issuer_profile(&aa)
+        .expect("§4.5 permits an authority whose keyUsage asserts nonRepudiation");
+
+    // And a keyUsage that asserts neither is still refused.
+    let ca = ct_fixture("precert-issuer.der");
+    assert!(matches!(
+        pkix_ac::check_issuer_profile(&ca),
+        Err(Error::ProfileViolation(
+            ProfileViolation::IssuerIsACa | ProfileViolation::IssuerCannotSign
+        ))
+    ));
+}
+
+/// §4.2.5's 20-octet cap is on the VALUE, not on its DER encoding.
+///
+/// §4.2.5 tells issuers to add "a leading (leftmost) '00'H octet if
+/// necessary" to force the sign bit clear, then caps the value at 20
+/// octets — so a conforming 20-octet serial whose top byte has its high
+/// bit set occupies 21 DER content octets. Measuring those rejected it,
+/// which is roughly half of all 20-octet serials.
+#[test]
+fn a_conforming_twenty_octet_serial_is_not_too_long() {
+    // 20-octet magnitude, top byte 0xff, so DER carries a leading 00.
+    let padded = ac("ac-serial-20-octet-high-bit.der");
+    assert_eq!(
+        padded.inner().acinfo.serial_number.as_bytes().len(),
+        21,
+        "precondition: the sign-padded encoding is 21 octets"
+    );
+    padded
+        .check_profile()
+        .expect("the value is 20 octets, which §4.2.5 permits");
+
+    // A 21-octet magnitude is genuinely too long.
+    assert_eq!(
+        ac("ac-serial-too-long.der").check_profile(),
+        Err(Error::ProfileViolation(ProfileViolation::SerialTooLong))
+    );
 }

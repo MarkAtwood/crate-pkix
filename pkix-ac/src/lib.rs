@@ -65,6 +65,43 @@ use pkix_path::SignatureVerifier;
 
 use types::{AttCertIssuer, Attribute, AttributeCertificateInner};
 
+/// Which RFC 5755 §6 revocation scheme the caller supports for the
+/// attribute certificate itself.
+///
+/// §6 defines two and requires a choice: "for AC users, the 'never
+/// revoke' scheme MUST be supported, and the 'pointer in AC' scheme
+/// SHOULD be supported. If only the 'never revoke' scheme is supported,
+/// then all ACs that do not contain a noRevAvail extension, MUST be
+/// rejected."
+///
+/// This lives here, rather than in `pkix-chain` where it started,
+/// because [`AttributeCertificate::validate`] has to ask the same
+/// question. It did not, which left two entry points disagreeing about
+/// one MUST — and the one documented as the safe default was the
+/// permissive one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub enum AcRevocation {
+    /// Only the "never revoke" scheme, so an AC without `noRevAvail` is
+    /// refused — the §6 MUST.
+    ///
+    /// The conservative choice, and the right one unless the caller
+    /// really does establish AC revocation status. An AC with no
+    /// `noRevAvail` is its issuer "implicitly stating that revocation
+    /// status checks are supported", so honouring it without checking
+    /// accepts a credential the issuer expected to be checkable.
+    NeverRevokeOnly,
+    /// The caller establishes the AC's revocation status itself, by
+    /// whatever means — §6 permits "any source for AC revocation status
+    /// information".
+    ///
+    /// An AC without `noRevAvail` is then accepted, because the caller
+    /// has taken on the obligation §6 attaches to it. Nothing here can
+    /// check that they have; this is the caller saying so.
+    CallerChecks,
+}
+
 /// A parsed attribute certificate, keeping the bytes it was parsed from.
 ///
 /// The original DER is retained because the signature is over the DER of
@@ -87,6 +124,16 @@ impl AttributeCertificate {
     /// apply the §4.2 profile rules — call [`Self::check_profile`] for
     /// those — so that a non-conforming certificate can be read and
     /// reported on rather than refused as malformed.
+    ///
+    /// One exception, which is not this crate's choice: `x509-cert`'s
+    /// `SerialNumber` refuses more than 21 DER content octets while
+    /// decoding, so an AC whose serial exceeds that is
+    /// [`Error::ParseError`] here rather than
+    /// [`ProfileViolation::SerialTooLong`] from `check_profile`. A
+    /// grosser violation of §4.2.5 therefore reports as malformed where
+    /// a narrower one reports as a profile failure. Noted rather than
+    /// worked around: reaching it would mean giving up the typed serial
+    /// for an `Any`, and both answers are refusals.
     ///
     /// # Errors
     ///
@@ -228,7 +275,17 @@ impl AttributeCertificate {
         if serial.first().is_some_and(|b| b & 0x80 != 0) {
             return Err(Error::ProfileViolation(ProfileViolation::SerialNotPositive));
         }
-        if serial.len() > 20 {
+        // The magnitude, not the sign-padded encoding. §4.2.5 tells
+        // issuers to add "a leading (leftmost) '00'H octet if necessary"
+        // to force the sign bit clear, and then caps the *value* at 20
+        // octets — so a conforming 20-octet serial whose top byte has
+        // its high bit set is 21 DER content octets. Measuring those
+        // rejected it, which is roughly half of all 20-octet serials.
+        let magnitude = match serial {
+            [0x00, rest @ ..] => rest,
+            other => other,
+        };
+        if magnitude.len() > 20 {
             return Err(Error::ProfileViolation(ProfileViolation::SerialTooLong));
         }
 
@@ -430,7 +487,8 @@ impl AttributeCertificate {
     ///
     /// Runs, in order: the §4.5 profile on `aa_cert`; the §4.2/§4.3
     /// profile and §5 rule 7; the signature, §4.2.8 and the validity
-    /// window; the holder binding; and targeting.
+    /// window; §6's revocation scheme per `ac_revocation`; the holder
+    /// binding; and targeting.
     ///
     /// # What it still does not do
     ///
@@ -440,8 +498,8 @@ impl AttributeCertificate {
     /// `pkix_chain::verify_attribute_cert` does both and then this.
     ///
     /// §5 rule 4 — that the issuer be "directly trusted as an AC issuer
-    /// (by configuration or otherwise)" — is the caller's, as is §6's
-    /// revocation scheme. Supplying `aa_cert` is the rule-4 decision.
+    /// (by configuration or otherwise)" — remains the caller's.
+    /// Supplying `aa_cert` is that decision.
     ///
     /// # Errors
     ///
@@ -450,6 +508,14 @@ impl AttributeCertificate {
     /// `my_names`/`my_groups` are not among them — §4.3.2's "an
     /// (honest) AC verifier who is not amongst the named
     /// servers/services MUST reject the AC".
+    // Eight, counting &self. Consistent with `pkix-chain`'s use-case
+    // wrappers, which carry the same allow: §5 needs both certificates,
+    // the evaluation time, the verifier's own names and groups, the §6
+    // scheme and a signature verifier, and bundling them into a context
+    // struct would hide which of them the caller is being asked to
+    // decide. The §6 parameter in particular is a decision that should
+    // be visible at the call site.
+    #[allow(clippy::too_many_arguments)]
     pub fn validate<V: SignatureVerifier>(
         &self,
         aa_cert: &Certificate,
@@ -457,11 +523,23 @@ impl AttributeCertificate {
         now_unix: u64,
         my_names: &[GeneralName],
         my_groups: &[GeneralName],
+        ac_revocation: AcRevocation,
         verifier: &V,
     ) -> Result<Targeting> {
         check_issuer_profile(aa_cert)?;
         self.check_profile()?;
         self.verify(aa_cert, now_unix, verifier)?;
+
+        // §6. This function establishes no AC revocation status, so
+        // `NeverRevokeOnly` is what it supports, and an AC without
+        // `noRevAvail` must be refused under it. Omitting this was the
+        // whole hazard `validate` exists to remove, reproduced inside
+        // `validate`: `pkix-chain`'s wrapper enforced the rule while
+        // this did not.
+        if ac_revocation == AcRevocation::NeverRevokeOnly && !self.no_revocation_available() {
+            return Err(Error::RevocationUnsupported);
+        }
+
         if !self.matches_holder(holder_cert) {
             return Err(Error::HolderMismatch);
         }
@@ -597,6 +675,13 @@ impl AttributeCertificate {
     /// Its presence is the issuer saying no revocation information will
     /// be made available, so a verifier should not go looking. Absence
     /// says nothing either way.
+    ///
+    /// **Presence only.** §4.3.6 gives the extension the syntax `NULL`,
+    /// and this does not check the value —
+    /// [`Self::check_extensions`] does. So on a certificate that has
+    /// not been through `check_profile` or [`Self::validate`], a `true`
+    /// here means the OID is present and not that the issuer made a
+    /// well-formed "never revoke" assertion.
     #[must_use]
     pub fn no_revocation_available(&self) -> bool {
         self.extension(&ID_CE_NO_REV_AVAIL).is_some()
@@ -672,8 +757,18 @@ impl AttributeCertificate {
         // reading only the first it looks at would differ from one
         // reading the other.
         let has_no_rev_avail = exts.iter().any(|e| e.extn_id == ID_CE_NO_REV_AVAIL);
+        // A revocation pointer specifically. §6 defines the scheme as
+        // pointing "to sources of revocation status information, using
+        // either an authorityInfoAccess extension or a
+        // crlDistributionPoints extension" — and an AIA carrying only
+        // `id-ad-caIssuers` points at the issuer's certificate, not at
+        // revocation status. §4.3.4 makes caIssuers support optional
+        // precisely because it is a different thing. Treating any AIA
+        // as a pointer refused an AC that had chosen one scheme.
         let has_pointer = exts.iter().any(|e| {
-            e.extn_id == ID_CE_CRL_DISTRIBUTION_POINTS || e.extn_id == ID_PE_AUTHORITY_INFO_ACCESS
+            e.extn_id == ID_CE_CRL_DISTRIBUTION_POINTS
+                || (e.extn_id == ID_PE_AUTHORITY_INFO_ACCESS
+                    && aia_names_ocsp(e.extn_value.as_bytes()))
         });
         if has_no_rev_avail && has_pointer {
             return Err(Error::ProfileViolation(
@@ -911,6 +1006,21 @@ fn subject_alt_names(cert: &Certificate) -> Option<alloc::vec::Vec<GeneralName>>
         .map(|san| san.0)
 }
 
+/// Whether an `authorityInfoAccess` value names `id-ad-ocsp`.
+///
+/// §6's "pointer in AC" scheme points at revocation status, and inside
+/// an AIA that is the OCSP access method. An AIA holding only
+/// `id-ad-caIssuers` points at the issuer's certificate instead, which
+/// §4.3.4 treats as a separate and optional feature.
+///
+/// A value that will not decode names nothing, so it is not a pointer —
+/// `check_extensions` has its own arm for a malformed AIA.
+fn aia_names_ocsp(value: &[u8]) -> bool {
+    const ID_AD_OCSP: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.48.1");
+    x509_cert::ext::pkix::AuthorityInfoAccessSyntax::from_der(value)
+        .is_ok_and(|aia| aia.0.iter().any(|ad| ad.access_method == ID_AD_OCSP))
+}
+
 /// Compare two `GeneralName`s the way their own name forms require.
 ///
 /// Byte equality is wrong here for the same reason it was wrong for the
@@ -1007,9 +1117,11 @@ fn header(input: &[u8]) -> Option<(usize, usize)> {
 /// the second matters more than it looks:
 ///
 /// - `keyUsage` "MUST NOT explicitly indicate that the AC issuer's
-///   public key cannot be used to validate a digital signature", so a
-///   `keyUsage` that is present and omits `digitalSignature` is a
-///   refusal. An absent extension constrains nothing.
+///   public key cannot be used to validate a digital signature". So a
+///   present `keyUsage` must assert `digitalSignature` or
+///   `nonRepudiation` — per RFC 5280 §4.2.1.3 both denote verifying
+///   signatures, differing in purpose rather than in capability. An
+///   absent extension constrains nothing.
 /// - **"An AC issuer MUST NOT also be a PKC Issuer. That is, an AC
 ///   issuer cannot be a CA as well."** So `basicConstraints.cA` must not
 ///   be TRUE.
@@ -1194,9 +1306,9 @@ pub enum ProfileViolation {
     /// (`basicConstraints.cA` is TRUE). An AC issuer must not also be a
     /// PKC issuer.
     IssuerIsACa,
-    /// §4.5: the Attribute Authority's `keyUsage` excludes
-    /// `digitalSignature`, so its key may not be used to validate the
-    /// signature it just made.
+    /// §4.5: the Attribute Authority's `keyUsage` asserts neither
+    /// `digitalSignature` nor `nonRepudiation`, so it excludes using
+    /// that key to validate the signature it just made.
     IssuerCannotSign,
     /// §4.5: the Attribute Authority's `basicConstraints` or `keyUsage`
     /// extension will not decode.
@@ -1273,7 +1385,8 @@ impl core::fmt::Display for ProfileViolation {
                 "the attribute authority's certificate is a CA, which RFC 5755 §4.5 forbids"
             }
             Self::IssuerCannotSign => {
-                "the attribute authority's keyUsage excludes digitalSignature (RFC 5755 §4.5)"
+                "the attribute authority's keyUsage asserts neither digitalSignature nor \
+                 nonRepudiation (RFC 5755 §4.5)"
             }
             Self::IssuerExtensionMalformed => {
                 "the attribute authority's basicConstraints or keyUsage will not decode"

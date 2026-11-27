@@ -153,9 +153,18 @@
 // `Targeting`, so without these a consumer cannot call it without adding
 // `pkix-ac` to their own manifest and keeping its version in lockstep
 // with this crate's.
+//
+// The error types come too. An earlier version re-exported only the two
+// argument types, which left a consumer able to call the function and
+// unable to match `Error::AttributeCert` — the one useful thing to do
+// with what it returns. Every neighbouring re-export in this list
+// includes its error type, and leaving these out broke that convention
+// silently.
 #[cfg(feature = "attribute-certs")]
 #[cfg_attr(docsrs, doc(cfg(feature = "attribute-certs")))]
-pub use pkix_ac::{AttributeCertificate, Targeting};
+pub use pkix_ac::{
+    AcRevocation, AttributeCertificate, Error as AttributeCertError, ProfileViolation, Targeting,
+};
 pub use pkix_aia::{AiaError, AiaFetcher, NoAiaFetcher};
 pub use pkix_identity::{IdentityError, MailboxName, ServerName};
 pub use pkix_path::{
@@ -1675,44 +1684,6 @@ where
     Ok(validated)
 }
 
-/// Which RFC 5755 §6 revocation scheme the caller supports for the
-/// attribute certificate itself.
-///
-/// §6 defines two, and requires a choice: "for AC users, the 'never
-/// revoke' scheme MUST be supported, and the 'pointer in AC' scheme
-/// SHOULD be supported. If only the 'never revoke' scheme is supported,
-/// then all ACs that do not contain a noRevAvail extension, MUST be
-/// rejected."
-///
-/// This is distinct from the `RevocationChecker` passed alongside it,
-/// which applies to the holder's and authority's public-key chains. An
-/// attribute certificate's own revocation status is a separate question
-/// with its own two schemes, and nothing in this crate answers it.
-#[cfg(feature = "attribute-certs")]
-#[cfg_attr(docsrs, doc(cfg(feature = "attribute-certs")))]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum AcRevocation {
-    /// Only the "never revoke" scheme, so an AC without `noRevAvail` is
-    /// refused — the §6 MUST.
-    ///
-    /// The conservative choice, and the right one unless the caller
-    /// really does establish AC revocation status. An AC with no
-    /// `noRevAvail` is its issuer "implicitly stating that revocation
-    /// status checks are supported", so honouring it without checking
-    /// anything is accepting a credential the issuer expected to be
-    /// checkable.
-    NeverRevokeOnly,
-    /// The caller establishes the AC's revocation status itself, by
-    /// whatever means — §6 permits "any source for AC revocation status
-    /// information".
-    ///
-    /// An AC without `noRevAvail` is then accepted, because the caller
-    /// has taken on the obligation §6 attaches to it. Nothing here can
-    /// check that they have; this is the caller saying so.
-    CallerChecks,
-}
-
 /// What an attribute certificate verification established — RFC 5755 §5.
 ///
 /// Both certification paths are returned because both were validated and
@@ -1745,25 +1716,33 @@ pub struct ValidatedAttributeCert {
 ///
 /// # What is checked, against RFC 5755 §5
 ///
+/// In the order it happens, which is not RFC 5755's numbering — an
+/// earlier version of this list used the numbering and so put the
+/// targeting check three steps from where it runs:
+///
 /// 1. **Rule 1** — the holder's certificate path. `holder_chain[0]` is
 ///    the entity presenting the AC, and its whole path is validated.
-/// 2. **Rule 2** — the AC's signature, and the authority's certificate
-///    path. `aa_chain[0]` is the Attribute Authority.
-/// 3. **Rule 3** — §4.5's profile on the authority's own certificate,
-///    via [`pkix_ac::check_issuer_profile`]. This is where a CA is
-///    refused as an authority.
-/// 4. **Rule 5** — the evaluation time against the AC's validity, bounds
-///    inclusive.
-/// 5. **Rule 6** — the targeting check, from `my_names` and `my_groups`.
-/// 6. **Rule 7** — unsupported critical extensions, with the §4.2 and
-///    §4.3 profile, via [`pkix_ac::AttributeCertificate::check_profile`].
-/// 7. **§6** — the revocation scheme, per `ac_revocation`. With
+/// 2. **Rule 2, path half** — the authority's certificate path.
+///    `aa_chain[0]` is the Attribute Authority.
+///
+/// The rest is [`pkix_ac::AttributeCertificate::validate`], which this
+/// calls rather than repeating:
+///
+/// 3. **Rule 3** — §4.5's profile on the authority's own certificate.
+///    This is where a CA is refused as an authority.
+/// 4. **Rule 7**, with the §4.2 and §4.3 profile — unsupported critical
+///    extensions among them.
+/// 5. **Rule 2, signature half**, with §4.2.8 and **rule 5**, the
+///    evaluation time against the AC's validity, bounds inclusive.
+/// 6. **§6** — the revocation scheme, per `ac_revocation`. With
 ///    [`AcRevocation::NeverRevokeOnly`] an AC lacking `noRevAvail` is
 ///    refused, which is what §6 requires of a verifier that checks no AC
 ///    revocation status — and this function checks none.
 /// 7. **Holder binding** — the AC's holder field against
 ///    `holder_chain[0]`. An AC that is validly signed but names someone
 ///    else is refused.
+/// 8. **Rule 6** — the targeting check, from `my_names` and
+///    `my_groups`.
 ///
 /// # Rule 4 is yours
 ///
@@ -1847,58 +1826,19 @@ where
     let holder_cert = &holder_chain[0];
     let aa_cert = &aa_chain[0];
 
-    // Rule 3. Before the signature check, because "this is not an
-    // attribute authority" is a better answer than "the signature did
-    // not verify" when a caller has passed a CA by mistake.
-    pkix_ac::check_issuer_profile(aa_cert)?;
-
-    // Rules 7, and the §4.2/§4.3 profile.
-    ac.check_profile()?;
-
-    // §6. An AC with no noRevAvail is its issuer "implicitly stating
-    // that revocation status checks are supported", and §6 is explicit
-    // that a verifier supporting only the "never revoke" scheme "MUST
-    // reject" such an AC. This function checks no AC revocation status
-    // at all, so NeverRevokeOnly is what it actually supports, and
-    // accepting those ACs regardless was fail-open on a MUST — the same
-    // mistake as returning Ok for an AC targeted elsewhere.
-    //
-    // CallerChecks exists because §6 permits "any source for AC
-    // revocation status information", and a caller who has one is
-    // conforming. It cannot be verified from here; naming it at the call
-    // site is the point.
-    if ac_revocation == AcRevocation::NeverRevokeOnly && !ac.no_revocation_available() {
-        return Err(Error::AttributeCert(pkix_ac::Error::RevocationUnsupported));
-    }
-
-    // Rule 2's signature half, and rule 5.
-    ac.verify(aa_cert, now_unix, verifier)?;
-
-    // Holder binding. Without this the result would mean "some authority
-    // you trust issued this AC to someone", which is not a question
-    // anybody asks.
-    if !ac.matches_holder(holder_cert) {
-        return Err(Error::AttributeCert(pkix_ac::Error::HolderMismatch));
-    }
-
-    // Rule 6, and it is a refusal rather than a report. RFC 5755
-    // §4.3.2: "An (honest) AC verifier who is not amongst the named
-    // servers/services MUST reject the AC", and §5 rule 6 requires the
-    // targeting check to *pass*.
-    //
-    // This returned Ok(.. NotATarget) and left the decision to the
-    // caller, on the reasoning that being outside an AC's targets is
-    // policy rather than invalidity. That reasoning was wrong against a
-    // MUST, and wrong in the dangerous direction: the obvious use of a
-    // Result-returning verifier is `let v = verify_attribute_cert(..)?;`
-    // followed by granting the attribute, which honours an AC scoped to
-    // somebody else's service. A caller who wants the verdict without
-    // the refusal has pkix_ac::check_targeting, which still reports all
-    // three states.
-    let targeting = ac.check_targeting(my_names, my_groups)?;
-    if targeting == pkix_ac::Targeting::NotATarget {
-        return Err(Error::AttributeCert(pkix_ac::Error::NotATarget));
-    }
+    // Everything §5 asks that does not need trust anchors, in one
+    // call. This used to repeat the sequence here, which is how the two
+    // entry points came to disagree about §6: the rule was added to
+    // this function and not to `validate`. One sequence, one place.
+    let targeting = ac.validate(
+        aa_cert,
+        holder_cert,
+        now_unix,
+        my_names,
+        my_groups,
+        ac_revocation,
+        verifier,
+    )?;
 
     Ok(ValidatedAttributeCert {
         holder,

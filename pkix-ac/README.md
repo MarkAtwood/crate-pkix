@@ -8,20 +8,35 @@ Attribute Authority (AA) whose own certificate is an ordinary public-key
 certificate.
 
 ```rust
-use pkix_ac::AttributeCertificate;
+use pkix_ac::{AcRevocation, AttributeCertificate};
 
 let ac = AttributeCertificate::from_der(ac_der)?;
-ac.check_profile()?;
 
-// `aa_cert` is the Attribute Authority's certificate, which the caller
-// must already have validated — see below.
-ac.verify(&aa_cert, now_unix, &pkix_path::DefaultVerifier)?;
+// Everything RFC 5755 §5 asks except the two certification paths.
+// `aa_cert` is the Attribute Authority's and `holder_cert` the
+// presenter's, and the caller must already have validated both — see
+// below.
+let targeting = ac.validate(
+    &aa_cert,
+    &holder_cert,
+    now_unix,
+    &my_names,
+    &my_groups,
+    AcRevocation::NeverRevokeOnly,
+    &pkix_path::DefaultVerifier,
+)?;
 
 for attr in ac.attributes() {
     let _oid = attr.r#type;
 }
 # Ok::<(), pkix_ac::Error>(())
 ```
+
+`check_profile` and `verify` are available separately, for a caller that
+wants to report on a certificate rather than accept it. Do not reach for
+that pair as the normal path: it runs neither §4.5 on the authority nor
+the §4.3.2 targeting check, so it will accept an attribute certificate
+scoped to somebody else's service.
 
 ## What this crate does not do, and why
 
@@ -36,10 +51,9 @@ meaningless**: the signature will check out against whatever key is handed
 over, an attacker's included.
 
 Use `pkix_chain::verify_attribute_cert` unless you are doing the path
-validation yourself. It runs the whole of RFC 5755 §5 — both certification
-paths, the §4.5 profile on the authority's own certificate, the AC
-signature, validity, targeting, the §4.2/§4.3 profile, and the holder
-binding — and is the only entry point that does.
+validation yourself. It validates both chains and then calls `validate`,
+so it is the only entry point that covers the whole of §5 including rules
+1 and 2.
 
 ## Attributes are parsed, not interpreted
 

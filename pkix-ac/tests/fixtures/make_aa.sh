@@ -105,7 +105,26 @@ openssl req -new -key holder-deep-key.pem   -subj "/CN=pkix-ac deep holder" -out
 WORK="$WORK" openssl ca -batch -config "$WORK/ica.cnf"   -in "$WORK/hd.csr" -extensions holder_ext   -startdate 20250101000000Z -enddate 20350101000000Z   -out "$WORK/hd.pem" >/dev/null 2>&1
 openssl x509 -in "$WORK/hd.pem" -out holder-deep-cert.der -outform DER
 
-for f in aa-cert.der ica-cert.der aa-deep-cert.der holder-deep-cert.der; do
+# An authority whose keyUsage asserts only nonRepudiation. §4.5 forbids a
+# keyUsage that "explicitly indicate[s] that the AC issuer's public key
+# cannot be used to validate a digital signature", and per RFC 5280
+# §4.2.1.3 nonRepudiation (contentCommitment) also denotes verifying
+# signatures — so this authority is permitted. Requiring
+# digitalSignature specifically refused it, and the test that was meant
+# to cover the change used an authority asserting digitalSignature, so
+# the nonRepudiation branch was never evaluated.
+cat >> "$WORK/ca.cnf" <<'CNF'
+[aa_nonrep_ext]
+basicConstraints     = critical,CA:FALSE
+keyUsage             = critical,nonRepudiation
+subjectKeyIdentifier = hash
+CNF
+openssl ecparam -name prime256v1 -genkey -noout -out aa-nonrep-key.pem
+openssl req -new -key aa-nonrep-key.pem   -subj "/CN=pkix-ac nonrepudiation authority" -out "$WORK/aanr.csr"
+WORK="$WORK" openssl ca -batch -config "$WORK/ca.cnf"   -in "$WORK/aanr.csr" -extensions aa_nonrep_ext   -startdate 20250101000000Z -enddate 20350101000000Z   -out "$WORK/aanr.pem" >/dev/null 2>&1
+openssl x509 -in "$WORK/aanr.pem" -out aa-nonrep-cert.der -outform DER
+
+for f in aa-cert.der ica-cert.der aa-deep-cert.der holder-deep-cert.der          aa-nonrep-cert.der; do
   echo "--- $f ---"
   openssl x509 -in "$f" -inform DER -noout -subject -issuer     -ext basicConstraints,keyUsage 2>/dev/null | sed 's/^/  /'
 done

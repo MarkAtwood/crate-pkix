@@ -488,6 +488,27 @@ def main() -> None:
     (HERE / "ac-norevavail-with-pointer.der").write_bytes(
         attribute_certificate(info))
 
+    # §6's "pointer in AC" scheme points at REVOCATION status. Inside an
+    # AIA that is id-ad-ocsp; an AIA holding only id-ad-caIssuers points
+    # at the issuer's certificate, which §4.3.4 treats as a separate and
+    # optional feature. So noRevAvail beside a caIssuers-only AIA has
+    # chosen one scheme and is conforming.
+    def aia(access_method, uri):
+        return extension("1.3.6.1.5.5.7.1.1", False, seq(seq(
+            oid(access_method), tlv(0x86, uri.encode()))))
+
+    null = b"\x05\x00"
+    info = with_exts(0x94, extension(ID_CE_NO_REV_AVAIL, False, null)
+                     + aia("1.3.6.1.5.5.7.48.2", "http://ca.example/issuer.cer"))
+    (HERE / "ac-norevavail-with-caissuers.der").write_bytes(
+        attribute_certificate(info))
+
+    # Whereas an OCSP accessMethod IS a revocation pointer.
+    info = with_exts(0x95, extension(ID_CE_NO_REV_AVAIL, False, null)
+                     + aia("1.3.6.1.5.5.7.48.1", "http://ocsp.example/"))
+    (HERE / "ac-norevavail-with-ocsp.der").write_bytes(
+        attribute_certificate(info))
+
     # A targetCert as the ONLY target, which §4.3.2 forbids -- and whose
     # certDigestInfo carries otherObjectTypes(2), the value §4.1 forbids.
     # This was the route by which a profile-checked AC could still hold
@@ -520,6 +541,18 @@ def main() -> None:
     # And longer than the 20 octets §4.2.5 permits.
     (HERE / "ac-serial-too-long.der").write_bytes(attribute_certificate(
         acinfo_raw_serial(tlv(0x02, b"\x01" + bytes(20)))))
+
+    # A CONFORMING positive serial whose magnitude has its high bit set:
+    # DER `02 02 00 80` is +128, with the leading 00 §4.2.5 prescribes.
+    (HERE / "ac-serial-positive-high-bit.der").write_bytes(
+        attribute_certificate(acinfo_raw_serial(tlv(0x02, b"\x00\x80"))))
+
+    # A CONFORMING 20-octet serial whose top byte has the high bit set,
+    # so §4.2.5's prescribed leading 00 makes the DER content 21 octets.
+    # The VALUE is 20 octets, which is exactly what §4.2.5 permits.
+    mag20 = b"\xff" + bytes(range(1, 20))
+    (HERE / "ac-serial-20-octet-high-bit.der").write_bytes(
+        attribute_certificate(acinfo_raw_serial(tlv(0x02, b"\x00" + mag20))))
 
     # §4.2.2: an entityName present but carrying no names. `A1 00`.
     (HERE / "ac-holder-no-names.der").write_bytes(attribute_certificate(
