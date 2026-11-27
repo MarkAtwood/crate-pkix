@@ -888,3 +888,171 @@ const _: fn() = || {
     fn _assert_send_sync<T: Send + Sync>() {}
     _assert_send_sync::<Error>();
 };
+
+/// Error rendering: every variant says something, and no two say the same
+/// thing.
+///
+/// `std`, not bare `test`: `to_string` needs `alloc`, which this crate pulls
+/// in only for some feature combinations.
+///
+/// # Why this is worth its length
+///
+/// These messages are what an operator reading a log line has. A `Display`
+/// impl that writes nothing renders an error that says a revocation check
+/// failed and not why -- and nothing else in the suite looks at the text,
+/// so both impls here could have been `Ok(())`, and `crl_reason_name` could
+/// have returned one string for every reason.
+///
+/// Distinctness carries as much weight as non-emptiness. Thirty-one arms
+/// written by hand is thirty-one chances to paste the neighbouring message,
+/// and a duplicate renders two different failures identically while every
+/// non-emptiness check passes.
+#[cfg(all(test, feature = "std"))]
+mod display_tests {
+    use super::{crl_reason_name, Error, OutOfScopeReason};
+    use x509_cert::ext::pkix::crl::CrlReason;
+    use x509_cert::serial_number::SerialNumber;
+
+    fn der_error() -> crate::DerError {
+        crate::DerError::new(der::Error::from(der::ErrorKind::Failed))
+    }
+
+    fn serial() -> SerialNumber {
+        SerialNumber::new(&[0x07]).expect("a one-byte serial is in range")
+    }
+
+    /// Asserts each rendering is non-empty and unlike every other.
+    fn each_renders_distinctly<T: core::fmt::Display + core::fmt::Debug>(values: &[T]) {
+        let mut seen: Vec<(String, String)> = Vec::new();
+        for value in values {
+            let text = value.to_string();
+            assert!(!text.is_empty(), "{value:?} renders as nothing");
+            if let Some((other, _)) = seen.iter().find(|(_, t)| t == &text) {
+                panic!("{value:?} renders exactly like {other}: {text:?}");
+            }
+            seen.push((format!("{value:?}"), text));
+        }
+    }
+
+    #[test]
+    fn every_out_of_scope_reason_renders_distinctly() {
+        each_renders_distinctly(&[
+            OutOfScopeReason::CrlOnlyAttributeCerts,
+            OutOfScopeReason::CrlOnlyUserCerts,
+            OutOfScopeReason::CrlOnlyCaCerts,
+            OutOfScopeReason::CrlIdpDistributionPointMismatch,
+            OutOfScopeReason::CrlDistributionPointIssuerMismatch,
+            OutOfScopeReason::CrlOnlySomeReasons,
+        ]);
+    }
+
+    #[test]
+    fn every_error_variant_renders_distinctly() {
+        each_renders_distinctly(&[
+            Error::Revoked {
+                serial: serial(),
+                reason_code: None,
+            },
+            Error::Revoked {
+                serial: serial(),
+                reason_code: Some(CrlReason::KeyCompromise),
+            },
+            Error::CrlExpired,
+            Error::CrlIssuerMismatch,
+            Error::CrlSignatureInvalid,
+            Error::CrlParseError(der_error()),
+            Error::OcspSignatureInvalid,
+            Error::OcspResponderIdMismatch,
+            Error::OcspCertIdMismatch,
+            Error::OcspIssuerCertMismatch,
+            Error::OcspStatusUnknown,
+            Error::OcspExpired,
+            Error::OcspParseError(der_error()),
+            Error::OcspMalformed,
+            Error::OcspResponderEkuMissing,
+            Error::OcspResponderEkuMalformed,
+            Error::OcspResponderCertNotIssuedByCa,
+            Error::OcspResponderCertExpired,
+            Error::OcspResponderCertSigInvalid,
+            Error::IndirectCrlIssuerMissing,
+            Error::IndirectCrlIssuerUnexpected,
+            Error::CrlSignMissing,
+            Error::CrlSignerNotFound,
+            Error::CrlSignerNotTrusted,
+            Error::DeltaCrlBaseMismatch,
+            Error::CrlNumberMismatch,
+            Error::DeltaCrlAsComplete,
+            Error::CrlUnsupportedCriticalExtension,
+            Error::MalformedCertificate,
+            Error::OutOfScope(OutOfScopeReason::CrlOnlySomeReasons),
+            Error::AnchorCheckUnsupported,
+            Error::RevocationFetchFailed {
+                description: "http://ocsp.example: connection refused".to_owned(),
+            },
+        ]);
+    }
+
+    /// `CrlParseError` and `OcspParseError` render the same inner text, so
+    /// the one thing that keeps them apart is the prefix each arm writes.
+    #[test]
+    fn the_two_parse_errors_are_told_apart_by_their_prefix() {
+        let crl = Error::CrlParseError(der_error()).to_string();
+        let ocsp = Error::OcspParseError(der_error()).to_string();
+        assert_ne!(
+            crl, ocsp,
+            "a reader must be able to tell which parser failed"
+        );
+        assert!(crl.starts_with("CRL"), "got {crl:?}");
+        assert!(ocsp.starts_with("OCSP"), "got {ocsp:?}");
+    }
+
+    /// Every RFC 5280 §5.3.1 reason has its own camelCase name.
+    ///
+    /// The names are written out here rather than compared to the function's
+    /// own output, so the table is an independent oracle: this is the
+    /// spelling that reaches a log line, and `cACompromise` and
+    /// `aACompromise` are the RFC's own capitalisation rather than a typo.
+    #[test]
+    fn every_crl_reason_has_its_rfc_name() {
+        const NAMES: [(CrlReason, &str); 10] = [
+            (CrlReason::Unspecified, "unspecified"),
+            (CrlReason::KeyCompromise, "keyCompromise"),
+            (CrlReason::CaCompromise, "cACompromise"),
+            (CrlReason::AffiliationChanged, "affiliationChanged"),
+            (CrlReason::Superseded, "superseded"),
+            (CrlReason::CessationOfOperation, "cessationOfOperation"),
+            (CrlReason::CertificateHold, "certificateHold"),
+            (CrlReason::RemoveFromCRL, "removeFromCRL"),
+            (CrlReason::PrivilegeWithdrawn, "privilegeWithdrawn"),
+            (CrlReason::AaCompromise, "aACompromise"),
+        ];
+        for (reason, name) in NAMES {
+            assert_eq!(crl_reason_name(reason), name, "for {reason:?}");
+        }
+    }
+
+    /// A parse error exposes the DER error underneath it.
+    ///
+    /// `Display` interpolates the inner error, so a reader of the message
+    /// loses nothing when `source` returns `None` -- but a caller walking
+    /// the chain to find the `der::Error` does, and that is the only
+    /// structured handle on what the parser objected to.
+    #[test]
+    fn the_parse_errors_expose_their_der_error_as_a_source() {
+        use core::error::Error as _;
+
+        for e in [
+            Error::CrlParseError(der_error()),
+            Error::OcspParseError(der_error()),
+        ] {
+            assert!(
+                e.source().is_some(),
+                "{e:?} must expose the DER error underneath it"
+            );
+        }
+        assert!(
+            Error::CrlExpired.source().is_none(),
+            "a variant with nothing underneath it has no source"
+        );
+    }
+}
