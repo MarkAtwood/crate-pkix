@@ -7263,3 +7263,201 @@ mod nc_type_mask_tests {
         assert_eq!(by_value, by_assign);
     }
 }
+
+/// Rendering, equality, hashing and source chains of [`Error`] and
+/// [`DerError`].
+///
+/// These impls have no caller inside the crate: a path validation returns
+/// an `Error`, and whether it renders, compares or hashes is the consumer's
+/// business. So nothing here was exercised, and the failure mode is quiet
+/// in the way that matters for a diagnostic — a `Display` that writes
+/// nothing still returns `Ok`, a `source` that returns `None` still
+/// satisfies the trait, and an `eq` that answers `true` makes two different
+/// DER failures the same value.
+#[cfg(test)]
+mod error_rendering_tests {
+    use super::{DerError, Error, VerificationErrorKind};
+    use core::hash::{Hash, Hasher};
+
+    /// FNV-1a, so the hash assertions do not need `std`'s `DefaultHasher`.
+    ///
+    /// Any deterministic hasher does: the question is whether `Hash` reads
+    /// the field `PartialEq` compares, not what the digest is.
+    struct Fnv(u64);
+
+    impl Fnv {
+        fn of<T: Hash>(value: &T) -> u64 {
+            let mut h = Self(0xcbf2_9ce4_8422_2325);
+            value.hash(&mut h);
+            h.finish()
+        }
+    }
+
+    impl Hasher for Fnv {
+        fn write(&mut self, bytes: &[u8]) {
+            for b in bytes {
+                self.0 ^= u64::from(*b);
+                self.0 = self.0.wrapping_mul(0x0100_0000_01b3);
+            }
+        }
+        fn finish(&self) -> u64 {
+            self.0
+        }
+    }
+
+    /// A `DerError` wrapping the failure `bytes` produces as an OID.
+    fn der_error(bytes: &[u8]) -> DerError {
+        use der::Decode as _;
+        let failed: der::Result<der::asn1::ObjectIdentifier> =
+            der::asn1::ObjectIdentifier::from_der(bytes);
+        DerError::new(failed.expect_err("not a well-formed OID"))
+    }
+
+    /// One of every [`Error`] variant.
+    ///
+    /// The index is the same throughout on purpose: the variants that carry
+    /// only an index are otherwise indistinguishable, so holding it fixed
+    /// makes the distinctness assertion below a statement about the
+    /// messages rather than about the numbers in them.
+    fn every_variant() -> [Error; 23] {
+        const IDX: usize = 2;
+        [
+            Error::SignatureInvalid { index: IDX },
+            Error::SignatureNotVerified {
+                index: IDX,
+                reason: VerificationErrorKind::UnsupportedAlgorithm,
+            },
+            Error::MalformedCertificate { index: IDX },
+            Error::ValidityPeriod { index: IDX },
+            Error::ChainBroken { index: IDX },
+            Error::NoTrustedPath,
+            Error::PathTooLong,
+            Error::NotCA { index: IDX },
+            Error::KeyUsageMissing { index: IDX },
+            Error::CrlSignMissing { index: IDX },
+            Error::UnhandledCriticalExtension { index: IDX },
+            Error::NameConstraintViolation { index: IDX },
+            Error::PolicyViolation { index: IDX },
+            Error::Der(der_error(&[0x06, 0x01, 0x80])),
+            Error::ValidityPeriodExceedsMax { index: IDX },
+            Error::AlgorithmNotAllowed { index: IDX },
+            Error::KeyTooSmall { index: IDX },
+            Error::MissingSan,
+            Error::MissingRfc822San,
+            Error::MissingEku,
+            Error::MissingLeafPolicyOid {
+                required: der::asn1::ObjectIdentifier::new_unwrap("1.2.3.4"),
+            },
+            Error::SubjectDnAttrRuleUnmet,
+            Error::DuplicateCertificate {
+                first: IDX,
+                second: IDX + 1,
+            },
+        ]
+    }
+
+    /// Every variant renders something, and no two render the same thing.
+    ///
+    /// An `Error` whose message is empty, or shared with another variant,
+    /// tells a caller nothing about what went wrong. The array is a fixed
+    /// length so adding a variant without a message is a compile error
+    /// here rather than a silent gap.
+    #[test]
+    fn every_error_variant_renders_a_distinct_message() {
+        let variants = every_variant();
+        let rendered: Vec<_> = variants.iter().map(|e| format!("{e}")).collect();
+        for (variant, text) in variants.iter().zip(&rendered) {
+            assert!(!text.is_empty(), "{variant:?} renders nothing");
+        }
+        for (i, a) in rendered.iter().enumerate() {
+            for (j, b) in rendered.iter().enumerate().skip(i + 1) {
+                assert_ne!(
+                    a, b,
+                    "{:?} and {:?} render the same message",
+                    variants[i], variants[j]
+                );
+            }
+        }
+    }
+
+    /// Only `Error::Der` has an underlying cause, and it exposes it.
+    ///
+    /// A `source` that always answers `None` breaks `{:#}`-style chained
+    /// reporting: the DER failure that explains the whole error is in the
+    /// wrapped value and nowhere else.
+    #[test]
+    fn only_the_der_variant_has_a_source() {
+        use core::error::Error as _;
+        for variant in &every_variant() {
+            let expected = matches!(variant, Error::Der(_));
+            assert_eq!(
+                variant.source().is_some(),
+                expected,
+                "{variant:?} source presence"
+            );
+        }
+    }
+
+    /// `DerError` renders the message it cached, and exposes the
+    /// `der::Error` it was built from.
+    #[test]
+    fn a_der_error_renders_and_exposes_its_cause() {
+        use core::error::Error as _;
+        let e = der_error(&[0x06, 0x01, 0x80]);
+        let rendered = format!("{e}");
+        assert!(!rendered.is_empty(), "DerError renders nothing");
+        let source = e.source().expect("a DerError built from a der::Error");
+        assert_eq!(
+            format!("{source}"),
+            rendered,
+            "the cached message is the der::Error's own rendering"
+        );
+    }
+
+    /// Equality compares the cached message, so distinct DER failures are
+    /// distinct values.
+    ///
+    /// `Error` derives `PartialEq`, so an `eq` that always answered `true`
+    /// would make `Err(Error::Der(a)) == Err(Error::Der(b))` for any two
+    /// DER failures — and a test asserting a particular error would pass
+    /// for the wrong one.
+    #[test]
+    fn der_errors_with_different_messages_differ() {
+        let wrong_tag = der_error(&[0x02, 0x01, 0x00]);
+        let truncated = der_error(&[0x06, 0x01, 0x80]);
+        assert_ne!(
+            format!("{wrong_tag}"),
+            format!("{truncated}"),
+            "the two fixtures must fail differently for this test to mean anything"
+        );
+        assert_ne!(wrong_tag, truncated);
+        assert_eq!(
+            Error::Der(wrong_tag.clone()),
+            Error::Der(wrong_tag.clone()),
+            "the same failure twice"
+        );
+        assert_ne!(Error::Der(wrong_tag), Error::Der(truncated));
+    }
+
+    /// `Hash` reads the field `PartialEq` compares.
+    ///
+    /// Equal values must hash equally, which a `hash` that writes nothing
+    /// satisfies trivially — and then every `DerError` lands in one bucket,
+    /// including inside the `Error` and `ValidatedPath` hashes that exist
+    /// only because `DerError` is `Hash`.
+    #[test]
+    fn der_error_hashing_follows_its_equality() {
+        let wrong_tag = der_error(&[0x02, 0x01, 0x00]);
+        let truncated = der_error(&[0x06, 0x01, 0x80]);
+        assert_eq!(
+            Fnv::of(&wrong_tag),
+            Fnv::of(&der_error(&[0x02, 0x01, 0x00])),
+            "equal values hash equally"
+        );
+        assert_ne!(
+            Fnv::of(&wrong_tag),
+            Fnv::of(&truncated),
+            "unequal values are not all one hash"
+        );
+    }
+}
