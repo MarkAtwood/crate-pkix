@@ -127,10 +127,20 @@ fn truncation_is_refused_at_every_length() {
     }
 }
 
-/// The signature covers the DER of `acinfo`, so a consumer has to be able
-/// to recover exactly those bytes. Re-encoding the parsed structure must
-/// reproduce the slice that was signed, or signature verification built
-/// on it would be checking different bytes than the AA signed.
+/// Re-encoding `acinfo` reproduces the signed slice **for this
+/// canonical fixture**.
+///
+/// Stated narrowly on purpose. It is tempting to read this as a general
+/// property — and that reading is false: `validate.rs`'s
+/// `an_unsorted_set_of_verifies_though_re_encoding_would_not` exists to
+/// disprove it, because `SetOfVec` re-sorts on decode, so an attribute
+/// whose `SET OF` values arrived non-canonically re-encodes to different
+/// bytes than were signed.
+///
+/// A canonical fixture passing this test is exactly how `pkix-ct`'s
+/// re-encoding approach passed its own tests while being wrong. What
+/// makes verification safe here is that `signed_bytes()` is a slice of
+/// the original DER, not that re-encoding happens to agree.
 #[test]
 fn acinfo_re_encodes_to_the_bytes_that_were_signed() {
     let der = fixture("ac-role-valid.der");

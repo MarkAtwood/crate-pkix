@@ -7,7 +7,7 @@ Neither OpenSSL nor pyca/cryptography can create an attribute
 certificate — they model public-key certificates, CRLs and requests, and
 so does `x509-cert`, which is why `pkix-ac` declares the ASN.1 itself.
 That leaves no independent tool to generate fixtures with, so they are
-assembled here from the productions in RFC 5755 Appendix A and signed
+assembled here from the productions in RFC 5755 Appendix B and signed
 with a real key by `openssl dgst`.
 
 The consequence is worth stating plainly: this generator is not an
@@ -472,6 +472,60 @@ def main() -> None:
         (HERE / f"ac-version-{label}.der").write_bytes(
             attribute_certificate(info))
 
+    # ---- §6 revocation, §4.2.5 serials, and an empty entityName -----
+
+    # §4.3.6 gives noRevAvail the syntax NULL. The value was never
+    # checked, so an AC asserting "never revoke" with a body of junk
+    # satisfied no_revocation_available().
+    info = with_exts(0x90, extension(ID_CE_NO_REV_AVAIL, False, tlv(0x04, b"junk")))
+    (HERE / "ac-norevavail-not-null.der").write_bytes(attribute_certificate(info))
+
+    # §6: "an AC MUST NOT contain both a noRevAvail extension and a
+    # 'pointer in AC'". The two schemes are alternatives.
+    cdp = extension("2.5.29.31", False, seq(seq(tlv(0xA0, tlv(0xA0,
+        tlv(0x86, b"http://crl.example.com/ac.crl"))))))
+    info = with_exts(0x91, extension(ID_CE_NO_REV_AVAIL, False, b"\x05\x00") + cdp)
+    (HERE / "ac-norevavail-with-pointer.der").write_bytes(
+        attribute_certificate(info))
+
+    # A targetCert as the ONLY target, which §4.3.2 forbids -- and whose
+    # certDigestInfo carries otherObjectTypes(2), the value §4.1 forbids.
+    # This was the route by which a profile-checked AC could still hold
+    # an ObjectDigestInfo.
+    # TargetCert ::= SEQUENCE { targetCertificate IssuerSerial,
+    #   targetName GeneralName OPTIONAL,
+    #   certDigestInfo ObjectDigestInfo OPTIONAL }
+    #
+    # [2] is IMPLICIT and replaces TargetCert's own SEQUENCE tag, so its
+    # fields sit directly inside: the IssuerSerial keeps its SEQUENCE,
+    # targetName is omitted, and certDigestInfo keeps its own.
+    tc_with_odi = tlv(0xA2,
+        seq(issuer_serial_contents(leaf_subject, 0x77))
+        + seq(object_digest_info_contents(2)))
+    info = with_exts(0x92, extension(
+        ID_CE_TARGET_INFORMATION, True, target_information(targets(tc_with_odi))))
+    (HERE / "ac-target-cert-other-object.der").write_bytes(
+        attribute_certificate(info))
+
+    # §4.2.5: the serial's sign bit MUST be zero. `02 01 80` is -128.
+    def acinfo_raw_serial(serial_der, exts=b""):
+        tail = seq(exts) if exts else b""
+        return seq(integer(1),
+                   seq(tlv(0xA1, general_name_directory(leaf_subject))),
+                   tlv(0xA0, general_names(general_name_directory(aa_subject))),
+                   ECDSA_SHA256, serial_der,
+                   seq(gen_time(window[0]), gen_time(window[1])), role, tail)
+    (HERE / "ac-serial-negative.der").write_bytes(attribute_certificate(
+        acinfo_raw_serial(tlv(0x02, b"\x80"))))
+    # And longer than the 20 octets §4.2.5 permits.
+    (HERE / "ac-serial-too-long.der").write_bytes(attribute_certificate(
+        acinfo_raw_serial(tlv(0x02, b"\x01" + bytes(20)))))
+
+    # §4.2.2: an entityName present but carrying no names. `A1 00`.
+    (HERE / "ac-holder-no-names.der").write_bytes(attribute_certificate(
+        acinfo(b"", aa_subject, 0x93, *window, role,
+               holder_override=seq(tlv(0xA1, b"")))))
+
     # ---- a chain with depth -----------------------------------------
     #
     # root -> intermediate -> {authority, holder}, all from
@@ -580,8 +634,15 @@ def main() -> None:
         return seq(seq(*values))
 
     # Clearance ::= SEQUENCE { policyId OID, classList BIT STRING
-    #   DEFAULT {unmarked}, securityCategories SET OF ... OPTIONAL }
-    clearance = seq(oid("1.3.6.1.4.1.99.7"), bitstring(b"\x20"))
+    #   DEFAULT {unclassified}, securityCategories SET OF ... OPTIONAL }
+    #
+    # classList is a named bit list, so X.690 §11.2.2 requires trailing
+    # zero bits to be removed: restricted(2) is `03 02 05 20`, not
+    # `03 02 00 20`. `bitstring()` writes a plain BIT STRING with zero
+    # unused bits, which is wrong for this type -- and the fixture passed
+    # anyway because the value rides inside `Any` and is never decoded,
+    # so the test presenting it as a §4.4 Clearance could not notice.
+    clearance = seq(oid("1.3.6.1.4.1.99.7"), tlv(0x03, b"\x05\x20"))
 
     # All six §4.4 types in one certificate.
     info = acinfo(leaf_subject, aa_subject, 0x50, *window, seq(

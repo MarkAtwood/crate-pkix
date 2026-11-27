@@ -2,7 +2,7 @@
 //!
 //! `x509-cert` 0.3 models public-key certificates, CRLs and certification
 //! requests but not attribute certificates, so these are declared here.
-//! They follow the shapes in RFC 5755 Appendix A verbatim, and the module
+//! They follow the shapes in RFC 5755 Appendix B verbatim, and the module
 //! there is `DEFINITIONS IMPLICIT TAGS`, so every context-specific tag
 //! below is `IMPLICIT` — unlike RFC 5280's, which are explicit. Getting
 //! that backwards does not fail to compile; it fails to parse real
@@ -167,8 +167,8 @@ pub enum DigestedObjectType {
 /// `AttCertValidityPeriod` — RFC 5755 §4.1.
 ///
 /// Both bounds are `GeneralizedTime`, with none of the UTCTime-before-2050
-/// rule that applies to public-key certificates. §4.1 also requires the
-/// seconds field to be present and the time to be in Z, which
+/// rule that applies to public-key certificates. §4.2.6 also requires
+/// the seconds field to be present and the time to be in Z, which
 /// `GeneralizedTime` already enforces.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Sequence)]
 #[allow(missing_docs)]

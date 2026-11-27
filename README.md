@@ -35,7 +35,7 @@ Per-crate versions live on crates.io and in each crate's `Cargo.toml`.
 | [`pkix-revocation-http`] | Online CRL/OCSP fetching from CDP/AIA | — | planned |
 | [`pkix-ct`] | Certificate Transparency SCT verification | — | planned |
 | [`pkix-composite`] | Composite classical+PQC signature verifier | ✓ | planned |
-| [`pkix-ac`] | RFC 5755 attribute certificate validation | ✓ | planned |
+| [`pkix-ac`] | RFC 5755 attribute certificate validation | ✓ | ✓ |
 
 ### Industry-forum reference crates (not authoritative)
 
@@ -241,7 +241,6 @@ certificate chains the library can validate. Tracked as epic **PKIX-qws**
 - TLSRPT report compression (RFC 8460 §5.2, a SHOULD) — needs a gzip
   dependency; `ReportFilename` already distinguishes `json` from `json.gz`
 - Composite post-quantum + classical signature verification (`pkix-composite`, stub only)
-- RFC 5755 attribute certificate validation (`pkix-ac`, stub only)
 - OS-native trust store loading (`pkix-truststore-system`, stub only)
 - PKCS#11 / HSM trust store adapter (`pkix-truststore-pkcs11`, stub only)
 
@@ -318,7 +317,7 @@ layer underneath.
 | Crate | What | Status |
 |-------|------|--------|
 | `pkix-composite` | Post-quantum + classical composite signatures | stub |
-| `pkix-ac` | RFC 5755 attribute certificate validation | stub |
+| `pkix-ac` | RFC 5755 attribute certificate validation | ✓ |
 | `pkix-pkilint-bridge` | pkilint subprocess integration | name reserved |
 | `pkix-policy-pkilint` | pkilint → pkix-lint adapter | name reserved |
 | `pkix-truststore-pkcs11` | HSM / smart card trust store adapter | stub |

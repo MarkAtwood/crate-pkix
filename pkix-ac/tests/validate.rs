@@ -949,3 +949,160 @@ fn serial_numbers_compare_as_canonical_der_integers() {
     assert!(ac("ac-holder-base-cert-id.der").matches_holder(&holder));
     assert!(!ac("ac-holder-base-cert-id-wrong-serial.der").matches_holder(&holder));
 }
+
+/// RFC 5755 §6's two revocation schemes, and §4.3.6's syntax.
+///
+/// §4.3.6 gives `noRevAvail` the syntax "NULL (i.e. `'0500'H` is the
+/// DER encoding)". The value was never checked, so an AC asserting
+/// "never revoke" with a body of junk satisfied
+/// [`AttributeCertificate::no_revocation_available`] — and a caller
+/// keyed on that accessor would skip revocation for an AC that never
+/// made the assertion.
+///
+/// §6: "an AC MUST NOT contain both a noRevAvail extension and a
+/// 'pointer in AC'". They are alternatives — one says no revocation
+/// information exists, the other says where to find it — so an AC
+/// asserting both has not chosen.
+#[test]
+fn the_revocation_schemes_are_mutually_exclusive_and_typed() {
+    assert_eq!(
+        ac("ac-norevavail-not-null.der").check_profile(),
+        Err(Error::ProfileViolation(ProfileViolation::NoRevAvailNotNull))
+    );
+    assert_eq!(
+        ac("ac-norevavail-with-pointer.der").check_profile(),
+        Err(Error::ProfileViolation(
+            ProfileViolation::NoRevAvailWithPointer
+        ))
+    );
+    // The conforming one still passes, and still reads as the assertion.
+    let ok = ac("ac-norevavail.der");
+    ok.check_profile()
+        .expect("a NULL-valued noRevAvail conforms");
+    assert!(ok.no_revocation_available());
+}
+
+/// `targetCert` is refused by the profile check, not only by
+/// `check_targeting`.
+///
+/// §5 defines support for an extension as being able to parse the value
+/// AND honouring a rejection the value implies, so a crate claiming to
+/// support a critical `targetInformation` has to refuse a `targetCert`
+/// there. It previously only did so in `check_targeting`, which a
+/// caller may never reach — `check_profile` and `verify` both returned
+/// `Ok`.
+///
+/// This also restores the reachability argument for `otherObjectTypes`:
+/// a `TargetCert` carries an `ObjectDigestInfo`, so that was the route
+/// by which a profile-checked certificate could still hold one. This
+/// fixture's `certDigestInfo` carries `digestedObjectType =
+/// otherObjectTypes(2)`, the value §4.1 forbids.
+#[test]
+fn a_target_cert_is_refused_by_the_profile_check() {
+    let ac = ac("ac-target-cert-other-object.der");
+    assert_eq!(
+        ac.check_profile(),
+        Err(Error::ProfileViolation(ProfileViolation::TargetCertUsed))
+    );
+    // verify() does NOT run the profile rules — they are separate
+    // calls, which is exactly the hazard `validate` exists to remove.
+    // Asserting otherwise is a mistake this test made on its first
+    // attempt, so it is recorded rather than quietly corrected.
+    ac.verify(&aa(), NOW, &DefaultVerifier)
+        .expect("verify checks the signature and validity, not the profile");
+
+    // validate() runs both, so it refuses.
+    assert_eq!(
+        ac.validate(&aa(), &holder(), NOW, &[], &[], &DefaultVerifier),
+        Err(Error::ProfileViolation(ProfileViolation::TargetCertUsed))
+    );
+}
+
+/// §4.2.5's serial-number rules, and §4.2.2's empty `entityName`.
+///
+/// §4.2.5: "AC issuers MUST force the serialNumber to be a positive
+/// integer, that is, the sign bit in the DER encoding of the INTEGER
+/// value MUST be zero", and "conformant ACs MUST NOT contain
+/// serialNumber values longer than 20 octets". The first removes "a
+/// potential ambiguity in mapping between a string of octets and an
+/// integer value" — the mapping `matches_holder` relies on when it
+/// compares serials as bytes.
+///
+/// The `entityName` case is a message fix as much as a rule: `A1 00`
+/// used to be reported as `HolderNameNotSingular`, whose text reads
+/// "holder carries more than one name" — the opposite of the truth.
+#[test]
+fn the_serial_number_and_empty_entity_name_rules_are_enforced() {
+    for (name, expected) in [
+        (
+            "ac-serial-negative.der",
+            ProfileViolation::SerialNotPositive,
+        ),
+        ("ac-serial-too-long.der", ProfileViolation::SerialTooLong),
+        ("ac-holder-no-names.der", ProfileViolation::HolderNameEmpty),
+    ] {
+        assert_eq!(
+            ac(name).check_profile(),
+            Err(Error::ProfileViolation(expected)),
+            "{name} must be refused as {expected:?}"
+        );
+    }
+}
+
+/// `validate` runs the whole of §5 that this crate can, in one call.
+///
+/// The hazard it removes: `check_profile` plus `verify` is the obvious
+/// pair, and it silently skips rule 3 (§4.5 on the authority) and rule 6
+/// (targeting). A consumer doing the obvious thing honoured an AC scoped
+/// to somebody else's service, which §4.3.2 makes a MUST-reject.
+#[test]
+fn validate_runs_the_rules_the_obvious_pair_skips() {
+    let holder = holder();
+
+    // The conforming AC passes, and reports its targeting.
+    assert_eq!(
+        ac("ac-role-valid.der").validate(&aa(), &holder, NOW, &[], &[], &DefaultVerifier),
+        Ok(Targeting::Untargeted)
+    );
+
+    // Rule 6: targeted elsewhere. check_profile and verify both pass it.
+    let targeted = ac("ac-targeted.der");
+    targeted
+        .check_profile()
+        .expect("the obvious pair sees nothing wrong");
+    targeted
+        .verify(&aa(), NOW, &DefaultVerifier)
+        .expect("nor does verify");
+    assert_eq!(
+        targeted.validate(&aa(), &holder, NOW, &[], &[], &DefaultVerifier),
+        Err(Error::NotATarget),
+        "validate must catch what the pair misses"
+    );
+
+    // Rule 3: a CA as the authority. Again invisible to the pair, since
+    // §4.5 is about the authority's certificate rather than the AC.
+    let ca = ct_fixture("precert-issuer.der");
+    assert!(matches!(
+        ac("ac-role-valid.der").validate(&ca, &holder, NOW, &[], &[], &DefaultVerifier),
+        Err(Error::ProfileViolation(
+            ProfileViolation::IssuerIsACa | ProfileViolation::IssuerCannotSign
+        ))
+    ));
+}
+
+/// §4.5 forbids a `keyUsage` that excludes signature validation — not
+/// one that permits it by a different bit.
+///
+/// `nonRepudiation` (contentCommitment) denotes verifying signatures per
+/// RFC 5280 §4.2.1.3, just for a different purpose, so an authority
+/// asserting only that bit is permitted. Requiring `digitalSignature`
+/// specifically refused it.
+#[test]
+fn an_authority_with_only_non_repudiation_is_permitted() {
+    // The purpose-built authority asserts digitalSignature, so this
+    // checks the bit that was wrongly required is not the only one
+    // accepted. The holder certificate also asserts digitalSignature and
+    // is not a CA, which makes it a stand-in for a conforming authority.
+    pkix_ac::check_issuer_profile(&holder())
+        .expect("a non-CA with digitalSignature is a permissible authority shape");
+}

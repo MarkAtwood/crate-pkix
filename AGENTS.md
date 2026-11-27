@@ -21,7 +21,8 @@ adjacent PKI concerns.
 - **`pkix-profiles`** — RFC-baseline profile policy pre-configurations (RFC 5280 / 6125 / 8551). Per PKIX-amgn this crate is reverting to RFC-baseline only; CA/B Forum content moves to `pkix-profiles-cabf`.
 - **`pkix-lint`** — Advisory lint engine. RFC-conformance lint Catalogs ship here; CA/B Forum bundles move to `pkix-lint-cabf`.
 - **`pkix-chain-simple`** — Opinionated validator with extension whitelist for high-assurance contexts.
-- **`pkix-ac`** — RFC 5755 attribute certificate validation (skeleton; tracked as PKIX-ng0x).
+- **`pkix-ac`** — RFC 5755 attribute certificate validation. Composed by
+  `pkix_chain::verify_attribute_cert` behind the `attribute-certs` feature.
 - **`pkix-ct`** — RFC 6962 / RFC 9162 Certificate Transparency / SCT verification (skeleton; tracked as PKIX-baac).
 - **`pkix-composite`** — Composite (PQC + classical) signature verification (skeleton).
 - **`pkix-identity`** — Cert-side identity matching (RFC 6125 hostname, RFC 5280 §4.2.1.6 + RFC 8398 mailbox, IP literal). Pure function over (cert, identity-string); no chain context, no trust anchors. Scaffold-only at 0.1.0; bodies land via PKIX-fmtv.11 / .12.

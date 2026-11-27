@@ -30,7 +30,7 @@
 #![cfg(feature = "attribute-certs")]
 
 use pkix_ac::{AttributeCertificate, Targeting};
-use pkix_chain::{verify_attribute_cert, Error, NoAiaFetcher, NoRevocation};
+use pkix_chain::{verify_attribute_cert, AcRevocation, Error, NoAiaFetcher, NoRevocation};
 use pkix_path::{DefaultVerifier, TrustAnchor};
 use pkix_profiles::Rfc5280Profile;
 use x509_cert::der::Decode as _;
@@ -85,6 +85,10 @@ fn run_as(
         &anchors(),
         my_names,
         my_groups,
+        // The fixtures carry no noRevAvail, so §6's never-revoke-only
+        // reading would refuse them all. These tests are about the other
+        // rules; §6 has a test of its own.
+        AcRevocation::CallerChecks,
         &Rfc5280Profile,
         NOW,
         &DefaultVerifier,
@@ -183,6 +187,7 @@ fn an_unanchored_authority_is_refused() {
         &[],
         &[],
         &[],
+        AcRevocation::CallerChecks,
         &Rfc5280Profile,
         NOW,
         &DefaultVerifier,
@@ -373,4 +378,53 @@ fn swapping_the_holder_and_authority_chains_is_refused() {
         run(AC_DEEP, &aa, &holder).err(),
         Some(Error::AttributeCert(pkix_ac::Error::IssuerMismatch))
     );
+}
+
+/// RFC 5755 §6: a verifier that checks no AC revocation status MUST
+/// reject an AC without `noRevAvail`.
+///
+/// §6: "for AC users, the 'never revoke' scheme MUST be supported ...
+/// If only the 'never revoke' scheme is supported, then all ACs that do
+/// not contain a noRevAvail extension, MUST be rejected." This function
+/// checks none, so [`AcRevocation::NeverRevokeOnly`] is what it
+/// actually supports — and an AC without the extension is its issuer
+/// "implicitly stating that revocation status checks are supported, and
+/// some revocation method MUST be provided".
+///
+/// Accepting those regardless was fail-open on a MUST, the same mistake
+/// as returning `Ok` for an AC targeted elsewhere. `CallerChecks` is the
+/// opt-out, and it is a parameter rather than a default so the decision
+/// is named at every call site — nothing here can verify the caller
+/// really does check.
+#[test]
+fn an_ac_without_no_rev_avail_is_refused_unless_the_caller_checks() {
+    let holder = vec![load(HOLDER_DER)];
+    let aa = vec![load(AA_DER)];
+    let ac = AttributeCertificate::from_der(AC_VALID).expect("AC parses");
+
+    let run_with = |policy| {
+        verify_attribute_cert(
+            &ac,
+            &holder,
+            &aa,
+            &anchors(),
+            &[],
+            &[],
+            policy,
+            &Rfc5280Profile,
+            NOW,
+            &DefaultVerifier,
+            &NoRevocation,
+            &NoAiaFetcher,
+        )
+    };
+
+    assert_eq!(
+        run_with(AcRevocation::NeverRevokeOnly).err(),
+        Some(Error::AttributeCert(pkix_ac::Error::RevocationUnsupported)),
+        "this AC carries no noRevAvail, and §6 requires rejecting it"
+    );
+
+    run_with(AcRevocation::CallerChecks)
+        .expect("a caller who establishes revocation status itself may proceed");
 }

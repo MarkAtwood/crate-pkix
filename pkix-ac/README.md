@@ -2,63 +2,74 @@
 
 RFC 5755 X.509 attribute certificate validation.
 
-**Status: planned (not yet implemented).**
-
-## What this will do
-
-Validate X.509 v2 attribute certificates (ACs) per RFC 5755. Attribute
-certificates bind a set of attributes — roles, clearances, group
-memberships, capabilities — to a subject without containing a public key.
-They are issued by an Attribute Authority (AA) and validated against a
-separate chain of AA certificates, distinct from the public key
-infrastructure used by `pkix-path`.
-
-## Attribute certificates vs public key certificates
-
-| | Public Key Cert | Attribute Cert |
-|---|---|---|
-| Contains public key | yes | no |
-| Subject identified by | distinguished name | holder reference (PKC issuer+serial) |
-| Issued by | Certification Authority (CA) | Attribute Authority (AA) |
-| Validated by | `pkix-path` | `pkix-ac` (uses `pkix-path` for AA chain) |
-| RFC | 5280 | 5755 |
-| Use case | identity, authentication | authorisation, role, clearance |
-
-## Planned API
+An attribute certificate binds attributes — a role, a group, a clearance —
+to a holder, and carries no public key of its own. It is issued by an
+Attribute Authority (AA) whose own certificate is an ordinary public-key
+certificate.
 
 ```rust
-use pkix_ac::{validate_attribute_cert, AttributeCertificate};
-use pkix_path::{DefaultVerifier, TrustAnchor, ValidationPolicy};
+use pkix_ac::AttributeCertificate;
 
-let ac = AttributeCertificate { der: ac_der_bytes };
+let ac = AttributeCertificate::from_der(ac_der)?;
+ac.check_profile()?;
 
-// AA trust anchors are separate from PKC trust anchors
-let aa_anchors = vec![TrustAnchor::from_der(aa_root_der)?];
+// `aa_cert` is the Attribute Authority's certificate, which the caller
+// must already have validated — see below.
+ac.verify(&aa_cert, now_unix, &pkix_path::DefaultVerifier)?;
 
-let policy = ValidationPolicy {
-    current_time_unix: unix_now(),
-    ..Default::default()
-};
-
-validate_attribute_cert(&ac, &aa_anchors, unix_now(), &DefaultVerifier)?;
-
-// Then inspect the attributes from the parsed AC
+for attr in ac.attributes() {
+    let _oid = attr.r#type;
+}
+# Ok::<(), pkix_ac::Error>(())
 ```
 
-## How it will work
+## What this crate does not do, and why
 
-1. Parse the DER-encoded `AttributeCertificate` structure (RFC 5755 §4.1).
-2. Check the validity period (`notBefore ≤ now ≤ notAfter`).
-3. Identify the Attribute Authority via the `issuer` field.
-4. Use `pkix-path` to validate the AA's public key certificate chain
-   against the provided AA trust anchors.
-5. Verify the AC signature against the AA's validated SPKI.
-6. Return the parsed attributes for the caller to inspect.
+It does not validate the Attribute Authority's certification path, and it
+takes no trust anchors. The AA's chain is an ordinary public-key chain, so
+validating it belongs to [`pkix-path`](../pkix-path) and composing the two
+belongs to [`pkix-chain`](../pkix-chain).
 
-## Standards
+`verify` therefore takes the AA's certificate and trusts the caller to have
+validated it. **Passing an unvalidated certificate makes the answer
+meaningless**: the signature will check out against whatever key is handed
+over, an attacker's included.
 
-- [RFC 5755] — An Internet Attribute Certificate Profile for Authorization
-- [RFC 5280] §6 — used internally to validate the AA's PKC chain
+Use `pkix_chain::verify_attribute_cert` unless you are doing the path
+validation yourself. It runs the whole of RFC 5755 §5 — both certification
+paths, the §4.5 profile on the authority's own certificate, the AC
+signature, validity, targeting, the §4.2/§4.3 profile, and the holder
+binding — and is the only entry point that does.
+
+## Attributes are parsed, not interpreted
+
+§4.4 profiles six attribute types — `Role`, `Group`, `Clearance`,
+`ChargingIdentity`, `AccessIdentity` and `ServiceAuthenticationInfo` — and
+this crate hands all of them back as an OID and a set of unparsed values.
+It does not decide what any of them mean.
+
+That is deliberate. What a `Clearance` permits is security policy belonging
+to the application: it turns on a policy identifier the application owns, a
+lattice it defines, and often a classification scheme this library has no
+business encoding. Match on the attribute type and decode the values your
+deployment understands.
+
+## Supported profile
+
+The §4.2 and §4.3 rules are enforced, with each refusal naming the rule it
+broke rather than reporting a generic parse failure — a certificate that
+violates the profile should be readable and refusable with a reason. The
+§4.1 syntax is accepted even where the profile forbids it, which is why
+parsing and profile checking are separate calls.
+
+Known limitations, each with its reasoning in the rustdoc:
+
+- `objectDigestInfo` holders are not supported (§7.3 calls the feature
+  optional, and §4.2.2 does not profile it).
+- `targetCert` targets are refused rather than evaluated, per §4.3.2's
+  "MUST NOT be used".
+- Several names in a holder's `entityName` are refused, which is stricter
+  than §4.2.2's SHOULD — see `ProfileViolation::HolderNameNotSingular`.
 
 ## License
 

@@ -148,6 +148,14 @@
 // three times over, and by this crate's own `Error` as well.
 // `pkix-chain-simple` already names `pkix_path::Error as PathError` for
 // the same reason.
+// Re-exported for the same reason as the rest of this list:
+// `verify_attribute_cert` takes a `&AttributeCertificate` and returns a
+// `Targeting`, so without these a consumer cannot call it without adding
+// `pkix-ac` to their own manifest and keeping its version in lockstep
+// with this crate's.
+#[cfg(feature = "attribute-certs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "attribute-certs")))]
+pub use pkix_ac::{AttributeCertificate, Targeting};
 pub use pkix_aia::{AiaError, AiaFetcher, NoAiaFetcher};
 pub use pkix_identity::{IdentityError, MailboxName, ServerName};
 pub use pkix_path::{
@@ -470,9 +478,13 @@ pub enum Error {
     /// RFC 5755 attribute certificate validation failed.
     ///
     /// Only produced by [`verify_attribute_cert`]. Carries the
-    /// `pkix-ac` error, which names the rule: a §4.2/§4.3 profile
-    /// violation, an expired AC, a bad signature, an authority that is
-    /// not the issuer the AC names, or a holder mismatch.
+    /// `pkix-ac` error, which names the rule. See that function's
+    /// `# Errors` section rather than a list here — the list this doc
+    /// used to carry went stale as rules were added, missing
+    /// [`pkix_ac::Error::NotATarget`],
+    /// [`SignatureAlgorithmMismatch`](pkix_ac::Error::SignatureAlgorithmMismatch)
+    /// and
+    /// [`UnsupportedCriticalExtension`](pkix_ac::Error::UnsupportedCriticalExtension).
     #[cfg(feature = "attribute-certs")]
     #[cfg_attr(docsrs, doc(cfg(feature = "attribute-certs")))]
     AttributeCert(pkix_ac::Error),
@@ -1663,6 +1675,44 @@ where
     Ok(validated)
 }
 
+/// Which RFC 5755 §6 revocation scheme the caller supports for the
+/// attribute certificate itself.
+///
+/// §6 defines two, and requires a choice: "for AC users, the 'never
+/// revoke' scheme MUST be supported, and the 'pointer in AC' scheme
+/// SHOULD be supported. If only the 'never revoke' scheme is supported,
+/// then all ACs that do not contain a noRevAvail extension, MUST be
+/// rejected."
+///
+/// This is distinct from the `RevocationChecker` passed alongside it,
+/// which applies to the holder's and authority's public-key chains. An
+/// attribute certificate's own revocation status is a separate question
+/// with its own two schemes, and nothing in this crate answers it.
+#[cfg(feature = "attribute-certs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "attribute-certs")))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum AcRevocation {
+    /// Only the "never revoke" scheme, so an AC without `noRevAvail` is
+    /// refused — the §6 MUST.
+    ///
+    /// The conservative choice, and the right one unless the caller
+    /// really does establish AC revocation status. An AC with no
+    /// `noRevAvail` is its issuer "implicitly stating that revocation
+    /// status checks are supported", so honouring it without checking
+    /// anything is accepting a credential the issuer expected to be
+    /// checkable.
+    NeverRevokeOnly,
+    /// The caller establishes the AC's revocation status itself, by
+    /// whatever means — §6 permits "any source for AC revocation status
+    /// information".
+    ///
+    /// An AC without `noRevAvail` is then accepted, because the caller
+    /// has taken on the obligation §6 attaches to it. Nothing here can
+    /// check that they have; this is the caller saying so.
+    CallerChecks,
+}
+
 /// What an attribute certificate verification established — RFC 5755 §5.
 ///
 /// Both certification paths are returned because both were validated and
@@ -1707,6 +1757,10 @@ pub struct ValidatedAttributeCert {
 /// 5. **Rule 6** — the targeting check, from `my_names` and `my_groups`.
 /// 6. **Rule 7** — unsupported critical extensions, with the §4.2 and
 ///    §4.3 profile, via [`pkix_ac::AttributeCertificate::check_profile`].
+/// 7. **§6** — the revocation scheme, per `ac_revocation`. With
+///    [`AcRevocation::NeverRevokeOnly`] an AC lacking `noRevAvail` is
+///    refused, which is what §6 requires of a verifier that checks no AC
+///    revocation status — and this function checks none.
 /// 7. **Holder binding** — the AC's holder field against
 ///    `holder_chain[0]`. An AC that is validly signed but names someone
 ///    else is refused.
@@ -1764,6 +1818,7 @@ pub fn verify_attribute_cert<V, P, R, A>(
     anchors: &[TrustAnchor],
     my_names: &[x509_cert::ext::pkix::name::GeneralName],
     my_groups: &[x509_cert::ext::pkix::name::GeneralName],
+    ac_revocation: AcRevocation,
     profile: &P,
     now_unix: u64,
     verifier: &V,
@@ -1799,6 +1854,22 @@ where
 
     // Rules 7, and the §4.2/§4.3 profile.
     ac.check_profile()?;
+
+    // §6. An AC with no noRevAvail is its issuer "implicitly stating
+    // that revocation status checks are supported", and §6 is explicit
+    // that a verifier supporting only the "never revoke" scheme "MUST
+    // reject" such an AC. This function checks no AC revocation status
+    // at all, so NeverRevokeOnly is what it actually supports, and
+    // accepting those ACs regardless was fail-open on a MUST — the same
+    // mistake as returning Ok for an AC targeted elsewhere.
+    //
+    // CallerChecks exists because §6 permits "any source for AC
+    // revocation status information", and a caller who has one is
+    // conforming. It cannot be verified from here; naming it at the call
+    // site is the point.
+    if ac_revocation == AcRevocation::NeverRevokeOnly && !ac.no_revocation_available() {
+        return Err(Error::AttributeCert(pkix_ac::Error::RevocationUnsupported));
+    }
 
     // Rule 2's signature half, and rule 5.
     ac.verify(aa_cert, now_unix, verifier)?;

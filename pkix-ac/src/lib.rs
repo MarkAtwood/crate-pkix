@@ -130,7 +130,12 @@ impl AttributeCertificate {
         &self.inner.acinfo.attributes
     }
 
-    /// Apply the RFC 5755 §4.2 profile rules.
+    /// Apply the RFC 5755 §4.2 and §4.3 profile rules, and §5 rule 7.
+    ///
+    /// **Not all of §5.** Pairing this with [`Self::verify`] — the
+    /// obvious pair — leaves rule 3 ([`check_issuer_profile`]) and rule
+    /// 6 ([`Self::check_targeting`]) unchecked. Use [`Self::validate`]
+    /// unless you mean to run the parts yourself.
     ///
     /// # Errors
     ///
@@ -193,11 +198,38 @@ impl AttributeCertificate {
             (false, false) => return Err(Error::ProfileViolation(ProfileViolation::HolderMissing)),
         }
         if let Some(names) = holder.entity_name.as_deref() {
-            if names.len() != 1 {
+            // Zero names and several names are different faults, and
+            // reporting both as "more than one name" told a caller with
+            // an `A1 00` entityName the opposite of what happened. The
+            // issuer side already separated them; this did not. Zero is
+            // also a `GeneralNames ::= SEQUENCE SIZE (1..MAX)`
+            // violation in its own right.
+            if names.is_empty() {
+                return Err(Error::ProfileViolation(ProfileViolation::HolderNameEmpty));
+            }
+            if names.len() > 1 {
                 return Err(Error::ProfileViolation(
                     ProfileViolation::HolderNameNotSingular,
                 ));
             }
+        }
+
+        // §4.2.5: "AC issuers MUST force the serialNumber to be a
+        // positive integer, that is, the sign bit in the DER encoding of
+        // the INTEGER value MUST be zero", and "conformant ACs MUST NOT
+        // contain serialNumber values longer than 20 octets".
+        //
+        // The first exists to remove "a potential ambiguity in mapping
+        // between a string of octets and an integer value" — which is
+        // precisely the mapping `matches_holder` relies on when it
+        // compares serials as bytes, and that any issuer/serial audit
+        // correlation relies on too.
+        let serial = info.serial_number.as_bytes();
+        if serial.first().is_some_and(|b| b & 0x80 != 0) {
+            return Err(Error::ProfileViolation(ProfileViolation::SerialNotPositive));
+        }
+        if serial.len() > 20 {
+            return Err(Error::ProfileViolation(ProfileViolation::SerialTooLong));
         }
 
         // §4.1: at least one attribute, each with at least one value.
@@ -241,7 +273,11 @@ impl AttributeCertificate {
         self.check_extensions()
     }
 
-    /// Verify the signature and the validity period.
+    /// Verify the signature, §4.2.8 and the validity period.
+    ///
+    /// **Not all of §5.** See [`Self::validate`], which runs the rest —
+    /// this does not check the §4.5 profile on `aa_cert`, the holder
+    /// binding, or targeting.
     ///
     /// `aa_cert` is the Attribute Authority's certificate, and **the
     /// caller must already have validated its certification path** —
@@ -301,11 +337,28 @@ impl AttributeCertificate {
         // Conditional on the authority's certificate, so it cannot live
         // in check_profile, which does not have one — this is the only
         // place that does.
-        let aa_has_uid = aa_cert.tbs_certificate().issuer_unique_id().is_some();
-        if info.issuer_unique_id.is_some() != aa_has_uid {
-            return Err(Error::ProfileViolation(
-                ProfileViolation::IssuerUniqueIdMismatch,
-            ));
+        // The AA's OWN unique identifier, which in the AA's certificate
+        // is `subjectUniqueID` — the AA is that certificate's subject.
+        // This compared against `issuerUniqueID`, which identifies the
+        // AA's *CA*, two hops from anything about this AC: it rejected
+        // an ordinary AC carrying no issuerUniqueID whenever the AA's
+        // own issuer happened to use one, and rejected an AC correctly
+        // carrying the AA's identifier whenever it did not.
+        //
+        // And the values are compared, not just their presence —
+        // "in which case it MUST be used" means used with the same
+        // value, or the field identifies nothing.
+        match (
+            &info.issuer_unique_id,
+            aa_cert.tbs_certificate().subject_unique_id(),
+        ) {
+            (None, None) => {}
+            (Some(ac_uid), Some(aa_uid)) if ac_uid == aa_uid => {}
+            _ => {
+                return Err(Error::ProfileViolation(
+                    ProfileViolation::IssuerUniqueIdMismatch,
+                ))
+            }
         }
 
         // RFC 5755 §4.1: both bounds are GeneralizedTime, with no
@@ -362,6 +415,61 @@ impl AttributeCertificate {
                 signature,
             )
             .map_err(|_| Error::SignatureInvalid)
+    }
+
+    /// Everything RFC 5755 §5 asks of an attribute certificate, except
+    /// the two certification paths.
+    ///
+    /// The single entry point. [`Self::check_profile`] and
+    /// [`Self::verify`] each do part of §5, and a consumer calling the
+    /// obvious pair of them skips rule 3 ([`check_issuer_profile`]) and
+    /// rule 6 ([`Self::check_targeting`]) without being told — which
+    /// means honouring an attribute certificate scoped to somebody
+    /// else's service, a §4.3.2 MUST-reject. This exists so that
+    /// omission is not the default shape.
+    ///
+    /// Runs, in order: the §4.5 profile on `aa_cert`; the §4.2/§4.3
+    /// profile and §5 rule 7; the signature, §4.2.8 and the validity
+    /// window; the holder binding; and targeting.
+    ///
+    /// # What it still does not do
+    ///
+    /// **Neither certification path.** §5 rules 1 and 2 require the
+    /// holder's and the authority's whole paths to be validated, and
+    /// this crate takes no trust anchors — see the crate documentation.
+    /// `pkix_chain::verify_attribute_cert` does both and then this.
+    ///
+    /// §5 rule 4 — that the issuer be "directly trusted as an AC issuer
+    /// (by configuration or otherwise)" — is the caller's, as is §6's
+    /// revocation scheme. Supplying `aa_cert` is the rule-4 decision.
+    ///
+    /// # Errors
+    ///
+    /// Any error from the calls it makes, in the order above, plus
+    /// [`Error::NotATarget`] when the AC names targets and
+    /// `my_names`/`my_groups` are not among them — §4.3.2's "an
+    /// (honest) AC verifier who is not amongst the named
+    /// servers/services MUST reject the AC".
+    pub fn validate<V: SignatureVerifier>(
+        &self,
+        aa_cert: &Certificate,
+        holder_cert: &Certificate,
+        now_unix: u64,
+        my_names: &[GeneralName],
+        my_groups: &[GeneralName],
+        verifier: &V,
+    ) -> Result<Targeting> {
+        check_issuer_profile(aa_cert)?;
+        self.check_profile()?;
+        self.verify(aa_cert, now_unix, verifier)?;
+        if !self.matches_holder(holder_cert) {
+            return Err(Error::HolderMismatch);
+        }
+        let targeting = self.check_targeting(my_names, my_groups)?;
+        if targeting == Targeting::NotATarget {
+            return Err(Error::NotATarget);
+        }
+        Ok(targeting)
     }
 
     /// Does this attribute certificate belong to the holder of
@@ -544,15 +652,33 @@ impl AttributeCertificate {
             return Ok(());
         };
 
-        // §4.2: an extension must not appear twice. Two instances let
-        // two implementations read one certificate differently, which is
-        // the whole reason the rule exists.
+        // RFC 5280 §4.2 — not RFC 5755, which says nothing about it:
+        // "a certificate MUST NOT include more than one instance of a
+        // particular extension". Two instances let two implementations
+        // read one certificate differently, which is the whole reason
+        // the rule exists.
         for (i, e) in exts.iter().enumerate() {
             if exts[i + 1..].iter().any(|o| o.extn_id == e.extn_id) {
                 return Err(Error::ProfileViolation(
                     ProfileViolation::DuplicateExtension,
                 ));
             }
+        }
+
+        // §6: "An AC MUST NOT contain both a noRevAvail extension and a
+        // 'pointer in AC'." The two schemes are alternatives — one says
+        // no revocation information exists, the other says where to find
+        // it — so an AC asserting both has not chosen, and a verifier
+        // reading only the first it looks at would differ from one
+        // reading the other.
+        let has_no_rev_avail = exts.iter().any(|e| e.extn_id == ID_CE_NO_REV_AVAIL);
+        let has_pointer = exts.iter().any(|e| {
+            e.extn_id == ID_CE_CRL_DISTRIBUTION_POINTS || e.extn_id == ID_PE_AUTHORITY_INFO_ACCESS
+        });
+        if has_no_rev_avail && has_pointer {
+            return Err(Error::ProfileViolation(
+                ProfileViolation::NoRevAvailWithPointer,
+            ));
         }
 
         for e in exts.iter() {
@@ -592,14 +718,40 @@ impl AttributeCertificate {
                             ProfileViolation::TargetInformationNotCritical,
                         ));
                     }
-                    self.parse_targets()?;
+                    // Parsing it was not enough. §5 defines support for
+                    // an extension as being able to parse the value AND
+                    // honouring a rejection the value implies, and
+                    // §4.3.2 says `targetCert` MUST NOT be used — so an
+                    // AC carrying one has to be refused here, not only
+                    // by `check_targeting`, which a caller may never
+                    // reach.
+                    //
+                    // It also restores the reachability argument for
+                    // `otherObjectTypes`: a `TargetCert` carries an
+                    // `ObjectDigestInfo`, so leaving this to
+                    // `check_targeting` left one route by which a
+                    // profile-checked certificate could hold one.
+                    for target in self.parse_targets()? {
+                        if matches!(target, types::Target::TargetCert(_)) {
+                            return Err(Error::ProfileViolation(ProfileViolation::TargetCertUsed));
+                        }
+                    }
                 }
-                // §4.3.6: criticality MUST be FALSE.
+                // §4.3.6: criticality MUST be FALSE, and the syntax is
+                // "NULL (i.e., '0500'H is the DER encoding)".
                 ID_CE_NO_REV_AVAIL => {
                     if e.critical {
                         return Err(Error::ProfileViolation(
                             ProfileViolation::NoRevAvailCritical,
                         ));
+                    }
+                    // The value was never checked, so an AC carrying
+                    // `noRevAvail` with a body of junk satisfied
+                    // `no_revocation_available()` — a caller keyed on
+                    // that accessor would skip revocation on an AC that
+                    // never made the "never revoke" assertion.
+                    if e.extn_value.as_bytes() != [0x05, 0x00] {
+                        return Err(Error::ProfileViolation(ProfileViolation::NoRevAvailNotNull));
                     }
                 }
                 // Profiled by §4.3.3/§4.3.4/§4.3.5 and not acted on
@@ -918,7 +1070,14 @@ pub fn check_issuer_profile(aa_cert: &Certificate) -> Result<()> {
     if let Some(ext) = exts.iter().find(|e| e.extn_id == OID_KEY_USAGE) {
         let ku = x509_cert::ext::pkix::KeyUsage::from_der(ext.extn_value.as_bytes())
             .map_err(|_| Error::ProfileViolation(ProfileViolation::IssuerExtensionMalformed))?;
-        if !ku.digital_signature() {
+        // §4.5 forbids only a keyUsage that "explicitly indicate[s]
+        // that the AC issuer's public key cannot be used to validate a
+        // digital signature". Requiring `digitalSignature` specifically
+        // refused an authority whose keyUsage asserts only
+        // `nonRepudiation` (contentCommitment) — a bit that per RFC 5280
+        // §4.2.1.3 also denotes verifying signatures, just for a
+        // different purpose. Either bit means the key may validate one.
+        if !ku.digital_signature() && !ku.non_repudiation() {
             return Err(Error::ProfileViolation(ProfileViolation::IssuerCannotSign));
         }
     }
@@ -952,13 +1111,20 @@ pub enum ProfileViolation {
     /// §4.2.3: `baseCertificateID` or `objectDigestInfo` appeared in the
     /// v2 form, where neither is permitted.
     IssuerExtraFields,
-    /// §4.2.8: `issuerUniqueID` is present on the AC but not on the
-    /// Attribute Authority's certificate, or the other way round. It
-    /// "MUST NOT be used unless it is also used in the AC issuer's PKC,
-    /// in which case it MUST be used" — a condition that needs the
-    /// authority's certificate, so it is checked by
-    /// [`AttributeCertificate::verify`] rather than
-    /// [`AttributeCertificate::check_profile`].
+    /// §4.2.8: the AC's `issuerUniqueID` and the Attribute Authority's
+    /// own unique identifier disagree — one is present without the
+    /// other, or they hold different values. It "MUST NOT be used
+    /// unless it is also used in the AC issuer's PKC, in which case it
+    /// MUST be used".
+    ///
+    /// The authority's identifier is its certificate's
+    /// `subjectUniqueID`, since the authority is that certificate's
+    /// subject. Comparing against its `issuerUniqueID` would be asking
+    /// about the authority's CA instead.
+    ///
+    /// Checked by [`AttributeCertificate::verify`] rather than
+    /// [`AttributeCertificate::check_profile`], because it needs the
+    /// authority's certificate and `check_profile` has none.
     IssuerUniqueIdMismatch,
     /// §4.2.2: the holder gives both `baseCertificateID` and
     /// `entityName`, so which identifies it is ambiguous.
@@ -966,6 +1132,7 @@ pub enum ProfileViolation {
     /// §4.2.2: the holder gives neither.
     HolderMissing,
     /// §4.2.2: the holder's `entityName` carries more than one name.
+    /// Zero names is [`Self::HolderNameEmpty`].
     ///
     /// Stricter than the RFC, deliberately. §4.2.2 says "only one name
     /// SHOULD be present", not MUST — but several names leave which one
@@ -977,6 +1144,18 @@ pub enum ProfileViolation {
     /// §4.1: the holder used `objectDigestInfo`, which this profile does
     /// not cover.
     HolderObjectDigestInfo,
+    /// §4.2.5: the serial number's DER encoding has its sign bit set,
+    /// where "AC issuers MUST force the serialNumber to be a positive
+    /// integer".
+    SerialNotPositive,
+    /// §4.2.5: the serial number is longer than 20 octets, where
+    /// "conformant ACs MUST NOT contain serialNumber values longer than
+    /// 20 octets".
+    SerialTooLong,
+    /// §4.2.2: the holder's `entityName` is present and carries no
+    /// names at all, which `GeneralNames ::= SEQUENCE SIZE (1..MAX)`
+    /// also forbids.
+    HolderNameEmpty,
     /// §4.1: `attributes` is empty, though one is required.
     NoAttributes,
     /// §4.1: an attribute carries no values, though one is required.
@@ -985,7 +1164,9 @@ pub enum ProfileViolation {
     /// one instance of each attribute can occur in a single AC, but each
     /// instance can be multi-valued".
     DuplicateAttributeType,
-    /// §4.2: the same extension appears more than once.
+    /// RFC 5280 §4.2: the same extension appears more than once. Every
+    /// other bare § in this enumeration is RFC 5755; this one is not,
+    /// because RFC 5755 does not state the rule.
     DuplicateExtension,
     /// §4.3.1: `auditIdentity` is not marked critical, though it must be.
     AuditIdentityNotCritical,
@@ -1000,6 +1181,13 @@ pub enum ProfileViolation {
     TargetInformationNotCritical,
     /// §4.3.6: `noRevAvail` is marked critical, though it must not be.
     NoRevAvailCritical,
+    /// §4.3.6: `noRevAvail`'s value is not `NULL` — the section gives
+    /// the syntax as "NULL (i.e., `'0500'H` is the DER encoding)".
+    NoRevAvailNotNull,
+    /// §6: the AC carries both `noRevAvail` and a "pointer in AC"
+    /// (`crlDistributionPoints` or `authorityInfoAccess`), where "an AC
+    /// MUST NOT contain both".
+    NoRevAvailWithPointer,
     /// §4.3.2: a target used `targetCert`, which MUST NOT be used.
     TargetCertUsed,
     /// §4.5: the Attribute Authority's certificate is a CA
@@ -1041,6 +1229,16 @@ impl core::fmt::Display for ProfileViolation {
             Self::HolderMissing => "holder gives neither baseCertificateID nor entityName",
             Self::HolderNameNotSingular => "holder carries more than one name",
             Self::HolderObjectDigestInfo => "holder uses objectDigestInfo, which is not profiled",
+            Self::SerialNotPositive => {
+                "the serial number is negative, though RFC 5755 §4.2.5 requires a \
+                 positive integer"
+            }
+            Self::SerialTooLong => {
+                "the serial number is longer than the 20 octets RFC 5755 §4.2.5 permits"
+            }
+            Self::HolderNameEmpty => {
+                "the holder's entityName is present but carries no names (RFC 5755 §4.2.2)"
+            }
             Self::NoAttributes => "no attributes, though RFC 5755 §4.1 requires at least one",
             Self::AttributeWithoutValues => "an attribute carries no values",
             Self::DuplicateAttributeType => {
@@ -1062,6 +1260,13 @@ impl core::fmt::Display for ProfileViolation {
             }
             Self::NoRevAvailCritical => {
                 "noRevAvail is critical, though RFC 5755 §4.3.6 requires it not to be"
+            }
+            Self::NoRevAvailNotNull => {
+                "noRevAvail's value is not NULL (RFC 5755 §4.3.6 gives it as '0500'H)"
+            }
+            Self::NoRevAvailWithPointer => {
+                "the AC carries both noRevAvail and a revocation pointer, which \
+                 RFC 5755 §6 forbids"
             }
             Self::TargetCertUsed => "a target used targetCert, which RFC 5755 §4.3.2 forbids",
             Self::IssuerIsACa => {
@@ -1109,6 +1314,16 @@ pub enum Error {
     /// them choose the algorithm the check runs with. RFC 5280 §4.1.1.2
     /// requires the two to be equal.
     SignatureAlgorithmMismatch,
+    /// The attribute certificate carries no `noRevAvail`, and the
+    /// verifier supports only RFC 5755 §6's "never revoke" scheme.
+    ///
+    /// §6: "if only the 'never revoke' scheme is supported, then all ACs
+    /// that do not contain a noRevAvail extension, MUST be rejected."
+    /// An AC without the extension is its issuer stating that revocation
+    /// status checks are supported and some method is provided, so
+    /// honouring it without checking anything accepts a credential its
+    /// issuer expected to be checkable.
+    RevocationUnsupported,
     /// The attribute certificate is targeted at verifiers this one is
     /// not among — RFC 5755 §4.3.2.
     ///
@@ -1148,6 +1363,10 @@ impl core::fmt::Display for Error {
             Self::SignatureInvalid => f.write_str("attribute certificate signature invalid"),
             Self::SignatureAlgorithmMismatch => f.write_str(
                 "outer signatureAlgorithm differs from the signature field inside acinfo",
+            ),
+            Self::RevocationUnsupported => f.write_str(
+                "attribute certificate carries no noRevAvail and no revocation scheme \
+                 is supported for it",
             ),
             Self::NotATarget => {
                 f.write_str("attribute certificate is targeted at another verifier")
@@ -1247,6 +1466,9 @@ mod tests {
             V::HolderMissing,
             V::HolderNameNotSingular,
             V::HolderObjectDigestInfo,
+            V::SerialNotPositive,
+            V::SerialTooLong,
+            V::HolderNameEmpty,
             V::NoAttributes,
             V::AttributeWithoutValues,
             V::DuplicateAttributeType,
@@ -1256,6 +1478,8 @@ mod tests {
             V::AuditIdentityNotOctetString,
             V::TargetInformationNotCritical,
             V::NoRevAvailCritical,
+            V::NoRevAvailNotNull,
+            V::NoRevAvailWithPointer,
             V::TargetCertUsed,
             V::IssuerIsACa,
             V::IssuerCannotSign,
@@ -1278,6 +1502,9 @@ mod tests {
                 V::HolderMissing => "HolderMissing",
                 V::HolderNameNotSingular => "HolderNameNotSingular",
                 V::HolderObjectDigestInfo => "HolderObjectDigestInfo",
+                V::SerialNotPositive => "SerialNotPositive",
+                V::SerialTooLong => "SerialTooLong",
+                V::HolderNameEmpty => "HolderNameEmpty",
                 V::NoAttributes => "NoAttributes",
                 V::AttributeWithoutValues => "AttributeWithoutValues",
                 V::DuplicateAttributeType => "DuplicateAttributeType",
@@ -1287,6 +1514,8 @@ mod tests {
                 V::AuditIdentityNotOctetString => "AuditIdentityNotOctetString",
                 V::TargetInformationNotCritical => "TargetInformationNotCritical",
                 V::NoRevAvailCritical => "NoRevAvailCritical",
+                V::NoRevAvailNotNull => "NoRevAvailNotNull",
+                V::NoRevAvailWithPointer => "NoRevAvailWithPointer",
                 V::TargetCertUsed => "TargetCertUsed",
                 V::IssuerIsACa => "IssuerIsACa",
                 V::IssuerCannotSign => "IssuerCannotSign",
