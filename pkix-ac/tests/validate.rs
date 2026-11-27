@@ -1479,3 +1479,93 @@ fn an_authority_without_key_usage_is_permitted() {
     pkix_ac::check_issuer_profile(&aa)
         .expect("§4.5 requires keyUsage not to forbid signing, not that it be present");
 }
+
+/// The attribute authority whose certificate carries a
+/// `subjectUniqueID`.
+///
+/// `aa-cert.der` with the field spliced in and the TBSCertificate
+/// re-signed by the same root; the key is untouched, so ACs signed with
+/// `aa-key.pem` verify against either. See
+/// `tests/fixtures/make_unique_id.py`.
+fn aa_with_unique_id() -> Certificate {
+    let der = fixture("aa-unique-id-cert.der");
+    Certificate::from_der(&der).expect("the spliced authority certificate parses")
+}
+
+/// §4.2.8, all four arms of it.
+///
+/// "issuerUniqueID MUST NOT be used unless it is also used in the AC
+/// issuer's PKC, in which case it MUST be used." The authority is the
+/// subject of its own certificate, so the field to compare against is
+/// that certificate's `subjectUniqueID`, and "in which case it MUST be
+/// used" means used with the same value -- a field that may hold any
+/// value identifies nothing.
+///
+/// Three of the four arms had no fixture, because nothing in the
+/// directory carried a `subjectUniqueID`: neither OpenSSL nor
+/// `cryptography` will emit one, so `ac-issuer-unique-id.der` was only
+/// ever offered to an authority that has none. The guard could answer
+/// "always equal" or "never equal" either way, and "always equal"
+/// accepts an AC naming an authority identifier that is not this
+/// authority's.
+#[test]
+fn an_issuer_unique_id_must_match_the_authoritys_own() {
+    let present_and_equal = ac("ac-issuer-unique-id.der").validate(
+        &aa_with_unique_id(),
+        &holder(),
+        NOW,
+        &[],
+        &[],
+        AcRevocation::CallerChecks,
+        &DefaultVerifier,
+    );
+    present_and_equal.expect("the AC names the identifier the authority's certificate carries");
+
+    assert_eq!(
+        ac("ac-issuer-unique-id-other.der").validate(
+            &aa_with_unique_id(),
+            &holder(),
+            NOW,
+            &[],
+            &[],
+            AcRevocation::CallerChecks,
+            &DefaultVerifier
+        ),
+        Err(Error::ProfileViolation(
+            ProfileViolation::IssuerUniqueIdMismatch
+        )),
+        "one byte different is a different authority identifier"
+    );
+
+    assert_eq!(
+        ac("ac-role-valid.der").validate(
+            &aa_with_unique_id(),
+            &holder(),
+            NOW,
+            &[],
+            &[],
+            AcRevocation::CallerChecks,
+            &DefaultVerifier
+        ),
+        Err(Error::ProfileViolation(
+            ProfileViolation::IssuerUniqueIdMismatch
+        )),
+        "the authority's certificate uses the field, so the AC must too"
+    );
+
+    assert_eq!(
+        ac("ac-issuer-unique-id.der").validate(
+            &aa(),
+            &holder(),
+            NOW,
+            &[],
+            &[],
+            AcRevocation::CallerChecks,
+            &DefaultVerifier
+        ),
+        Err(Error::ProfileViolation(
+            ProfileViolation::IssuerUniqueIdMismatch
+        )),
+        "and must not use it when the authority's certificate does not"
+    );
+}

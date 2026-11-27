@@ -804,6 +804,24 @@ def main() -> None:
                seq(extension(ID_CE_NO_REV_AVAIL, False, b"\x05\x00")))
     (HERE / "ac-issuer-unique-id.der").write_bytes(attribute_certificate(info))
 
+    # §4.2.8 compares the values, not just their presence: "MUST NOT be
+    # used unless it is also used in the AC issuer's PKC, in which case
+    # it MUST be used" means used with the same value, or the field
+    # identifies nothing. `aa-unique-id-cert.der` (see
+    # make_unique_id.py) carries subjectUniqueID 2a2b2c, so the
+    # certificate above is the matching case and this one differs in
+    # exactly that field and nothing else.
+    info_other = seq(integer(1),
+                     seq(tlv(0xA1, general_name_directory(leaf_subject))),
+                     tlv(0xA0, general_names(general_name_directory(aa_subject))),
+                     ECDSA_SHA256, integer(0x4C),
+                     seq(gen_time(window[0]), gen_time(window[1])),
+                     role,
+                     bitstring(b"\x2a\x2b\x2d"),
+                     seq(extension(ID_CE_NO_REV_AVAIL, False, b"\x05\x00")))
+    (HERE / "ac-issuer-unique-id-other.der").write_bytes(
+        attribute_certificate(info_other))
+
     # §4.2.2: the entityName "MUST be the same as the PKC subject field
     # OR ONE OF THE VALUES OF THE PKC subjectAltName field extension (if
     # present)". The holder certificate every other fixture uses --
