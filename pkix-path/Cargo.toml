@@ -115,6 +115,12 @@ serde_json = { workspace = true }
 name = "verifier_forwarding"
 required-features = ["std"]
 
+# Reads raw DER from tests/fixtures/alg-params with std::fs, and exercises
+# the RSA and Ed25519 backends.
+[[test]]
+name = "alg_params"
+required-features = ["rsa", "ed25519", "std"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
