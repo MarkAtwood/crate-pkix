@@ -139,6 +139,13 @@ impl Profile for Rfc5280Profile {
         ValidationPolicy::new(now_unix)
     }
 
+    // Every profile in this crate names no certificate policy, and
+    // returns `&[]` to say so. A mutation sweep reports
+    // `Vec::leak(Vec::new())` as surviving here and in each of the seven
+    // below: both are empty slices, so the two forms are
+    // indistinguishable to any caller. Equivalent, not untested -- what
+    // is testable is that the slice is empty, which
+    // `tests/profile_identity.rs` asserts for all eight.
     fn policy_oids(&self) -> &[ObjectIdentifier] {
         &[]
     }
