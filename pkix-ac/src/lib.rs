@@ -262,7 +262,15 @@ impl AttributeCertificate {
                 ProfileViolation::IssuerNameNotDirectoryName,
             ));
         };
-        if issuer_name != aa_cert.tbs_certificate().subject() {
+        // RFC 5280 §7.1 DN comparison, not byte equality. Two
+        // distinguished names can hold the same content and differ in
+        // encoding — PrintableString against UTF8String, letter case,
+        // insignificant whitespace — and X.501 says they are the same
+        // name. `pkix_path::names_match` is what the chain walker uses
+        // to link issuer to subject, so using it here keeps one workspace
+        // to one answer: a name pkix-path linked cannot be a name
+        // pkix-ac calls a mismatch.
+        if !pkix_path::names_match(issuer_name, aa_cert.tbs_certificate().subject()) {
             return Err(Error::IssuerMismatch);
         }
 
@@ -329,6 +337,14 @@ impl AttributeCertificate {
     /// its public-key certificate — issuer and serial — or by name, and
     /// this checks whichever form the AC uses.
     ///
+    /// Names compare under RFC 5280 §7.1 via
+    /// [`pkix_path::names_match`], not byte equality, so a holder whose
+    /// distinguished name differs from the certificate's only in string
+    /// type, letter case or insignificant whitespace still matches. That
+    /// is the same comparator the chain walker uses, which is the point:
+    /// a name `pkix-path` was willing to link must not be a name this
+    /// function calls a mismatch.
+    ///
     /// Returns `false` rather than an error for a mismatch, since "this
     /// AC is not for this entity" is an ordinary answer. A holder form
     /// the profile forbids also returns `false`: it cannot be shown to
@@ -341,12 +357,15 @@ impl AttributeCertificate {
         if let Some(base) = &holder.base_certificate_id {
             let issuer_matches = matches!(
                 base.issuer.as_slice(),
-                [GeneralName::DirectoryName(name)] if name == tbs.issuer()
+                [GeneralName::DirectoryName(name)]
+                    if pkix_path::names_match(name, tbs.issuer())
             );
+            // Serial numbers compare as DER INTEGERs, which have one
+            // canonical encoding per value, so bytes are the value here.
             return issuer_matches && base.serial.as_bytes() == tbs.serial_number().as_bytes();
         }
         if let Some([GeneralName::DirectoryName(name)]) = holder.entity_name.as_deref() {
-            return name == tbs.subject();
+            return pkix_path::names_match(name, tbs.subject());
         }
         false
     }

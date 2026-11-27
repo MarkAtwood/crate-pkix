@@ -742,3 +742,75 @@ fn an_unsorted_set_of_verifies_though_re_encoding_would_not() {
     ac.verify(&aa(), NOW, &DefaultVerifier)
         .expect("the signature covers the bytes as sent, sorted or not");
 }
+
+/// Distinguished names compare under RFC 5280 §7.1, not byte equality.
+///
+/// This was a real defect: all three name comparisons in this crate used
+/// derived `PartialEq` on `Name`, which is byte-shaped. Two
+/// distinguished names can hold the same content and differ in encoding
+/// — `PrintableString` against `UTF8String`, letter case, insignificant
+/// whitespace — and X.501 says they are one name.
+///
+/// The consequence was a workspace that contradicted itself.
+/// `pkix-path` links issuer to subject with
+/// [`pkix_path::names_match`], so a chain would validate and then the
+/// attribute certificate riding on it would be refused for a name
+/// `pkix-path` had just accepted. Fail-closed, and wrong.
+///
+/// The authority's certificate encodes its CN as `UTF8String`. These
+/// fixtures name the same authority with a `PrintableString` and with
+/// the case changed.
+#[test]
+fn an_equivalent_distinguished_name_is_not_a_mismatch() {
+    for name in ["ac-issuer-printablestring.der", "ac-issuer-case.der"] {
+        let ac = ac(name);
+        ac.check_profile()
+            .expect("a re-encoded DN is still conforming");
+        ac.verify(&aa(), NOW, &DefaultVerifier)
+            .unwrap_or_else(|e| panic!("{name} names the same authority under §7.1, got {e:?}"));
+    }
+}
+
+/// The `baseCertificateID` holder form — §4.2.2's other option.
+///
+/// Every other fixture names the holder by `entityName`, so this branch
+/// had never run against DER. It identifies the holder's certificate by
+/// that certificate's **issuer** and serial, not by its subject, which
+/// is the part easy to get backwards and impossible to notice while the
+/// branch is untested.
+///
+/// Three fixtures, because two of them are what make the first mean
+/// something: the issuer DN re-encoded, to show §7.1 applies on this
+/// branch too, and the serial changed, to show a match is not coming
+/// from the issuer name alone.
+#[test]
+fn a_holder_named_by_base_certificate_id_is_matched() {
+    let holder = holder();
+
+    let by_ref = ac("ac-holder-base-cert-id.der");
+    by_ref
+        .check_profile()
+        .expect("baseCertificateID is a profiled form");
+    assert!(
+        by_ref.matches_holder(&holder),
+        "the AC references this certificate by issuer and serial"
+    );
+
+    assert!(
+        ac("ac-holder-base-cert-id-reencoded.der").matches_holder(&holder),
+        "the issuer DN is re-encoded, and §7.1 makes it the same name"
+    );
+
+    assert!(
+        !ac("ac-holder-base-cert-id-wrong-serial.der").matches_holder(&holder),
+        "a different serial is a different certificate, whatever the issuer"
+    );
+
+    // And it must not match some other certificate that happens to
+    // share the issuer: the authority's own certificate is issued by the
+    // same root, so only the serial tells them apart.
+    assert!(
+        !by_ref.matches_holder(&aa()),
+        "the authority shares the holder's issuer and must not match on it"
+    );
+}

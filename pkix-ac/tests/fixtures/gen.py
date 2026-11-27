@@ -421,6 +421,66 @@ def main() -> None:
     info = with_exts(0x3A, extension(ID_PE_AC_AUDIT_IDENTITY, True, too_long))
     (HERE / "ac-audit-too-long.der").write_bytes(attribute_certificate(info))
 
+    # ---- holder binding and DN comparison ---------------------------
+
+    def dn_cn(text: str, string_tag: int = 0x0C) -> bytes:
+        """A Name holding a single CN, encoded with a chosen string type.
+
+        RDNSequence ::= SEQUENCE OF RelativeDistinguishedName
+        RelativeDistinguishedName ::= SET OF AttributeTypeAndValue
+        AttributeTypeAndValue ::= SEQUENCE { type OID, value ANY }
+
+        0x0C is UTF8String, 0x13 PrintableString. Both hold the same
+        characters and RFC 5280 §7.1 says the names are equal, so this is
+        how a cosmetic re-encoding is expressed.
+        """
+        ava = seq(oid("2.5.4.3"), tlv(string_tag, text.encode()))
+        return seq(tlv(0x31, ava))
+
+    AA_CN = "pkix-ac attribute authority"
+    ROOT_CN = "pkix-ct precert-oracle issuer CA"
+    LEAF_SERIAL = 0x9A9A
+
+    # The authority's certificate encodes its CN as UTF8String. This AC
+    # names the same authority with a PrintableString, which is the same
+    # distinguished name under §7.1 and different bytes.
+    (HERE / "ac-issuer-printablestring.der").write_bytes(attribute_certificate(
+        acinfo(leaf_subject, b"", 0x60, *window, role,
+               issuer_override=tlv(0xA0, general_names(
+                   general_name_directory(dn_cn(AA_CN, 0x13)))))))
+
+    # And the same authority with the case changed, which RFC 4518
+    # case-folds.
+    (HERE / "ac-issuer-case.der").write_bytes(attribute_certificate(
+        acinfo(leaf_subject, b"", 0x61, *window, role,
+               issuer_override=tlv(0xA0, general_names(
+                   general_name_directory(dn_cn(AA_CN.upper())))))))
+
+    # The holder named by baseCertificateID rather than entityName --
+    # §4.2.2's other form, which every fixture so far skipped. It
+    # references the holder's certificate by its ISSUER and serial, not
+    # by its own subject.
+    (HERE / "ac-holder-base-cert-id.der").write_bytes(attribute_certificate(
+        acinfo(b"", aa_subject, 0x62, *window, role,
+               holder_override=seq(tlv(0xA0, issuer_serial_contents(
+                   dn_cn(ROOT_CN), LEAF_SERIAL))))))
+
+    # The same form with the issuer DN re-encoded, so the §7.1
+    # comparison is exercised on this branch too.
+    (HERE / "ac-holder-base-cert-id-reencoded.der").write_bytes(
+        attribute_certificate(
+            acinfo(b"", aa_subject, 0x63, *window, role,
+                   holder_override=seq(tlv(0xA0, issuer_serial_contents(
+                       dn_cn(ROOT_CN, 0x13), LEAF_SERIAL))))))
+
+    # And with the wrong serial, so a match cannot be coming from the
+    # issuer name alone.
+    (HERE / "ac-holder-base-cert-id-wrong-serial.der").write_bytes(
+        attribute_certificate(
+            acinfo(b"", aa_subject, 0x64, *window, role,
+                   holder_override=seq(tlv(0xA0, issuer_serial_contents(
+                       dn_cn(ROOT_CN), LEAF_SERIAL + 1))))))
+
     # ---- §4.4 attribute types, uninterpreted ------------------------
     #
     # The crate's stated position is "parse all, interpret none". Every
