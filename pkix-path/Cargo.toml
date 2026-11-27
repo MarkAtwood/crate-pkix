@@ -121,6 +121,11 @@ required-features = ["std"]
 name = "alg_params"
 required-features = ["rsa", "ed25519", "std"]
 
+# Reads its fixtures with std::fs; the chain is P-256.
+[[test]]
+name = "gentime_validity"
+required-features = ["p256", "std"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
