@@ -1936,3 +1936,91 @@ fn check_dp_scope(
 fn cert_is_ca_cert(cert: &Certificate) -> crate::Result<bool> {
     pkix_path::cert_is_ca(cert).map_err(|_| Error::MalformedCertificate)
 }
+
+/// RFC 5280 §6.3.3 reason-mask accounting.
+///
+/// Both functions under test build an eight-way union of single-bit flags.
+/// Mutating any of those `|` to `^` is an equivalent mutation and no test
+/// can kill it: symmetric difference and union agree on operands that share
+/// no bits. Mutating one to `&` is not equivalent -- it drops the two flags
+/// either side of it from the result -- and the cases below kill every one
+/// of those.
+#[cfg(test)]
+mod reason_mask_tests {
+    use super::{all_reasons, covers_all_reasons};
+    use x509_cert::ext::pkix::crl::dp::{ReasonFlags, Reasons};
+
+    /// Every reason RFC 5280 §5.2.5 defines, in bit order. Bit 0 is
+    /// `unused` and is deliberately absent.
+    const EVERY_REASON: [Reasons; 8] = [
+        Reasons::KeyCompromise,
+        Reasons::CaCompromise,
+        Reasons::AffiliationChanged,
+        Reasons::Superseded,
+        Reasons::CessationOfOperation,
+        Reasons::CertificateHold,
+        Reasons::PrivilegeWithdrawn,
+        Reasons::AaCompromise,
+    ];
+
+    /// Union of every defined reason except the one at `skip`. Pass
+    /// `EVERY_REASON.len()` for the complete set. No `Vec`: the crate is
+    /// no_std and `alloc` is reachable only under some feature
+    /// combinations.
+    fn mask_except(skip: usize) -> ReasonFlags {
+        let mut m = ReasonFlags::default();
+        for (i, f) in EVERY_REASON.iter().enumerate() {
+            if i != skip {
+                m |= *f;
+            }
+        }
+        m
+    }
+
+    /// The whole weight of RFC 5280 §6.3.3's reason accounting rests on
+    /// this predicate: a reason-partitioned CRL can prove a certificate
+    /// **is** revoked, but it cannot prove one is not, because another
+    /// partition may list it. `check_revocation_with_crls` accumulates the
+    /// reasons its CRLs cover and asks this whether the accumulation is
+    /// complete; answering yes too early turns "no CRL I hold says
+    /// anything" into "not revoked".
+    ///
+    /// So every proper subset must be refused, and the test enumerates
+    /// them one missing reason at a time rather than sampling: a
+    /// requirement that silently dropped one flag would still accept the
+    /// full set, and only the mask missing that exact flag reveals it.
+    #[test]
+    fn a_mask_missing_any_single_reason_does_not_cover_all() {
+        assert!(
+            covers_all_reasons(mask_except(EVERY_REASON.len())),
+            "the complete set must cover all reasons"
+        );
+
+        for (i, missing) in EVERY_REASON.iter().enumerate() {
+            assert!(
+                !covers_all_reasons(mask_except(i)),
+                "a mask missing {missing:?} must not count as covering all reasons"
+            );
+        }
+    }
+
+    /// An empty `onlySomeReasons` covers nothing. Trivial, and it is the
+    /// value `ReasonFlags::default()` has at the start of the
+    /// accumulation, so a predicate that accepted it would short-circuit
+    /// the whole loop.
+    #[test]
+    fn an_empty_mask_covers_nothing() {
+        assert!(!covers_all_reasons(ReasonFlags::default()));
+    }
+
+    /// `all_reasons` is the mask stood in for a CRL with no
+    /// `onlySomeReasons`, so it has to be the complete set: anything
+    /// narrower makes an unpartitioned CRL report itself as partitioned,
+    /// and `check_revocation_with_crls` then refuses to conclude anything
+    /// from a CRL that covers everything.
+    #[test]
+    fn all_reasons_is_the_complete_set() {
+        assert_eq!(all_reasons(), mask_except(EVERY_REASON.len()));
+        assert!(covers_all_reasons(all_reasons()));
+    }
+}
