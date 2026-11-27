@@ -1345,3 +1345,49 @@ fn a_conforming_twenty_octet_serial_is_not_too_long() {
         Err(Error::ProfileViolation(ProfileViolation::SerialTooLong))
     );
 }
+
+/// `NeverRevokeOnly` accepts an AC that carries `noRevAvail`.
+///
+/// §6 lets a verifier support only the "never revoke" model, in which
+/// case it must reject any AC whose revocation status could change.
+/// `never_revoke_only_refuses_an_ac_without_no_rev_avail` covers the
+/// rejection; this is the other half, and without it the guard could
+/// answer "reject" unconditionally and look right -- a verifier in the
+/// mode the extension exists to serve would refuse every AC that
+/// declares itself irrevocable.
+#[test]
+fn never_revoke_only_accepts_an_ac_carrying_no_rev_avail() {
+    let ac = ac("ac-norevavail.der");
+    assert!(
+        ac.no_revocation_available(),
+        "precondition: this fixture carries noRevAvail"
+    );
+
+    ac.validate(
+        &aa(),
+        &holder(),
+        NOW,
+        &[],
+        &[],
+        AcRevocation::NeverRevokeOnly,
+        &DefaultVerifier,
+    )
+    .expect("§6: noRevAvail is exactly what a never-revoke verifier requires");
+}
+
+/// `as_der` hands back the bytes the certificate was parsed from.
+///
+/// Nothing inside the crate calls it -- `signed_bytes` is what
+/// verification uses -- so a crate-scoped sweep cannot reach it, and an
+/// accessor that returned an empty slice would be found by whoever
+/// re-transmitted an AC and wondered why the far end could not parse it.
+#[test]
+fn as_der_returns_the_bytes_it_parsed() {
+    let der = fixture("ac-role-valid.der");
+    let ac = AttributeCertificate::from_der(&der).expect("parses");
+    assert_eq!(ac.as_der(), der.as_slice());
+    assert!(
+        ac.signed_bytes().len() < ac.as_der().len(),
+        "acinfo is a proper part of the certificate, so the two differ"
+    );
+}
