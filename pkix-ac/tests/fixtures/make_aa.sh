@@ -60,6 +60,52 @@ WORK="$WORK" openssl ca -batch -config "$WORK/ca.cnf" \
 
 openssl x509 -in "$WORK/aa.pem" -out aa-cert.der -outform DER
 
-echo "--- aa-cert.der ---"
-openssl x509 -in aa-cert.der -inform DER -noout -subject -issuer -dates \
-  -ext basicConstraints,keyUsage
+# ---------------------------------------------------------------------
+# A second, deeper PKI: root -> intermediate -> {authority, holder}.
+#
+# Every pkix-chain wrapper test used one-element chains, so the
+# composition had never been exercised at depth even though real
+# deployments always have intermediates. These give it a chain to walk
+# on both sides at once.
+# ---------------------------------------------------------------------
+
+cat >> "$WORK/ca.cnf" <<'CNF'
+[ica_ext]
+basicConstraints     = critical,CA:TRUE,pathlen:0
+keyUsage             = critical,keyCertSign,cRLSign
+subjectKeyIdentifier = hash
+CNF
+
+openssl ecparam -name prime256v1 -genkey -noout -out ica-key.pem
+openssl req -new -key ica-key.pem -subj "/CN=pkix-ac intermediate CA"   -out "$WORK/ica.csr"
+WORK="$WORK" openssl ca -batch -config "$WORK/ca.cnf"   -in "$WORK/ica.csr" -extensions ica_ext   -startdate 20250101000000Z -enddate 20350101000000Z   -out "$WORK/ica.pem" >/dev/null 2>&1
+openssl x509 -in "$WORK/ica.pem" -out ica-cert.der -outform DER
+
+# Now issue the deep authority and holder FROM the intermediate, by
+# pointing the same CA config at it.
+sed -e "s|/root.pem|/ica.pem|" -e "s|/root-key.pem|/ica-key.pem|"     "$WORK/ca.cnf" > "$WORK/ica.cnf"
+cp "$WORK/ica.pem" "$WORK/ica.pem.ca"
+cp ica-key.pem "$WORK/ica-key.pem"
+: > "$WORK/index.txt"
+echo 20 > "$WORK/serial"
+
+openssl ecparam -name prime256v1 -genkey -noout -out aa-deep-key.pem
+openssl req -new -key aa-deep-key.pem   -subj "/CN=pkix-ac deep attribute authority" -out "$WORK/aad.csr"
+WORK="$WORK" openssl ca -batch -config "$WORK/ica.cnf"   -in "$WORK/aad.csr" -extensions aa_ext   -startdate 20250101000000Z -enddate 20350101000000Z   -out "$WORK/aad.pem" >/dev/null 2>&1
+openssl x509 -in "$WORK/aad.pem" -out aa-deep-cert.der -outform DER
+
+cat >> "$WORK/ica.cnf" <<'CNF'
+[holder_ext]
+basicConstraints     = critical,CA:FALSE
+keyUsage             = critical,digitalSignature
+subjectKeyIdentifier = hash
+CNF
+openssl ecparam -name prime256v1 -genkey -noout -out holder-deep-key.pem
+openssl req -new -key holder-deep-key.pem   -subj "/CN=pkix-ac deep holder" -out "$WORK/hd.csr"
+WORK="$WORK" openssl ca -batch -config "$WORK/ica.cnf"   -in "$WORK/hd.csr" -extensions holder_ext   -startdate 20250101000000Z -enddate 20350101000000Z   -out "$WORK/hd.pem" >/dev/null 2>&1
+openssl x509 -in "$WORK/hd.pem" -out holder-deep-cert.der -outform DER
+
+for f in aa-cert.der ica-cert.der aa-deep-cert.der holder-deep-cert.der; do
+  echo "--- $f ---"
+  openssl x509 -in "$f" -inform DER -noout -subject -issuer     -ext basicConstraints,keyUsage 2>/dev/null | sed 's/^/  /'
+done

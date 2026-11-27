@@ -814,3 +814,63 @@ fn a_holder_named_by_base_certificate_id_is_matched() {
         "the authority shares the holder's issuer and must not match on it"
     );
 }
+
+/// `AttCertVersion ::= INTEGER { v2(1) }` — the only legal value.
+///
+/// types.rs says the version is "modelled as an enumeration rather than
+/// an integer so that a wrong version is a parse failure at the type
+/// level instead of a check someone can forget". Nothing tested that:
+/// every fixture carried v2, so a type that silently accepted other
+/// values would have passed.
+///
+/// These two carry 0 and 2 — v1 and the hypothetical v3 — and must fail
+/// while parsing, before any profile rule gets a chance to opine.
+#[test]
+fn only_version_v2_parses() {
+    for name in ["ac-version-v1.der", "ac-version-v3.der"] {
+        let der = fixture(name);
+        assert_eq!(
+            AttributeCertificate::from_der(&der).err(),
+            Some(Error::ParseError),
+            "{name} must be refused by the parser, not by a later check"
+        );
+    }
+}
+
+/// The serial comparison in `matches_holder` treats DER INTEGER bytes as
+/// the value.
+///
+/// That holds because DER gives each integer one encoding — minimal
+/// length, and a leading zero octet only where it is needed to keep the
+/// value positive. The comment in `matches_holder` asserts it; this
+/// shows it, by reading the serial back out of a real certificate and
+/// confirming the encoding is the canonical one for its value.
+///
+/// It matters because a non-minimal encoding of the same number would
+/// compare unequal, so if `der` ever accepted one this comparison would
+/// start answering "different certificate" for the same certificate.
+#[test]
+fn serial_numbers_compare_as_canonical_der_integers() {
+    let holder = holder();
+    let serial = holder.tbs_certificate().serial_number();
+    let bytes = serial.as_bytes();
+
+    assert!(!bytes.is_empty(), "an INTEGER is never zero-length in DER");
+    // Minimal: a leading zero is only permitted to clear the sign bit.
+    if bytes.len() > 1 {
+        assert!(
+            bytes[0] != 0x00 || bytes[1] & 0x80 != 0,
+            "a leading zero octet is only canonical when the next has its \
+             high bit set, got {bytes:02x?}"
+        );
+        assert!(
+            bytes[0] != 0xFF || bytes[1] & 0x80 == 0,
+            "and 0xff is only canonical when the next clears its high bit"
+        );
+    }
+
+    // The holder's own AC matches it; a different serial does not. That
+    // is the property the byte comparison is standing in for.
+    assert!(ac("ac-holder-base-cert-id.der").matches_holder(&holder));
+    assert!(!ac("ac-holder-base-cert-id-wrong-serial.der").matches_holder(&holder));
+}

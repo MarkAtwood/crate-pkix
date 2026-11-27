@@ -244,3 +244,95 @@ fn targeting_is_reported_through_the_wrapper() {
     .expect("being outside the targets is not a validation failure");
     assert_eq!(stranger.targeting, Targeting::NotATarget);
 }
+
+const ICA_DER: &[u8] = include_bytes!("../../pkix-ac/tests/fixtures/ica-cert.der");
+const AA_DEEP_DER: &[u8] = include_bytes!("../../pkix-ac/tests/fixtures/aa-deep-cert.der");
+const HOLDER_DEEP_DER: &[u8] = include_bytes!("../../pkix-ac/tests/fixtures/holder-deep-cert.der");
+const AC_DEEP: &[u8] = include_bytes!("../../pkix-ac/tests/fixtures/ac-deep.der");
+
+/// The composition walks a real chain on both sides.
+///
+/// Every other test here uses one-element chains, so the wrapper had
+/// never seen an intermediate even though every deployment has one.
+/// These fixtures are a two-level PKI from
+/// `pkix-ac/tests/fixtures/make_aa.sh`: the `pkix-ct` root as the single
+/// trust anchor, an intermediate CA under it with `pathlen:0`, and both
+/// the attribute authority and the holder issued from that
+/// intermediate.
+#[test]
+fn both_chains_may_have_intermediates() {
+    let holder = vec![load(HOLDER_DEEP_DER), load(ICA_DER)];
+    let aa = vec![load(AA_DEEP_DER), load(ICA_DER)];
+
+    let out = run(AC_DEEP, &holder, &aa).expect("depth is ordinary, not exceptional");
+    assert_eq!(out.targeting, Targeting::Untargeted);
+    // Both paths reached the same anchor, two certificates deep.
+    assert_eq!(out.holder.anchor_index, 0);
+    assert_eq!(out.authority.anchor_index, 0);
+}
+
+/// An incomplete chain fails on the path, not as an attribute-certificate
+/// problem.
+///
+/// Which error arrives matters: a caller who forgot an intermediate
+/// needs to be told their chain is short, not sent looking at the AC.
+/// The holder's chain is validated first, so its failure is the one
+/// reported when both are short.
+#[test]
+fn a_missing_intermediate_is_a_path_failure_on_either_side() {
+    let holder = vec![load(HOLDER_DEEP_DER), load(ICA_DER)];
+    let aa = vec![load(AA_DEEP_DER), load(ICA_DER)];
+
+    for (name, h, a) in [
+        ("holder", vec![load(HOLDER_DEEP_DER)], aa.clone()),
+        ("authority", holder.clone(), vec![load(AA_DEEP_DER)]),
+    ] {
+        let err = run(AC_DEEP, &h, &a).expect_err("a short chain cannot validate");
+        assert!(
+            matches!(err, Error::Path(_) | Error::PathBuild(_)),
+            "the {name} chain's gap must surface as a path error, got {err:?}"
+        );
+    }
+}
+
+/// A reversed authority chain is caught by §4.5, not by luck.
+///
+/// `aa_chain[0]` is the authority, leaf-first like every other chain in
+/// this workspace. Hand it leaf-last and position 0 holds the
+/// intermediate — which is a CA, and RFC 5755 §4.5 forbids an AC issuer
+/// from being one.
+///
+/// So the rule that exists to stop a PKI CA being reused as an attribute
+/// authority also catches an ordinary ordering mistake, and names it.
+/// Worth pinning because it is the second time §4.5 has paid for itself
+/// on something other than the attack it was written for.
+#[test]
+fn a_reversed_authority_chain_is_refused_as_a_ca() {
+    let holder = vec![load(HOLDER_DEEP_DER), load(ICA_DER)];
+    let reversed = vec![load(ICA_DER), load(AA_DEEP_DER)];
+
+    assert_eq!(
+        run(AC_DEEP, &holder, &reversed).err(),
+        Some(Error::AttributeCert(pkix_ac::Error::ProfileViolation(
+            pkix_ac::ProfileViolation::IssuerIsACa
+        )))
+    );
+}
+
+/// Passing the two chains the wrong way round is refused by name.
+///
+/// Both chains validate against the anchors, so path validation cannot
+/// catch this — it is the issuer-name check that does, because the AC
+/// does not name the holder as its authority. A plausible mistake with
+/// a real consequence, since the alternative to catching it is verifying
+/// an AC against a key its issuer never held.
+#[test]
+fn swapping_the_holder_and_authority_chains_is_refused() {
+    let holder = vec![load(HOLDER_DEEP_DER), load(ICA_DER)];
+    let aa = vec![load(AA_DEEP_DER), load(ICA_DER)];
+
+    assert_eq!(
+        run(AC_DEEP, &aa, &holder).err(),
+        Some(Error::AttributeCert(pkix_ac::Error::IssuerMismatch))
+    );
+}

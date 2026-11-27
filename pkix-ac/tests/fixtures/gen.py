@@ -295,17 +295,17 @@ def acinfo(holder_name: bytes, issuer_name: bytes, serial: int,
                validity, attrs, tail)
 
 
-def sign(data: bytes) -> bytes:
+def sign(data: bytes, key: pathlib.Path = None) -> bytes:
     with tempfile.TemporaryDirectory() as td:
         p = pathlib.Path(td) / "acinfo.der"
         p.write_bytes(data)
         return subprocess.run(
-            ["openssl", "dgst", "-sha256", "-sign", str(AA_KEY), str(p)],
+            ["openssl", "dgst", "-sha256", "-sign", str(key or AA_KEY), str(p)],
             check=True, capture_output=True).stdout
 
 
-def attribute_certificate(info: bytes) -> bytes:
-    return seq(info, ECDSA_SHA256, bitstring(sign(info)))
+def attribute_certificate(info: bytes, key: pathlib.Path = None) -> bytes:
+    return seq(info, ECDSA_SHA256, bitstring(sign(info, key)))
 
 
 def main() -> None:
@@ -420,6 +420,33 @@ def main() -> None:
     too_long = tlv(0x04, bytes(21))
     info = with_exts(0x3A, extension(ID_PE_AC_AUDIT_IDENTITY, True, too_long))
     (HERE / "ac-audit-too-long.der").write_bytes(attribute_certificate(info))
+
+    # AttCertVersion ::= INTEGER { v2(1) }. The profile permits exactly
+    # one value, and it is modelled as an enumeration so a wrong version
+    # is a parse failure rather than a check that can be forgotten --
+    # a claim nothing tested, because no fixture carried another value.
+    for serial, version, label in ((0x80, 0, "v1"), (0x81, 2, "v3")):
+        info = seq(integer(version),
+                   seq(tlv(0xA1, general_name_directory(leaf_subject))),
+                   tlv(0xA0, general_names(general_name_directory(aa_subject))),
+                   ECDSA_SHA256, integer(serial),
+                   seq(gen_time(window[0]), gen_time(window[1])),
+                   role)
+        (HERE / f"ac-version-{label}.der").write_bytes(
+            attribute_certificate(info))
+
+    # ---- a chain with depth -----------------------------------------
+    #
+    # root -> intermediate -> {authority, holder}, all from
+    # make_aa.sh. Every pkix-chain wrapper test used one-element chains,
+    # so the composition had never walked a chain even though every real
+    # deployment has intermediates.
+    deep_aa = (HERE / "aa-deep-cert.der").read_bytes()
+    deep_holder = (HERE / "holder-deep-cert.der").read_bytes()
+    info = acinfo(tbs_field(deep_holder, 5), tbs_field(deep_aa, 5), 0x70,
+                  *window, role)
+    (HERE / "ac-deep.der").write_bytes(
+        attribute_certificate(info, HERE / "aa-deep-key.pem"))
 
     # ---- holder binding and DN comparison ---------------------------
 
