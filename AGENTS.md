@@ -362,6 +362,32 @@ bound, check:
 
     ps -eo pid,etime,pcpu,comm --sort=-pcpu | head
 
+Kill what it finds by PID. `pkill -f pkix_path-` matches the shell that invoked
+the verification too, because that pattern appears in its own command line, so
+it kills the harness and leaves the source file holding a mutation. If a
+verification run ends early, grep the file for the mutation text before trusting
+it.
+
+### A non-terminating mutant can only be caught by a timeout
+
+Some mutations do not produce a wrong answer, they produce a program that never
+answers: an `Iterator::next` replaced by `Some(0)`, or a position counter whose
+`+= 1` becomes `*= 1`. Any caller that consumes such an iterator to exhaustion
+runs forever, and the only way a test suite can report that is by not
+finishing. cargo-mutants calls it a timeout and does not count it as missed.
+That is the correct verdict and there is nothing to chase: a bounded test of
+the same iterator will fail in seconds when run on its own, but a sweep still
+sees the hang, because production code -- `names_match`, in `pkix-path`'s case
+-- consumes the whole stream and is right to.
+
+Two things are worth doing about such a mutant. Check whether the operator can
+be written out of the code: `NormalizedIter`'s space run used
+`while self.inner.peek() == Some(&b' ')`, whose reversed comparison consumes
+nothing and never ends, and `Peekable::next_if_eq` says the same thing with no
+comparison to reverse, so the mutant stopped existing. And add the bounded
+direct test anyway, because an iterator whose output nothing asserts is an
+untested iterator whatever the sweep says.
+
 ## Escalation rule
 
 If you hit 3 failed attempts at the same error without progress, stop and surface to the human.
