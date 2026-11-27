@@ -899,6 +899,24 @@ impl TrustAnchor {
     /// [`TrustAnchor::try_from`] instead. That path returns
     /// `Err(`[`DerError`]`)` so the caller can reject the malformed anchor
     /// rather than silently operating without name constraints.
+    ///
+    /// # A non-conformant `minimum`/`maximum` is kept, not dropped
+    ///
+    /// RFC 5280 §4.2.1.10 requires `minimum` to be zero and `maximum` to be
+    /// absent, and [`TrustAnchor::try_from`] rejects a certificate encoding
+    /// either. This constructor cannot: it is infallible, so its only
+    /// choices are to keep the subtree or to discard it.
+    ///
+    /// It keeps it, and the constraint is then enforced as though `minimum`
+    /// were zero — which applies it to *more* names than the issuer wrote,
+    /// never fewer. Discarding it would stop enforcing the constraint
+    /// altogether and widen the anchor's trust scope, so between two wrong
+    /// answers this is the conservative one. That makes it deliberately
+    /// unlike the malformed-DER case above, where there is no subtree to
+    /// apply and `None` is the only option.
+    ///
+    /// A caller who wants the certificate refused outright should use
+    /// [`TrustAnchor::try_from`].
     #[must_use]
     pub fn from_cert(cert: Certificate) -> Self {
         let name_constraints = find_cert_ext(&cert, OID_NAME_CONSTRAINTS);
@@ -941,8 +959,20 @@ impl TryFrom<Certificate> for TrustAnchor {
     type Error = DerError;
 
     fn try_from(cert: Certificate) -> core::result::Result<Self, Self::Error> {
-        let name_constraints =
+        let name_constraints: Option<NameConstraints> =
             try_find_cert_ext(&cert, OID_NAME_CONSTRAINTS).map_err(DerError::new)?;
+        // §4.2.1.10's minimum/maximum rule, which this constructor exists to
+        // enforce and did not. `cert_name_constraints` rejects an intermediate
+        // encoding either field; a strict trust store should not then accept
+        // the same extension on its anchor.
+        if name_constraints
+            .as_ref()
+            .is_some_and(|nc| !subtrees_are_conformant(nc))
+        {
+            return Err(DerError::new(der::Error::from(der::ErrorKind::Value {
+                tag: der::Tag::Integer,
+            })));
+        }
         Ok(Self {
             subject: cert.tbs_certificate().subject().clone(),
             subject_public_key_info: cert.tbs_certificate().subject_public_key_info().clone(),
@@ -2058,6 +2088,26 @@ fn cert_subject_alt_names(
 ///   (vjc.8: RFC 5280 §4.2.1.10 MUST require minimum=0, maximum=absent).
 ///
 /// Returns `Ok(None)` if the extension is absent.
+/// Does every `GeneralSubtree` leave `minimum` and `maximum` alone?
+///
+/// RFC 5280 §4.2.1.10: "Within this profile, the minimum and maximum fields
+/// are not used with any name forms, thus minimum MUST be zero, and maximum
+/// MUST be absent." A certificate that encodes either is non-conformant, and
+/// the semantics it is asking for are not implemented here.
+///
+/// One predicate because three paths need the same answer —
+/// [`cert_name_constraints`] for intermediates, and both fallible trust-anchor
+/// constructors. They used to disagree: the rule was applied to intermediates
+/// and to neither anchor path, so the same extension was grounds for rejection
+/// in the middle of a chain and accepted at its root.
+fn subtrees_are_conformant(nc: &NameConstraints) -> bool {
+    nc.permitted_subtrees
+        .iter()
+        .flatten()
+        .chain(nc.excluded_subtrees.iter().flatten())
+        .all(|st| st.minimum == 0 && st.maximum.is_none())
+}
+
 fn cert_name_constraints(
     cert: &Certificate,
     index: usize,
@@ -2066,19 +2116,8 @@ fn cert_name_constraints(
         .map_err(|_| Error::MalformedCertificate { index })?;
 
     if let Some(nc) = &nc {
-        // RFC 5280 §4.2.1.10: "the minimum and maximum fields are not used with
-        // any name forms, thus minimum MUST be zero, maximum MUST be absent."
-        // Reject certs that encode non-conformant subtrees rather than silently
-        // applying potentially unexpected constraint semantics.
-        let subtrees_iter = nc
-            .permitted_subtrees
-            .iter()
-            .flatten()
-            .chain(nc.excluded_subtrees.iter().flatten());
-        for st in subtrees_iter {
-            if st.minimum != 0 || st.maximum.is_some() {
-                return Err(Error::MalformedCertificate { index });
-            }
+        if !subtrees_are_conformant(nc) {
+            return Err(Error::MalformedCertificate { index });
         }
     }
 

@@ -182,3 +182,118 @@ fn from_cert_malformed_nc_gives_none() {
         "from_cert with malformed NC must silently produce name_constraints = None"
     );
 }
+
+// ---------------------------------------------------------------------------
+// RFC 5280 §4.2.1.10: minimum MUST be zero, maximum MUST be absent
+// ---------------------------------------------------------------------------
+
+/// The strict anchor constructor refuses a non-zero `minimum`.
+///
+/// §4.2.1.10: "Within this profile, the minimum and maximum fields are not
+/// used with any name forms, thus minimum MUST be zero, and maximum MUST be
+/// absent." `cert_name_constraints` already refused an *intermediate*
+/// encoding either field; `TrustAnchor::try_from`, which exists for strict
+/// §4.2 compliance, did not — so the same extension was grounds for
+/// rejection in the middle of a chain and accepted at its root.
+///
+/// Found by a mutation sweep: turning that check's `||` into `&&`, so a
+/// subtree would need *both* fields wrong to be refused, survived the whole
+/// suite. Writing the test showed the rule was missing from both anchor
+/// paths, which the mutant could not reveal.
+#[test]
+fn the_strict_constructor_refuses_a_non_zero_minimum() {
+    let cert = load_cert(&anchor_nc_fixture("anchor_nc_minimum.der"));
+    assert!(
+        TrustAnchor::try_from(cert).is_err(),
+        "minimum != 0 is non-conformant and the fail-closed path must say so"
+    );
+}
+
+/// The same for a present `maximum`.
+#[test]
+fn the_strict_constructor_refuses_a_present_maximum() {
+    let cert = load_cert(&anchor_nc_fixture("anchor_nc_maximum.der"));
+    assert!(
+        TrustAnchor::try_from(cert).is_err(),
+        "maximum present is non-conformant"
+    );
+}
+
+/// The same hand-built encoding with both fields conformant is accepted.
+///
+/// Without this the two tests above would pass if the hand-assembled
+/// extension were merely unparseable — they would be testing the fixture
+/// generator rather than the rule.
+#[test]
+fn the_strict_constructor_accepts_the_same_encoding_without_them() {
+    let cert = load_cert(&anchor_nc_fixture("anchor_nc_plain.der"));
+    let anchor = TrustAnchor::try_from(cert).expect("the encoding itself is fine");
+    assert!(
+        anchor.name_constraints.is_some(),
+        "and the constraint is seeded"
+    );
+}
+
+/// `from_cert` keeps the subtree instead, and that is deliberate.
+///
+/// It is infallible, so its only choices are to keep the subtree or discard
+/// it. Keeping it enforces the constraint as though `minimum` were zero,
+/// which covers more names than the issuer wrote; discarding it would stop
+/// enforcing the constraint and widen the anchor's trust scope. Between two
+/// wrong answers that is the conservative one, and it is why this differs
+/// from the malformed-DER case, where there is no subtree to apply.
+#[test]
+fn the_infallible_constructor_keeps_a_non_conformant_subtree() {
+    let cert = load_cert(&anchor_nc_fixture("anchor_nc_minimum.der"));
+    let anchor = TrustAnchor::from_cert(cert);
+    assert!(
+        anchor.name_constraints.is_some(),
+        "dropping it would stop enforcing the constraint altogether"
+    );
+}
+
+/// The rule applies to an intermediate, through `validate_path`.
+///
+/// The anchor tests above exercise the two trust-anchor constructors; this
+/// exercises `cert_name_constraints`, which is the path a chain actually
+/// takes. Deleting the check there left every other test in this crate
+/// green, anchor tests included — the three call sites needed three tests.
+#[test]
+fn a_non_conformant_constraint_on_an_intermediate_is_malformed() {
+    let root = load_cert(&anchor_nc_fixture("nc_int_root.der"));
+    let ica = load_cert(&anchor_nc_fixture("nc_int_bad.der"));
+    let leaf = load_cert(&anchor_nc_fixture("nc_int_bad_leaf.der"));
+
+    let err = pkix_path::validate_path(
+        &[leaf, ica],
+        &[TrustAnchor::from_cert(root)],
+        &policy(),
+        &DefaultVerifier,
+    )
+    .expect_err("minimum != 0 on the intermediate must be refused");
+
+    assert!(
+        matches!(err, pkix_path::Error::MalformedCertificate { index: 1 }),
+        "expected MalformedCertificate at the intermediate, got {err:?}"
+    );
+}
+
+/// The same chain shape with a conformant constraint validates.
+///
+/// Otherwise the test above would pass on a chain that was broken for some
+/// unrelated reason — a wrong signature, an expired certificate, a name
+/// outside the subtree.
+#[test]
+fn the_same_chain_with_a_conformant_constraint_validates() {
+    let root = load_cert(&anchor_nc_fixture("nc_int_root.der"));
+    let ica = load_cert(&anchor_nc_fixture("nc_int_ok.der"));
+    let leaf = load_cert(&anchor_nc_fixture("nc_int_ok_leaf.der"));
+
+    pkix_path::validate_path(
+        &[leaf, ica],
+        &[TrustAnchor::from_cert(root)],
+        &policy(),
+        &DefaultVerifier,
+    )
+    .expect("host.example.com is inside the permitted example.com subtree");
+}
