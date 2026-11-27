@@ -312,6 +312,21 @@ The inverse trap is real too: a crate whose test targets declare
 `required-features` runs none of them when the sweep omits the feature, so
 genuine gaps get hidden rather than invented.
 
+### Test code gets mutated too
+
+`#[cfg(test)]` modules are mutated like anything else, and a mutated test
+helper cannot be caught by the tests it serves, so it is always reported
+MISSED. Adding an in-crate test module therefore adds permanent survivors:
+pkix-revocation went from 276 mutants to 288 that way, one of which is a
+helper asserting that error messages are distinct.
+
+`-E` excludes them by name, matched against what `--list` shows:
+
+    cargo mutants -p <crate> --all-features -E 'tests::|_tests::'
+
+Check what the regex actually removed rather than assuming -- module names
+vary, and a regex that matches nothing is silent.
+
 ## Escalation rule
 
 If you hit 3 failed attempts at the same error without progress, stop and surface to the human.
