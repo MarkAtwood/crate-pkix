@@ -2714,10 +2714,12 @@ impl<I: Iterator<Item = u8>> Iterator for NormalizedIter<I> {
                 self.started = true;
                 return Some(b.to_ascii_lowercase());
             }
-            // Consume the rest of this space run.
-            while self.inner.peek() == Some(&b' ') {
-                self.inner.next();
-            }
+            // Consume the rest of this space run. `next_if_eq` rather than
+            // a peek-and-next pair: the pair's condition can be mutated
+            // into one that consumes nothing and never ends, because
+            // `next()` on an exhausted `Peekable` leaves `peek()` at
+            // `None` forever. There is no such reading of this.
+            while self.inner.next_if_eq(&b' ').is_some() {}
             // Leading run: drop it and continue with the first non-space byte.
             // Trailing run (nothing follows): drop it and end.
             // Internal run: collapse to exactly one space.
@@ -5144,7 +5146,79 @@ mod tests_rsa {
 // ---------------------------------------------------------------------------
 #[cfg(test)]
 mod tests_normalized_iter {
-    use super::normalized_eq;
+    use super::{any_to_str_bytes, normalized_eq, NormalizedIter};
+
+    /// At most `n` bytes of what `iter` yields.
+    ///
+    /// The bound is the point. Every existing test of these two iterators
+    /// goes through `normalized_eq` or `bmp_string_to_utf8`, which compare
+    /// or collect the whole stream, so an iterator that never returns
+    /// `None` hangs the test rather than failing it -- a mutation sweep
+    /// reports that as a timeout and leaves the test binary spinning. A
+    /// prefix comparison answers in one step.
+    fn prefix<I: Iterator<Item = u8>>(iter: I, n: usize) -> Vec<u8> {
+        iter.take(n).collect()
+    }
+
+    /// The first `n` bytes `NormalizedIter` yields for `input`.
+    fn normalized(input: &[u8], n: usize) -> Vec<u8> {
+        prefix(NormalizedIter::new(input.iter().copied()), n)
+    }
+
+    /// RFC 4518 §2 prep, read off the iterator directly and bounded.
+    ///
+    /// The asserted values are shorter than the bound, so an iterator that
+    /// keeps yielding -- the shape every one of its mutants takes -- fails
+    /// on length before anything else.
+    #[test]
+    fn the_normalizing_iterator_yields_exactly_the_prepared_bytes() {
+        assert_eq!(
+            normalized(b"  Hello   World  ", 32),
+            b"hello world".to_vec()
+        );
+        assert_eq!(normalized(b"a b", 16), b"a b".to_vec());
+        assert_eq!(normalized(b"", 8), b"".to_vec());
+        assert_eq!(
+            normalized(b"   ", 8),
+            b"".to_vec(),
+            "spaces alone prepare to nothing"
+        );
+        assert_eq!(
+            normalized(b" a", 8),
+            b"a".to_vec(),
+            "a leading run is dropped"
+        );
+        assert_eq!(
+            normalized(b"a ", 8),
+            b"a".to_vec(),
+            "a trailing run is dropped"
+        );
+    }
+
+    /// `DirectoryString` content reaches the comparison as UTF-8 bytes.
+    ///
+    /// The `BmpString` case transcodes one UCS-2 unit at a time through a
+    /// four-byte buffer, so the bytes of a multi-byte character come out on
+    /// successive calls and the position has to advance between them. The
+    /// three units below encode to one, two and three UTF-8 bytes, which
+    /// is every width a BMP scalar value takes.
+    #[test]
+    fn a_directory_string_yields_its_utf8_bytes_and_then_stops() {
+        let utf8 = der::Any::new(der::Tag::Utf8String, &b"ab"[..]).expect("utf8 value");
+        assert_eq!(
+            prefix(any_to_str_bytes(&utf8).expect("a UTF8String is text"), 8),
+            b"ab".to_vec()
+        );
+
+        // U+0041 A, U+00E9 e-acute, U+20AC euro sign.
+        let ucs2 = [0x00, 0x41, 0x00, 0xE9, 0x20, 0xAC];
+        let bmp = der::Any::new(der::Tag::BmpString, &ucs2[..]).expect("bmp value");
+        assert_eq!(
+            prefix(any_to_str_bytes(&bmp).expect("a BMPString is text"), 16),
+            [0x41, 0xC3, 0xA9, 0xE2, 0x82, 0xAC],
+            "one, two and three UTF-8 bytes in that order"
+        );
+    }
 
     /// Identical ASCII strings must compare equal.
     #[test]
