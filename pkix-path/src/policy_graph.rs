@@ -355,6 +355,7 @@ mod tests {
 
     const P1: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.99.1");
     const P2: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.99.2");
+    const P3: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.99.3");
     const SHARED: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.99.9");
 
     fn policies(oids: &[ObjectIdentifier]) -> CertificatePolicies {
@@ -366,6 +367,31 @@ mod tests {
                 })
                 .collect(),
         )
+    }
+
+    fn mappings(pairs: &[(ObjectIdentifier, ObjectIdentifier)]) -> PolicyMappings {
+        PolicyMappings(
+            pairs
+                .iter()
+                .map(|(idp, sdp)| x509_cert::ext::pkix::PolicyMapping {
+                    issuer_domain_policy: *idp,
+                    subject_domain_policy: *sdp,
+                })
+                .collect(),
+        )
+    }
+
+    /// The policy OIDs at the deepest level, in creation order.
+    fn deepest_policies(g: &PolicyGraph) -> Vec<ObjectIdentifier> {
+        g.deepest().iter().map(|n| n.valid_policy).collect()
+    }
+
+    /// Every level's policy OIDs, root first.
+    fn shape(g: &PolicyGraph) -> Vec<Vec<ObjectIdentifier>> {
+        g.levels
+            .iter()
+            .map(|l| l.iter().map(|n| n.valid_policy).collect())
+            .collect()
     }
 
     /// At most one node per policy OID at any depth.
@@ -428,6 +454,148 @@ mod tests {
             deepest[0].parents.len(),
             2,
             "the one node must list both parents: {deepest:#?}"
+        );
+    }
+    /// §6.1.4(b)(1) synthesizes a node for an unmapped issuerDomainPolicy
+    /// only when the level has an `anyPolicy` node.
+    ///
+    /// The new node's parent is that `anyPolicy` node, so without one there
+    /// is nothing for it to descend from, and inventing it anyway puts a
+    /// policy into the graph that no certificate in the path authorized.
+    /// The condition is a single `any(|n| n.valid_policy == anyPolicy)`;
+    /// read as `!=`, it is satisfied by any ordinary policy node, so the
+    /// synthesis happens at every level that has any node at all.
+    #[test]
+    fn a_mapping_without_a_node_is_synthesized_only_under_any_policy() {
+        // A level of two concrete policies and no anyPolicy node.
+        let mut concrete = PolicyGraph::new();
+        assert!(!concrete.add_certificate_policies(&policies(&[P1, P2]), true));
+        assert_eq!(deepest_policies(&concrete), vec![P1, P2]);
+
+        // P3 is not at this level, and there is no anyPolicy node to hang
+        // it from, so the mapping adds nothing.
+        assert!(!concrete.apply_policy_mappings(&mappings(&[(P3, SHARED)]), true, &[]));
+        assert_eq!(
+            deepest_policies(&concrete),
+            vec![P1, P2],
+            "P3 has no node and no anyPolicy parent to be created under"
+        );
+
+        // The same mapping against a level that does have an anyPolicy
+        // node: now P3 is synthesized, under that node.
+        let mut with_any = PolicyGraph::new();
+        assert!(!with_any.add_certificate_policies(&policies(&[P1, OID_ANY_POLICY]), true));
+        assert!(
+            deepest_policies(&with_any).contains(&OID_ANY_POLICY),
+            "the certificate asserted anyPolicy, so the level has that node"
+        );
+        assert!(!with_any.apply_policy_mappings(&mappings(&[(P3, SHARED)]), true, &[]));
+        let synthesized = with_any
+            .deepest()
+            .iter()
+            .find(|n| n.valid_policy == P3)
+            .expect("P3 synthesized under anyPolicy");
+        assert_eq!(
+            synthesized.parents,
+            vec![OID_ANY_POLICY],
+            "§6.1.4(b)(1): the new node descends from the anyPolicy node"
+        );
+        assert_eq!(
+            synthesized.expected_policy_set,
+            vec![SHARED],
+            "and expects what the mapping names"
+        );
+    }
+
+    /// §6.1.5(g)(iii)(3) attaches the `anyPolicy` parent to the node that
+    /// already carries that user policy.
+    ///
+    /// The lookup is `find(|nd| nd.valid_policy == *p)`: present, the
+    /// `anyPolicy` parent joins that node's parent list; absent, a new node
+    /// is created. Read as `!=` it matches any *other* node, so for a leaf
+    /// holding exactly the sought policy it finds nothing and takes the
+    /// create branch instead -- producing a second node for a policy that
+    /// already has one. The module's first test says why that matters: the
+    /// §6.1.5 walk counts parents per node, so a duplicate double-counts
+    /// one policy.
+    ///
+    /// Reaching the branch at all takes care, and the shape below was
+    /// arrived at by inspecting the graph rather than by assuming it. A
+    /// policy that appears at depth 1 is a child of the `anyPolicy` root,
+    /// so it is already in the `valid_policy_node_set` and the loop skips
+    /// it; the policy has to arrive lower down, through a mapping. Its
+    /// ancestor has to stay in the user set, or steps (iii)(1)-(2) orphan
+    /// it before the expansion runs. And the leaf step needs
+    /// `may_expand_any_policy`, without which §6.1.3(d)(2) discards the
+    /// certificate's `anyPolicy` entirely and there is no leaf
+    /// `anyPolicy` node left to expand. The expansion does not give P2 an
+    /// `anyPolicy` parent of its own, because P2 is already matched by
+    /// what P1 expects.
+    #[test]
+    fn the_user_policy_expansion_matches_the_node_carrying_that_policy() {
+        let mut g = PolicyGraph::new();
+        // Depth 1: P1 and an anyPolicy node, both under the anyPolicy root.
+        assert!(!g.add_certificate_policies(&policies(&[P1, OID_ANY_POLICY]), true));
+        // P1 now expects P2 instead of itself.
+        assert!(!g.apply_policy_mappings(&mappings(&[(P1, P2)]), true, &[]));
+        // Depth 2: P2 arrives as P1's child, and anyPolicy as the depth-1
+        // anyPolicy node's child. P2's only parent is P1 -- the (d)(2)
+        // expansion adds nothing, since what P1 expects already matches
+        // it -- so P2 is not in the valid_policy_node_set.
+        assert!(!g.add_certificate_policies(&policies(&[P2, OID_ANY_POLICY]), true));
+        let p2_before = g
+            .deepest()
+            .iter()
+            .find(|n| n.valid_policy == P2)
+            .expect("P2 is P1's child at depth 2");
+        assert_eq!(
+            p2_before.parents,
+            vec![P1],
+            "P2 must reach the leaf through the mapping alone"
+        );
+
+        // P1 has to be in the user set too: step (iii)(1)-(2) deletes any
+        // child of `anyPolicy` that is neither `anyPolicy` nor requested,
+        // and dropping P1 at depth 1 would orphan P2 at depth 2 before the
+        // expansion ever runs.
+        assert!(!g.intersect_user_policy_set(&[P1, P2]));
+
+        let p2: Vec<_> = g
+            .deepest()
+            .iter()
+            .filter(|n| n.valid_policy == P2)
+            .collect();
+        assert_eq!(p2.len(), 1, "one node per policy per level, not two");
+        assert!(
+            p2[0].parents.contains(&OID_ANY_POLICY),
+            "the anyPolicy parent joins the node that already carries P2, got {:?}",
+            p2[0].parents
+        );
+        assert!(
+            p2[0].parents.contains(&P1),
+            "and does not displace the parent it already had"
+        );
+    }
+
+    /// §6.1.3(d)(3) deletes nodes above the deepest level that have no
+    /// children.
+    ///
+    /// A node left behind has no descendant at the leaf, so no policy it
+    /// represents is valid for the path -- but it is still a node, and the
+    /// §6.1.5 walk over parents counts it. Skipping the prune entirely
+    /// leaves the graph claiming policies the path does not support.
+    #[test]
+    fn pruning_removes_intermediate_nodes_with_no_children() {
+        let mut g = PolicyGraph::new();
+        // Depth 1: two policies, both children of the anyPolicy root.
+        assert!(!g.add_certificate_policies(&policies(&[P1, P2]), true));
+        // Depth 2: only P1 continues. P2's node at depth 1 now has no
+        // child and must go.
+        assert!(!g.add_certificate_policies(&policies(&[P1]), false));
+        assert_eq!(
+            shape(&g),
+            vec![vec![OID_ANY_POLICY], vec![P1], vec![P1]],
+            "P2 at depth 1 has no child at depth 2 and is deleted"
         );
     }
 }
