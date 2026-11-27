@@ -202,6 +202,20 @@ and `pkix-difftest/baseline-limbo-analysis.md` for current state.
 - Test vector / expected-result sources: NIST PKITS (binary fixtures committed), x509-limbo (curated JSON manifest, fetched into `~/GIT/x509-limbo` on demand), per-RFC test vectors.
 - Tests are fully offline.
 
+### Run the gates the way CI runs them
+
+`quality-gates.yml` sets `RUSTFLAGS: -D warnings` for the lint and test
+jobs. A local `cargo clippy` or `cargo test` without it passes on code CI
+rejects -- an unused constant, an `Arc` around a non-`Sync` type -- and the
+failure arrives after the push instead of before it:
+
+    RUSTFLAGS="-D warnings" cargo fmt --all -- --check
+    RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features
+    RUSTFLAGS="-D warnings" cargo test --workspace --all-features
+
+The feature-powerset job deliberately clears `RUSTFLAGS`, and the
+bare-metal job sets its own; everything else inherits the deny.
+
 ## Commit messages: no tool attribution
 
 Never add `Assisted-by`, `Co-Authored-By`, `Generated with`, or any other
