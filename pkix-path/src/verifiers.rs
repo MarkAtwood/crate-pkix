@@ -167,25 +167,8 @@ fn ec_named_curve(spki: &SubjectPublicKeyInfoRef<'_>) -> Option<ObjectIdentifier
         .ok()
 }
 
-/// Left-pads a digest shorter than the curve order with zero bytes.
-///
-/// SEC 1 v2 §4.1.4 step 5 converts the digest to an integer, so leading
-/// zero bytes do not change the value. The `ecdsa` crate rejects prehashes
-/// shorter than half the field size, which would otherwise refuse, for
-/// example, P-521 with `ecdsa-with-SHA256`.
-#[cfg(any(feature = "p256", feature = "p384", feature = "p521"))]
-fn pad_prehash(mut digest: Vec<u8>, field_len: usize) -> Vec<u8> {
-    if digest.len() < field_len {
-        let mut padded = vec![0u8; field_len - digest.len()];
-        padded.append(&mut digest);
-        padded
-    } else {
-        digest
-    }
-}
-
 macro_rules! ecdsa_curve_verify {
-    ($fn_name:ident, $feature:literal, $krate:ident, $field_len:expr) => {
+    ($fn_name:ident, $feature:literal, $krate:ident) => {
         #[cfg(feature = $feature)]
         fn $fn_name(
             spki: SubjectPublicKeyInfoRef<'_>,
@@ -200,7 +183,14 @@ macro_rules! ecdsa_curve_verify {
                 VerifyingKey::try_from(spki).map_err(|_| VerificationError::malformed_key())?;
             let sig = DerSignature::try_from(signature)
                 .map_err(|_| VerificationError::invalid_signature())?;
-            let prehash = pad_prehash(sha2_digest(digest, message), $field_len);
+            // No padding to the field width. SEC 1 v2 §4.1.4 step 5 reads
+            // the digest as an integer, taking the leftmost min(N, outlen)
+            // bits, and `ecdsa`'s `bytes2scalar` does exactly that: it
+            // truncates a digest wider than the curve order and reduces a
+            // narrower one unchanged. A shorter digest is therefore the
+            // same scalar as the same digest left-padded with zeros, so
+            // P-521 with `ecdsa-with-SHA256` needs nothing done to it.
+            let prehash = sha2_digest(digest, message);
             vk.verify_prehash(&prehash, &sig).map_err(|e| {
                 VerificationError::with_source(VerificationErrorKind::InvalidSignature, e)
             })
@@ -208,9 +198,9 @@ macro_rules! ecdsa_curve_verify {
     };
 }
 
-ecdsa_curve_verify!(verify_ecdsa_p256, "p256", p256, 32);
-ecdsa_curve_verify!(verify_ecdsa_p384, "p384", p384, 48);
-ecdsa_curve_verify!(verify_ecdsa_p521, "p521", p521, 66);
+ecdsa_curve_verify!(verify_ecdsa_p256, "p256", p256);
+ecdsa_curve_verify!(verify_ecdsa_p384, "p384", p384);
+ecdsa_curve_verify!(verify_ecdsa_p521, "p521", p521);
 
 /// Which curves an ECDSA verifier accepts.
 #[derive(Clone, Copy)]
@@ -620,11 +610,11 @@ impl SignatureVerifier for EcdsaP256Sha1Verifier {
             VerifyingKey::try_from(issuer_spki).map_err(|_| VerificationError::malformed_key())?;
         let sig = DerSignature::try_from(signature)
             .map_err(|_| VerificationError::invalid_signature())?;
-        // Left-padded to the field width: FIPS 186-4 uses the leftmost
-        // min(N, outlen) bits of the hash, which for a 160-bit digest and
-        // a 256-bit field is all of it, and zero-padding on the left
-        // preserves the integer value.
-        let prehash = pad_prehash(sha1_digest(message), 32);
+        // FIPS 186-4 uses the leftmost min(N, outlen) bits of the hash,
+        // which for a 160-bit digest and a 256-bit field is all of it;
+        // `ecdsa` reduces the 20 bytes to the same scalar the padded form
+        // would give.
+        let prehash = sha1_digest(message);
         vk.verify_prehash(&prehash, &sig)
             .map_err(|e| VerificationError::with_source(VerificationErrorKind::InvalidSignature, e))
     }
