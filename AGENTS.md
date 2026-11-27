@@ -291,6 +291,27 @@ So:
 each test binary by 2.6x and keeps file and line in backtraces. It does not
 address accumulation, which was the larger half.
 
+## Name the features when running a mutation sweep
+
+`cargo mutants` builds its mutant list from the syntax tree, before `cfg` is
+resolved. Code behind a feature the sweep did not enable is still mutated,
+the mutation changes nothing in the build, the tests pass, and the mutant is
+reported MISSED. The report cannot tell that from a real coverage gap.
+
+A default-feature sweep of pkix-chain reported survivors in
+`combine_smtp_transport_security`, `SmtpTransportSecurity::permits_delivery`
+and `verify_attribute_cert`. All three sit behind `mta-sts` or
+`attribute-certs`, both off by default, and all three have tests that pass
+under their own features. Every one was spurious.
+
+So pass the features the crate's own tests need -- `--all-features` unless
+some combination does not build -- and read the baseline's `Test` phase
+duration in `outcomes.json`. A second or two means almost nothing ran.
+
+The inverse trap is real too: a crate whose test targets declare
+`required-features` runs none of them when the sweep omits the feature, so
+genuine gaps get hidden rather than invented.
+
 ## Escalation rule
 
 If you hit 3 failed attempts at the same error without progress, stop and surface to the human.
