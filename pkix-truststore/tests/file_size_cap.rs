@@ -109,3 +109,66 @@ fn cap_default_is_64_mib() {
     // forced to update this test deliberately rather than accidentally.
     assert_eq!(DEFAULT_FILE_SIZE_CAP, 64 * 1024 * 1024);
 }
+
+/// A file of exactly `cap` bytes is within the cap.
+///
+/// `read_file_capped`'s own rustdoc states the contract: `cap + 1` is
+/// requested from `take` "so the read fills exactly when the file is at
+/// the limit and overshoots by one byte when it is over --
+/// distinguishing 'exactly cap bytes' (accepted) from 'more than cap
+/// bytes' (rejected)". Two comparisons implement that, one on the
+/// metadata fast path and one on the bytes actually read, and both sat
+/// untested: every other case here is a 2 KiB file against a 1 KiB cap
+/// or a 64 KiB one, a thousand bytes from either boundary.
+///
+/// Read as `>=` or `==`, a file exactly at the limit is refused -- and
+/// the cap is a documented public number, so that is a bundle a
+/// deployment sized to the limit on purpose and cannot load.
+///
+/// The bytes are junk, so the load must fail at the PEM step; reaching
+/// that step at all is the assertion. Oracle: the size on disk, checked
+/// against the cap before the loader runs.
+#[test]
+fn a_file_exactly_at_the_cap_is_read() {
+    const CAP: u64 = 1024;
+    let path = make_tempfile("pem-exact", &vec![b'A'; CAP as usize]);
+    let size = std::fs::metadata(&path).expect("stat tempfile").len();
+    assert_eq!(size, CAP, "the fixture must sit exactly on the cap");
+
+    let err = from_pem_file_with_cap(&path, CAP)
+        .expect_err("junk is not a PEM bundle, whatever its size");
+    assert!(
+        matches!(err, Error::NoCertificates | Error::Pem(_)),
+        "a file at the cap must reach the PEM step, not be refused by the cap; got {err:?}"
+    );
+
+    let _ = std::fs::remove_file(&path);
+}
+
+/// And one byte more is over it.
+///
+/// The other side of the same two comparisons. Paired with the case
+/// above because one byte is the whole difference between them: a test
+/// that only rejected an oversized file would pass for a cap that
+/// refused everything at or above the limit.
+#[test]
+fn a_file_one_byte_over_the_cap_is_refused() {
+    const CAP: u64 = 1024;
+    let path = make_tempfile("pem-over-by-one", &vec![b'A'; CAP as usize + 1]);
+    let size = std::fs::metadata(&path).expect("stat tempfile").len();
+    assert_eq!(size, CAP + 1, "exactly one byte over");
+
+    match from_pem_file_with_cap(&path, CAP) {
+        Err(Error::Io(failure)) => {
+            assert_eq!(failure.kind, ErrorKind::InvalidData);
+            assert!(
+                failure.message.contains("exceeds") && failure.message.contains("cap"),
+                "message must name the cap; got: {}",
+                failure.message
+            );
+        }
+        other => panic!("one byte over the cap must be refused by the cap; got {other:?}"),
+    }
+
+    let _ = std::fs::remove_file(&path);
+}

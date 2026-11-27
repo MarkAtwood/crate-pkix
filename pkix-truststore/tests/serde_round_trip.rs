@@ -106,3 +106,81 @@ fn io_failure_wire_form_uses_debug_variant_name() {
     // exactly `msg`, so the message field equals "forbidden".
     assert_eq!(json, r#"{"kind":"PermissionDenied","message":"forbidden"}"#);
 }
+
+/// Every `io::ErrorKind` the shim names, with its wire form written out.
+///
+/// The names are the oracle: they are what `Debug` on `ErrorKind`
+/// produces, quoted here rather than derived from the code under test,
+/// so a `Debug` rendering that changed upstream would show up as a
+/// failure rather than as a silently different wire format.
+const KNOWN_KINDS: &[(&str, io::ErrorKind)] = &[
+    ("NotFound", io::ErrorKind::NotFound),
+    ("PermissionDenied", io::ErrorKind::PermissionDenied),
+    ("ConnectionRefused", io::ErrorKind::ConnectionRefused),
+    ("ConnectionReset", io::ErrorKind::ConnectionReset),
+    ("ConnectionAborted", io::ErrorKind::ConnectionAborted),
+    ("NotConnected", io::ErrorKind::NotConnected),
+    ("AddrInUse", io::ErrorKind::AddrInUse),
+    ("AddrNotAvailable", io::ErrorKind::AddrNotAvailable),
+    ("BrokenPipe", io::ErrorKind::BrokenPipe),
+    ("AlreadyExists", io::ErrorKind::AlreadyExists),
+    ("WouldBlock", io::ErrorKind::WouldBlock),
+    ("InvalidInput", io::ErrorKind::InvalidInput),
+    ("InvalidData", io::ErrorKind::InvalidData),
+    ("TimedOut", io::ErrorKind::TimedOut),
+    ("WriteZero", io::ErrorKind::WriteZero),
+    ("Interrupted", io::ErrorKind::Interrupted),
+    ("Unsupported", io::ErrorKind::Unsupported),
+    ("UnexpectedEof", io::ErrorKind::UnexpectedEof),
+    ("OutOfMemory", io::ErrorKind::OutOfMemory),
+];
+
+/// Each named `ErrorKind` survives a round-trip as itself.
+///
+/// The shim maps a finite list of names and sends everything else to
+/// `ErrorKind::Other`, which is lossy by design -- a producer on a newer
+/// Rust emitting a kind this list does not know reaches an older
+/// consumer as `Other`, with the message preserved. That design makes
+/// every arm fail silently when it goes missing: the kind degrades to
+/// `Other` and nothing errors. Only `NotFound` was covered, so eighteen
+/// arms could each have been deleted with the suite still green.
+///
+/// A caller branching on `kind` to decide whether a missing bundle is a
+/// configuration problem or a permissions problem gets `Other` for both.
+#[test]
+fn every_known_error_kind_round_trips_as_itself() {
+    for (name, kind) in KNOWN_KINDS {
+        let failure = IoFailure::from_io(&io::Error::from(*kind));
+
+        let value: serde_json::Value =
+            serde_json::to_value(&failure).expect("IoFailure serializes");
+        assert_eq!(
+            value.get("kind").and_then(serde_json::Value::as_str),
+            Some(*name),
+            "{name} must appear on the wire under that name"
+        );
+
+        let back: IoFailure =
+            serde_json::from_value(value).unwrap_or_else(|e| panic!("{name} deserializes: {e}"));
+        assert_eq!(back.kind, *kind, "{name} must come back as itself");
+        assert_eq!(back.message, failure.message, "and keep its message");
+    }
+}
+
+/// A name the shim does not know degrades to `Other`, keeping the
+/// message.
+///
+/// This is the documented lossy edge, and asserting it is what makes the
+/// test above a statement about the named arms rather than about the
+/// catch-all: without it, a shim that answered `Other` for everything
+/// would be indistinguishable from one missing a single arm.
+#[test]
+fn an_unknown_error_kind_degrades_to_other_with_its_message_kept() {
+    let value = serde_json::json!({
+        "kind": "FilesystemQuotaExceeded",
+        "message": "quota exceeded while reading the bundle",
+    });
+    let back: IoFailure = serde_json::from_value(value).expect("unknown kinds still deserialize");
+    assert_eq!(back.kind, io::ErrorKind::Other);
+    assert_eq!(back.message, "quota exceeded while reading the bundle");
+}
