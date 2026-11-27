@@ -2,13 +2,15 @@
   "id": "PKIX-pzlr",
   "title": "Delta-CRL numbering: uint_to_u64, crl_number and base_crl_number are unpinned",
   "description": "## Why\n\nDelta-CRL application turns on two numbers: the delta's `deltaCRLIndicator`\n(the base CRL number it updates) and the base's own `cRLNumber`. Nothing\npins how either is read.\n\n## The survivors\n\n    crl.rs:1357:5   replace uint_to_u64 -\u003e Option\u003cu64\u003e with Some(0)\n    crl.rs:1357:5   replace uint_to_u64 -\u003e Option\u003cu64\u003e with Some(1)\n    crl.rs:1358:16  replace \u003e with == in uint_to_u64\n    crl.rs:1358:16  replace \u003e with \u003e= in uint_to_u64\n    crl.rs:1375:5   replace crl_number -\u003e Option\u003cResult\u003cu64, der::Error\u003e\u003e with None\n    crl.rs:1375:5   replace crl_number -\u003e ... with Some(Ok(1))\n    crl.rs:1414:5   replace base_crl_number -\u003e ... with Some(Ok(0))\n    crl.rs:1414:5   replace base_crl_number -\u003e ... with Some(Ok(1))\n\n`uint_to_u64` returning a constant makes every CRL number read as the same\nvalue, so a delta pairs with any base. Its `b.len() \u003e 8` guard decides\nwhether an oversize INTEGER is refused -- the rustdoc says a `CRLNumber`\nabove 2^64 \"must not silently disable the staleness check\", and `\u003e=` would\nrefuse an eight-byte number that fits.\n\n`crl_number -\u003e None` means \"this CRL has no cRLNumber\", which is the\nextension-absent signal; `base_crl_number -\u003e Some(Ok(n))` claims a delta\nindicator the CRL does not carry.\n\nThe existing `delta-crl-*` fixtures are a matching pair (base CRLNumber=1,\ndelta BaseCRLNumber=1) and `with_delta` already rejects a base supplied as a\ndelta, so the construction-time checks are covered. What is not covered is\nthe arithmetic that compares the two numbers.\n\n## What a test needs\n\nFixtures with deliberately mismatched numbers: a delta whose BaseCRLNumber is\nhigher than the base's CRLNumber, one where it is lower, and a CRL number\nencoded in nine bytes. `gen_delta_crl_fixtures.py` is the oracle for the\nfirst two; the oversize one is raw INTEGER DER plus a re-sign, the way\n`pkix-path/tests/fixtures/dup-ext/gen.py` does its surgery.\n\n## Found by\n\nThe first pkix-revocation mutation sweep, 2026-11-27.\n",
-  "status": "open",
+  "status": "closed",
   "priority": 1,
   "issue_type": "task",
   "owner": "mark@reviewcommit.com",
   "created_at": "2026-11-27T16:21:17.327517138Z",
   "created_by": "Mark Atwood",
-  "updated_at": "2026-11-27T16:21:17.327517138Z",
+  "updated_at": "2026-11-27T16:29:58.88115939Z",
+  "closed_at": "2026-11-27T16:29:58.88115939Z",
+  "close_reason": "All eight killed. tests/delta_crl_numbers.rs with fixtures/delta-crl-numbers/: 3-against-5 and 9-against-5 so neither direction of the comparison passes by coincidence, plus the eight-byte boundary (2^56 fits, 2^64 is a parse error rather than an absent number). The existing delta-crl-* pair is 1 against 1, which satisfies the comparison without distinguishing it from a constant.",
   "dependencies": [
     {
       "issue_id": "PKIX-pzlr",

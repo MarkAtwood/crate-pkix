@@ -2,13 +2,15 @@
   "id": "PKIX-gme8",
   "title": "pkix-identity: eight survivors left, two of them unkillable",
   "description": "## Why\n\npkix-identity's sweep: 164 mutants, 27 missed, 19 closed. These eight are\nwhat is left.\n\n## The survivors\n\n    lib.rs:116:9    replace _assertions with ()\n\nUnobservable, same class as pkix-chain's `_verifier_is_send_sync`: a\ncompile-time assertion block whose obligation the build discharges.\n\n    lib.rs:485:33   replace || with \u0026\u0026 in MailboxName::parse\n\nEquivalent. `local_raw.is_empty() || domain_raw.is_empty()` is refused again\ndownstream by `validate_ascii_local_part` (empty local-part) and\n`normalize_dns_name` (empty domain), so no input distinguishes the two\nforms. Recorded in the commit that closed the rest of the function; left\nin place as redundant defence rather than deleted.\n\n## The rest\n\nSix survivors remain unexamined at the time of writing -- the sweep list is\nin the session scratchpad under mutants-pkix-identity/. Re-run the sweep to\nregenerate it:\n\n    cargo mutants -p pkix-identity --all-features -j 4 --timeout-multiplier 4\n\npkix-identity has one non-default feature (`serde`), so `--all-features` is\nthe right scope; a default-feature run would report the serde shims as\nsurvivors spuriously (see AGENTS.md, \"Name the features when running a\nmutation sweep\").\n\n## Found by\n\nThe pkix-identity mutation sweep, 2026-11-27.\n",
-  "status": "open",
+  "status": "closed",
   "priority": 2,
   "issue_type": "task",
   "owner": "mark@reviewcommit.com",
   "created_at": "2026-11-27T16:22:03.175435126Z",
   "created_by": "Mark Atwood",
-  "updated_at": "2026-11-27T16:22:03.175435126Z",
+  "updated_at": "2026-11-27T16:50:10.332861846Z",
+  "closed_at": "2026-11-27T16:50:10.332861846Z",
+  "close_reason": "Fully accounted for. A fresh --all-features sweep of pkix-identity reports 164 mutants, 3 missed, and all three are explained rather than open: lib.rs:116 is a const-block compile-time assertion the build discharges; lib.rs:485's disjunction is refused again downstream by validate_ascii_local_part and normalize_dns_name, so no input distinguishes the forms; lib.rs:897's RFC 8398 guard decides nothing, because der refuses any byte above 0x7F when decoding an IA5String, so an rfc822Name's local-part is always ASCII and an internationalized target's never is -- established by decoding a hand-built rfc822Name carrying UTF-8 bytes and recorded in a source comment in c82fbc8b. The other 24 were closed in 19f75de3.",
   "dependencies": [
     {
       "issue_id": "PKIX-gme8",
