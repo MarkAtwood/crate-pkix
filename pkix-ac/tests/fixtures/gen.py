@@ -637,6 +637,27 @@ def main() -> None:
                holder_override=seq(tlv(0xA0, issuer_serial_contents(
                    dn_cn(ROOT_CN), LEAF_SERIAL))))))
 
+    # §4.2.2's third sentence about this form: "The AC
+    # holder.baseCertificateID.issuerUID field MUST only be used if the
+    # holder's PKC contains an issuerUniqueID field. If both ... are
+    # present, the same value MUST be present in both fields."
+    #
+    # issuerUID is IssuerSerial's last field, a bare OPTIONAL BIT STRING
+    # after the serial. The borrowed holder certificate carries no
+    # issuerUniqueID, so the comparison had nothing to compare;
+    # holder-unique-id-cert.der (see make_unique_id.py) is that
+    # certificate with 3a3b3c spliced in. These two differ from each
+    # other in that one field.
+    for serial, fname, uid in (
+        (0x64, "ac-holder-base-cert-id-uid.der", b"\x3a\x3b\x3c"),
+        (0x65, "ac-holder-base-cert-id-uid-other.der", b"\x3a\x3b\x3d"),
+    ):
+        (HERE / fname).write_bytes(attribute_certificate(
+            acinfo(b"", aa_subject, serial, *window, role,
+                   holder_override=seq(tlv(0xA0,
+                       issuer_serial_contents(dn_cn(ROOT_CN), LEAF_SERIAL)
+                       + bitstring(uid))))))
+
     # The same form with the issuer DN re-encoded, so the §7.1
     # comparison is exercised on this branch too.
     (HERE / "ac-holder-base-cert-id-reencoded.der").write_bytes(

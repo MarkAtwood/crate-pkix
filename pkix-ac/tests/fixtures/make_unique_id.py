@@ -50,6 +50,11 @@ ROOT_KEY = HERE / "../../../pkix-ct/tests/fixtures/sct-oracle/precert-issuer-key
 
 # The same bytes gen.py writes into ac-issuer-unique-id.der.
 UNIQUE_ID = bytes([0x2A, 0x2B, 0x2C])
+# And into ac-holder-base-cert-id-uid.der. Deliberately different from
+# UNIQUE_ID: the authority's identifier and the holder's PKC issuer's
+# identifier are unrelated fields, and sharing a value would let a test
+# pass that compared the wrong pair.
+HOLDER_UNIQUE_ID = bytes([0x3A, 0x3B, 0x3C])
 
 
 def read_tlv(buf, i=0):
@@ -131,5 +136,60 @@ def main():
     print("signature verifies, subject and key unchanged, subjectUniqueID present")
 
 
+def splice_issuer_unique_id():
+    """The holder certificate with `issuerUniqueID`, for §4.2.2's
+    `baseCertificateID.issuerUID`.
+
+    "The AC holder.baseCertificateID.issuerUID field MUST only be used if
+    the holder's PKC contains an issuerUniqueID field. If both ... are
+    present, the same value MUST be present in both fields." The borrowed
+    holder certificate has no issuerUniqueID, so the comparison had
+    nothing to compare and could answer either way.
+
+    `issuerUniqueID` is `[1] IMPLICIT`, before `[2] subjectUniqueID` and
+    the `[3]` extensions. Re-signed by the issuer that issued it, whose
+    key this workspace commits; the subject, issuer, serial and key are
+    all left alone, so the certificate still answers every other question
+    the same way.
+    """
+    leaf = HERE / "../../../pkix-ct/tests/fixtures/sct-oracle/precert-leaf-final.der"
+    der = leaf.read_bytes()
+    _, cert_body, _ = read_tlv(der)
+    outer = children(cert_body)
+    tbs_tag, tbs_body = outer[0]
+    sigalg_tag, sigalg_body = outer[1]
+
+    fields = children(tbs_body)
+    assert fields[-1][0] == 0xA3, "expected [3] extensions last"
+    assert not any(t == 0x81 for t, _ in fields), "already carries an issuerUniqueID"
+    issuer_unique_id = enc(0x81, b"\x00" + HOLDER_UNIQUE_ID)
+    new_fields = fields[:-1] + [(0x81, issuer_unique_id[2:]), fields[-1]]
+    new_tbs = enc(tbs_tag, b"".join(enc(t, b) for t, b in new_fields))
+
+    key = serialization.load_pem_private_key(ROOT_KEY.read_bytes(), password=None)
+    sig = key.sign(new_tbs, ec.ECDSA(hashes.SHA256()))
+    rebuilt = enc(
+        0x30,
+        new_tbs + enc(sigalg_tag, sigalg_body) + enc(0x03, b"\x00" + sig),
+    )
+    (HERE / "holder-unique-id-cert.der").write_bytes(rebuilt)
+    print(f"wrote holder-unique-id-cert.der ({len(rebuilt)} bytes)")
+
+    from cryptography import x509
+
+    before = x509.load_der_x509_certificate(der)
+    after = x509.load_der_x509_certificate(rebuilt)
+    key.public_key().verify(
+        after.signature, after.tbs_certificate_bytes, ec.ECDSA(hashes.SHA256())
+    )
+    assert after.subject == before.subject, "same holder"
+    assert after.issuer == before.issuer, "same issuer, so baseCertificateID still names it"
+    assert after.serial_number == before.serial_number, "and the same serial"
+    spliced = [t for t, _ in children(children(read_tlv(rebuilt)[1])[0][1])]
+    assert 0x81 in spliced, "issuerUniqueID present"
+    print("signature verifies, issuer and serial unchanged, issuerUniqueID present")
+
+
 if __name__ == "__main__":
     main()
+    splice_issuer_unique_id()

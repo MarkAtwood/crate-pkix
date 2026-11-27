@@ -1569,3 +1569,48 @@ fn an_issuer_unique_id_must_match_the_authoritys_own() {
         "and must not use it when the authority's certificate does not"
     );
 }
+
+/// The holder certificate with an `issuerUniqueID`.
+///
+/// `pkix-ct`'s `precert-leaf-final.der` with the field spliced in and
+/// re-signed by its own issuer; subject, issuer and serial are unchanged,
+/// so a `baseCertificateID` that names it still does. See
+/// `tests/fixtures/make_unique_id.py`.
+fn holder_with_unique_id() -> Certificate {
+    let der = fixture("holder-unique-id-cert.der");
+    Certificate::from_der(&der).expect("the spliced holder certificate parses")
+}
+
+/// §4.2.2: `baseCertificateID.issuerUID` must agree with the holder
+/// certificate's own `issuerUniqueID`.
+///
+/// "The AC holder.baseCertificateID.issuerUID field MUST only be used if
+/// the holder's PKC contains an issuerUniqueID field. If both ... are
+/// present, the same value MUST be present in both fields."
+///
+/// The borrowed holder certificate carries no `issuerUniqueID`, so every
+/// existing `baseCertificateID` test takes the `(None, _)` arm and the
+/// comparison had nothing to compare. Left answering "always equal", an
+/// AC naming one certificate's issuer identifier matches a different
+/// certificate from the same issuer with the same serial.
+#[test]
+fn a_base_certificate_id_issuer_uid_must_match_the_holders() {
+    let with_uid = holder_with_unique_id();
+
+    assert!(
+        ac("ac-holder-base-cert-id-uid.der").matches_holder(&with_uid),
+        "the AC names the identifier the holder's certificate carries"
+    );
+    assert!(
+        !ac("ac-holder-base-cert-id-uid-other.der").matches_holder(&with_uid),
+        "one byte different is a different issuer identifier"
+    );
+    assert!(
+        !ac("ac-holder-base-cert-id-uid.der").matches_holder(&holder()),
+        "the field must only be used when the holder's certificate uses it"
+    );
+    assert!(
+        ac("ac-holder-base-cert-id.der").matches_holder(&with_uid),
+        "and an AC omitting it still matches a certificate that has one"
+    );
+}
