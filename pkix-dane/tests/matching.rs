@@ -429,3 +429,65 @@ fn no_tlsa_resolver_reports_disabled_rather_than_failure() {
         .iter()
         .all(|r| r == &Err(DaneError::ResolutionDisabled)));
 }
+
+/// A response whose every record is unusable has no usable record.
+///
+/// RFC 7671 §17 treats that response as if no TLSA record were
+/// published, which is a different outcome from a published record that
+/// fails to match: the first means DANE does not apply to this
+/// destination, the second means it applies and the peer failed it. A
+/// sender that has to tag, route or hold a message needs them apart.
+///
+/// Only the positive direction was asserted -- a response holding one
+/// usable record reports `true` -- so the predicate could answer `true`
+/// always, and an all-unusable response would then be reported as
+/// DANE-protected and fail, instead of being reported as having no
+/// policy at all.
+///
+/// Both records below are unusable for a reason §17 names: a digest
+/// whose length does not match its matching type, and an empty
+/// association. Neither is a match failure; both are malformed
+/// publications.
+#[test]
+fn a_response_of_only_unusable_records_has_none() {
+    let wrong_digest_length = record(
+        TlsaUsage::DaneEe,
+        TlsaSelector::Spki,
+        TlsaMatchingType::Sha256,
+        vec![0xab; 31],
+    );
+    assert!(
+        !wrong_digest_length.is_usable(),
+        "SHA-256 is 32 octets, so 31 is not a SHA-256 digest"
+    );
+
+    let empty_association = record(
+        TlsaUsage::DaneEe,
+        TlsaSelector::Spki,
+        TlsaMatchingType::Sha256,
+        Vec::new(),
+    );
+    assert!(
+        !empty_association.is_usable(),
+        "an empty association names nothing"
+    );
+
+    let response = secure(vec![wrong_digest_length, empty_association]);
+    assert!(
+        !response.has_usable_record(),
+        "§17: a response of only unusable records is as if none were published"
+    );
+
+    // And one usable record among them is enough, which is the half that
+    // was already covered -- kept adjacent so the pair reads as the rule.
+    let mixed = secure(vec![
+        record(
+            TlsaUsage::DaneEe,
+            TlsaSelector::Spki,
+            TlsaMatchingType::Sha256,
+            vec![0xab; 31],
+        ),
+        sha256_record(TlsaUsage::DaneEe, TlsaSelector::Cert, "leaf", "Cert"),
+    ]);
+    assert!(mixed.has_usable_record());
+}

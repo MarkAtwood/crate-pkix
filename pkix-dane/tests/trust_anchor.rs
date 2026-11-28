@@ -536,3 +536,46 @@ fn matches_spki_agrees_with_matches_on_selector_one() {
         );
     }
 }
+
+/// An unusable record does not match, whatever its selector says.
+///
+/// `matches_spki` guards on `!record.is_usable() || selector != Spki`,
+/// and RFC 7671 §17 forbids using an unusable record at all. Loosened to
+/// `&&`, a record that is unusable but does carry selector 1 reaches the
+/// comparison -- and since its association data is whatever was
+/// published, a malformed record can then produce a match. That is the
+/// fail-open direction: a publication §17 says to ignore becomes a
+/// positive authentication result.
+///
+/// The record below has the right selector, the right matching type and
+/// association data that genuinely is the CA's key, so the comparison
+/// would succeed if it were reached. The only thing wrong with it is the
+/// unassigned usage, which is one of the conditions §17 lists.
+#[test]
+fn matches_spki_refuses_an_unusable_record_of_the_right_selector() {
+    let unusable = record(
+        TlsaUsage::Unassigned(200),
+        TlsaSelector::Spki,
+        TlsaMatchingType::Full,
+        CA_SPKI_DER.to_vec(),
+    );
+    assert!(
+        !unusable.is_usable(),
+        "precondition: usage 200 is unassigned, so §17 says ignore the record"
+    );
+    assert!(
+        !matches_spki(&unusable, CA_SPKI_DER).expect("should not error"),
+        "§17: an unusable record cannot authenticate anything, even its own key"
+    );
+
+    // The same record with an assigned usage does match, so the refusal
+    // above is about usability and not about the data.
+    let usable = record(
+        TlsaUsage::PkixTa,
+        TlsaSelector::Spki,
+        TlsaMatchingType::Full,
+        CA_SPKI_DER.to_vec(),
+    );
+    assert!(usable.is_usable());
+    assert!(matches_spki(&usable, CA_SPKI_DER).expect("should not error"));
+}

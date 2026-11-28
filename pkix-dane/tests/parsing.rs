@@ -282,3 +282,31 @@ fn alloc_format(name: &TlsaName) -> String {
     write!(out, "{name}").expect("writing to a String cannot fail");
     out
 }
+
+/// A protocol label may be 63 octets, and not 64.
+///
+/// 63 is the DNS label limit (RFC 1035 §2.3.4), so a label exactly that
+/// long is legal and one octet more cannot be put in a query at all.
+/// `malformed_protocol_labels_are_rejected` covers the short and
+/// ill-formed cases and nothing approached the limit, so `> MAX_LABEL_LEN`
+/// read as `>=` or `==` refuses a legal label -- and read as `==`, a
+/// 64-octet one is accepted and builds a name no resolver will take.
+///
+/// The labels are all-lowercase so length is the only thing in question.
+#[test]
+fn a_protocol_label_may_be_sixty_three_octets_but_not_sixty_four() {
+    let at_limit = "a".repeat(63);
+    let name = TlsaName::new(443, &TlsaProtocol::Other(at_limit.clone()), "example.com")
+        .expect("63 octets is a legal DNS label");
+    assert!(
+        name.as_str().contains(&at_limit),
+        "the label appears in the query name"
+    );
+
+    let over_limit = "a".repeat(64);
+    assert_eq!(
+        TlsaName::new(443, &TlsaProtocol::Other(over_limit), "example.com"),
+        Err(DaneError::InvalidProtocol),
+        "64 octets exceeds the DNS label limit"
+    );
+}

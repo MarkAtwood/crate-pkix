@@ -767,6 +767,16 @@ impl MxResolution {
             }
 
             // ---- A delivery target was offered and the driver came back ----
+            //
+            // The bound is defensive, and a mutation sweep reports `<=` as
+            // surviving because the state the two readings disagree about
+            // cannot be reached. `Awaiting::Nothing` is set without `done`
+            // only at the two sites above, each of which is processing the
+            // host at `host_index`, so that index is always inside
+            // `hosts` here; `advance_host` sets `Nothing` too but sets
+            // `done` with it, and `absorb` returns early once done. The
+            // index check therefore guards against a state no caller can
+            // produce. Equivalent, not untested.
             (Awaiting::Nothing, _) => {
                 if self.host_index < self.hosts.len() {
                     self.offered_any = true;

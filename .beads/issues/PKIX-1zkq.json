@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-1zkq",
+  "title": "pkix-dane: a sans-IO state machine turns a deleted arm into a hang, not a wrong answer",
+  "description": "## What\n\nThe first pkix-dane sweep (2026-11-27) reported 19 missed and 13 timeouts\nin 237 mutants. The 19 are closed. The 13 timeouts are a class, not a\nbacklog, and this records why so the next sweep does not re-litigate them.\n\nEight are deleted match arms of `MxResolution::absorb`, and five are the\ncounters that advance it (`cname_depth += 1`, `host_index += 1`, and the\n`host_index \u003c hosts.len()` comparison in `advance_host`).\n\n## Why they time out rather than fail\n\n`absorb` is a sans-IO state machine: the caller asks `next_step()`, performs\nthe I/O, and feeds the answer back. Deleting the arm that handles an answer\ndoes not produce a wrong verdict -- it produces a resolution that never\nleaves the state it was in, so `next_step()` keeps asking the same question\nand the driver loops. Same for a counter that stops advancing: `advance_host`\nnever reaches the end of the host list.\n\nSo the suite detects every one of them, by not finishing. That is the only\nverdict available, exactly as for pkix-path's DirStringBytes and\nNormalizedIter iterators (PKIX-8d92). Not a coverage gap.\n\n## What is worth doing about it\n\nNothing, unless the operator can be written out of the code. The pkix-path\ncase had one such: `Peekable::next_if_eq` removed a reversible comparison\nfrom the mutation space entirely. Nothing equivalent applies to a match arm.\n\nA sweep of this crate should expect ~13 timeouts and read them as caught.\nIf the count changes, the state machine's shape changed and that is worth\nlooking at.\n\n## Found by\n\nThe pkix-dane sweep, 2026-11-27. Recorded under PKIX-9bzr.",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-28T00:12:00.085383735Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-28T00:12:00.085383735Z"
+}

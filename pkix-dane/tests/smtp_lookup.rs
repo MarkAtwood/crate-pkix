@@ -1004,3 +1004,244 @@ fn mandatory_dane_delays_on_a_pkix_only_set() {
     assert_eq!(delay, Some(DelayReason::MandatoryDaneWithoutUsableTlsa));
     assert!(script.targets.is_empty());
 }
+
+// ---------------------------------------------------------------------------
+// What a DeliveryTarget reports about itself
+// ---------------------------------------------------------------------------
+
+/// A secure MX resolution reports every part of its provenance.
+///
+/// `mx_was_secure`, `came_from_mx` and `next_hop` are how a caller
+/// decides what to do with a message whose DANE check did not succeed:
+/// RFC 7672 §2.2 makes delivery still possible, so the sender has to be
+/// able to say *which* hop it reached, whether the MX RRset was
+/// authenticated, and whether an MX RRset was used at all. That is a
+/// tagging and routing decision, not a crash.
+///
+/// Every existing assertion on these is negative -- `!mx_was_secure()`,
+/// `!came_from_mx()` -- taken from the insecure-MX and non-MX cases. So
+/// each could answer `false` always, and `next_hop` could answer `""`,
+/// and nothing would notice: a secure MX delivery would be reported as
+/// an unauthenticated non-MX one to nowhere.
+#[test]
+fn a_secure_mx_target_reports_its_provenance() {
+    let mut resolution = MxResolution::new("example.com", SmtpDaneConfig::new());
+    resolution.absorb(MxAnswer::Mx {
+        status: DnssecStatus::Secure,
+        records: vec![MxRecord::new(10, "mail.example.com")],
+    });
+    resolution.absorb(MxAnswer::Addresses {
+        status: DnssecStatus::Secure,
+        found: true,
+    });
+    resolution.absorb(MxAnswer::Tlsa {
+        status: DnssecStatus::Secure,
+        records: vec![tlsa()],
+    });
+
+    let MxStep::Deliver(target) = resolution.next_step() else {
+        panic!(
+            "expected a delivery target, got {:?}",
+            resolution.next_step()
+        );
+    };
+
+    assert!(
+        target.mx_was_secure(),
+        "the MX RRset was authenticated, and saying otherwise narrows the \
+         identity set for no reason"
+    );
+    assert!(
+        target.came_from_mx(),
+        "an MX RRset was used, so the MX hostname is an identifier"
+    );
+    assert_eq!(
+        target.next_hop(),
+        "example.com",
+        "the original next-hop domain, which is what was asked for"
+    );
+
+    // §2.2.1 and §3.2.2 together: a secure MX gives both the base domain
+    // and the MX hostname as reference identifiers. That set is what
+    // `came_from_mx` selects, so asserting it here pins the accessor to a
+    // consequence rather than to itself.
+    let ids = target.identities().expect("DANE applies");
+    assert!(
+        ids.iter().any(|i| i == "example.com"),
+        "the base domain is an identifier under a secure MX"
+    );
+    assert!(
+        ids.iter().any(|i| i == "mail.example.com"),
+        "and so is the MX hostname"
+    );
+    assert!(!ids.is_empty(), "a non-empty identity set is not empty");
+}
+
+// ---------------------------------------------------------------------------
+// §2.2.2 NoMx: the same trust rules as an MX RRset, on their own copy
+// ---------------------------------------------------------------------------
+
+/// Mandatory DANE refuses an insecure `NoMx` answer.
+///
+/// §2.2.2 makes the domain its own SMTP server when it publishes no MX,
+/// and the trust rules are the same as for an MX RRset: a sender
+/// configured to require DANE cannot accept an unauthenticated answer,
+/// because an attacker who can forge the absence of MX records can
+/// choose the destination.
+///
+/// The `Mx` arm's copy of this logic is tested; the `NoMx` arm's is a
+/// second copy and was not, which left five mutants of it alive --
+/// including dropping the negation, which inverts the rule into refusing
+/// only *secure* answers.
+#[test]
+fn mandatory_dane_refuses_an_insecure_no_mx_answer() {
+    let mut resolution =
+        MxResolution::new("solo.example", SmtpDaneConfig::new().with_mandatory(true));
+    resolution.absorb(MxAnswer::NoMx {
+        status: DnssecStatus::Insecure,
+    });
+    assert_eq!(
+        resolution.next_step(),
+        MxStep::Delay(DelayReason::MandatoryDaneWithInsecureMx),
+        "an unauthenticated absence of MX records cannot satisfy mandatory DANE"
+    );
+}
+
+/// And accepts a secure one.
+///
+/// The other side of the same comparison: without it, the rule could
+/// refuse every `NoMx` answer and mandatory DANE would never deliver to
+/// a domain that is its own server.
+#[test]
+fn mandatory_dane_accepts_a_secure_no_mx_answer() {
+    let mut resolution =
+        MxResolution::new("solo.example", SmtpDaneConfig::new().with_mandatory(true));
+    resolution.absorb(MxAnswer::NoMx {
+        status: DnssecStatus::Secure,
+    });
+    assert_eq!(
+        resolution.next_step(),
+        MxStep::LookupAddresses {
+            host: "solo.example".to_string()
+        },
+        "a signed absence of MX records is authenticated, so delivery proceeds"
+    );
+}
+
+/// An insecure CNAME before a secure `NoMx` leaves the result insecure.
+///
+/// The conjunct is `trust == Secure && self.mx_secure != Some(false)`:
+/// once any step in the chain was unauthenticated, a later signed answer
+/// does not repair it, because the attacker who controlled the earlier
+/// step chose what the later one asks about. Dropping that conjunct makes
+/// a secure `NoMx` after an insecure CNAME read as fully secure, which
+/// mandatory DANE would then accept.
+#[test]
+fn an_insecure_cname_is_not_repaired_by_a_secure_no_mx() {
+    let mut resolution =
+        MxResolution::new("alias.example", SmtpDaneConfig::new().with_mandatory(true));
+    resolution.absorb(MxAnswer::MxCname {
+        status: DnssecStatus::Insecure,
+        target: "real.example".to_string(),
+    });
+    resolution.absorb(MxAnswer::NoMx {
+        status: DnssecStatus::Secure,
+    });
+    assert_eq!(
+        resolution.next_step(),
+        MxStep::Delay(DelayReason::MandatoryDaneWithInsecureMx),
+        "the insecure CNAME is still the weakest link in the chain"
+    );
+}
+
+/// An address-lookup failure moves to the next MX, not to a delay.
+///
+/// A host with no reachable address is unreachable; the destination is
+/// not. §2.2.2's ordering exists so a backup MX gets its turn, and
+/// deleting that arm leaves the resolution waiting for an answer it has
+/// already had -- which is why the mutant times out rather than failing.
+#[test]
+fn an_address_lookup_failure_tries_the_next_mx() {
+    let mut resolution = MxResolution::new("example.com", SmtpDaneConfig::new());
+    resolution.absorb(MxAnswer::Mx {
+        status: DnssecStatus::Secure,
+        records: vec![
+            MxRecord::new(10, "primary.example.com"),
+            MxRecord::new(20, "backup.example.com"),
+        ],
+    });
+    assert_eq!(
+        resolution.next_step(),
+        MxStep::LookupAddresses {
+            host: "primary.example.com".to_string()
+        }
+    );
+
+    resolution.absorb(MxAnswer::LookupFailed);
+    assert_eq!(
+        resolution.next_step(),
+        MxStep::LookupAddresses {
+            host: "backup.example.com".to_string()
+        },
+        "the backup MX still gets its turn"
+    );
+}
+
+/// `hosts` reports the MX hosts in the order they will be tried.
+///
+/// Public, and nothing inside the crate reads it -- the resolution
+/// drives itself from the same list. A caller logging or displaying the
+/// delivery plan is what it exists for, and an empty answer makes a
+/// two-host plan look like none.
+#[test]
+fn the_resolution_reports_its_host_order() {
+    let mut resolution = MxResolution::new("example.com", SmtpDaneConfig::new());
+    assert!(
+        resolution.hosts().is_empty(),
+        "no MX answer yet, so no hosts"
+    );
+    resolution.absorb(MxAnswer::Mx {
+        status: DnssecStatus::Secure,
+        records: vec![
+            MxRecord::new(20, "backup.example.com"),
+            MxRecord::new(10, "primary.example.com"),
+        ],
+    });
+    assert_eq!(
+        resolution.hosts(),
+        ["primary.example.com", "backup.example.com"],
+        "sorted by preference, not by the order they arrived"
+    );
+}
+
+/// An answer arriving after a terminal verdict is ignored.
+///
+/// `absorb` returns early when the resolution already has a terminal
+/// reason or is done. The guard is a disjunction, and narrowed to a
+/// conjunction a late answer would be processed: a resolution that had
+/// already decided to delay could be driven onward by an answer to a
+/// question it is no longer asking.
+#[test]
+fn an_answer_after_a_terminal_verdict_changes_nothing() {
+    let mut resolution = MxResolution::new("example.com", SmtpDaneConfig::new());
+    resolution.absorb(MxAnswer::LookupFailed);
+    assert_eq!(
+        resolution.next_step(),
+        MxStep::Delay(DelayReason::DnsFailure)
+    );
+
+    // A late, perfectly good MX answer.
+    resolution.absorb(MxAnswer::Mx {
+        status: DnssecStatus::Secure,
+        records: vec![MxRecord::new(10, "mail.example.com")],
+    });
+    assert_eq!(
+        resolution.next_step(),
+        MxStep::Delay(DelayReason::DnsFailure),
+        "the verdict stands; a late answer does not revive the resolution"
+    );
+    assert!(
+        resolution.hosts().is_empty(),
+        "and it did not reach the host list either"
+    );
+}
