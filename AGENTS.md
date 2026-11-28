@@ -446,6 +446,13 @@ I/O wait with 2.9 GB of swap in use, and the rate fell from 556 mutants in
 column and a long `b` queue mean adding jobs makes it slower. Keep the count at
 4 or below, and do not run heavy `cargo test --workspace` builds beside one.
 
+That limit is across the machine, not per sweep. Two agents sweeping different
+crates at `-j 3` is six jobs, and it behaves like six: measured on
+2026-11-27 with five concurrent runs, the box sat at 92% iowait with a long
+block queue and 3.2 GB swapped, and one sweep managed 62 mutants in 75 minutes
+that took 5 minutes alone -- roughly twenty to one. Serialise sweep *starts*
+when work is split across agents, even though the crates are disjoint.
+
 What is on the disk is mostly linker output, and the multiplier is the crate's
 integration test count. `pkix-path` has thirty files in `tests/`, so every
 mutant relinks thirty binaries before a single assertion runs, and the whole
