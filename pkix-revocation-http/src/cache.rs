@@ -419,7 +419,7 @@ pub trait RevocationCache: Send + Sync {
     #[cfg(feature = "crl")]
     #[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
     fn put_crl_unless_rollback(&self, key: CrlCacheKey, entry: CachedCrl) -> bool {
-        if is_rollback(self.get_crl(&key).as_deref(), entry.crl_number()) {
+        if is_rollback(self.get_crl(&key).as_deref(), &entry) {
             return false;
         }
         self.put_crl(key, entry);
@@ -686,7 +686,7 @@ impl RevocationCache for InMemoryCache {
     fn put_crl_unless_rollback(&self, key: CrlCacheKey, entry: CachedCrl) -> bool {
         let mut guard = self.crl.write().unwrap_or_else(PoisonError::into_inner);
         if let Some(existing) = guard.get(&key) {
-            if is_rollback(Some(existing.as_ref()), entry.crl_number()) {
+            if is_rollback(Some(existing.as_ref()), &entry) {
                 return false;
             }
         }
@@ -878,30 +878,45 @@ fn parse_ocsp_metadata(der_bytes: &[u8]) -> Result<OcspMetadata, der::Error> {
 /// Decide whether a newly-fetched CRL is a rollback relative to the
 /// currently-cached entry.
 ///
-/// Returns `true` (rollback — drop the incoming entry) iff:
+/// Returns `true` (rollback — drop the incoming entry) iff there is a
+/// prior cached entry and it is newer than the one arriving, by
+/// whichever ordering both entries support:
 ///
-/// - there IS a prior cached entry, and
-/// - the prior entry carried a `CRLNumber`, and
-/// - the incoming entry carries a `CRLNumber`, and
-/// - the prior `CRLNumber` is strictly greater than the incoming one.
+/// - both carry a `CRLNumber`: rollback iff the prior number is strictly
+///   greater. RFC 5280 §5.2.3 makes that counter monotonic per series,
+///   so it is the ordering the issuer intended.
+/// - either lacks one: rollback iff the prior `thisUpdate` is strictly
+///   later. §5.2.3 requires conforming issuers to include `CRLNumber`
+///   in every CRL, so this is the non-conforming case — but
+///   `tbsCertList.thisUpdate` is mandatory in the CRL itself, so there
+///   is always something to order by.
 ///
-/// Any other combination (no prior, prior without a number, incoming
-/// without a number, equal numbers, or incoming higher) returns `false`
-/// — the cache should accept the new entry.
+/// With no prior entry there is nothing to roll back, so `false`.
 ///
-/// RFC 5280 §5.2.3 makes `CRLNumber` monotonic per series; a refresh
-/// that goes backwards is either a misconfigured responder serving a
-/// stale snapshot or an attack.
+/// # Why the fallback exists
+///
+/// Until this was fixed, an entry lacking `CRLNumber` on either side was
+/// accepted unconditionally, which let any CRL with no `CRLNumber`
+/// displace a cached one of any age — including a higher-numbered one.
+/// Whoever controls the distribution point could then walk the cache
+/// backwards by serving an unnumbered stale CRL. The justification given
+/// at the time was that §5.2.3 makes `CRLNumber` a SHOULD; it does not,
+/// it is a MUST for conforming issuers, which is what makes the absent
+/// case suspect rather than ordinary.
+///
+/// This is also what [`is_staler_ocsp`] already did for the other half
+/// of the cache: compare `thisUpdate`. The two halves now order their
+/// entries the same way.
 #[cfg(feature = "crl")]
-fn is_rollback(prior: Option<&CachedCrl>, incoming: Option<&[u8]>) -> bool {
-    match (prior, incoming) {
-        (Some(p), Some(inc)) => match p.crl_number() {
-            // Rollback iff the number already cached is greater than the
-            // one arriving: prior > incoming.
-            Some(prior_num) => crl_number_gt(prior_num, inc),
-            None => false,
-        },
-        _ => false,
+fn is_rollback(prior: Option<&CachedCrl>, incoming: &CachedCrl) -> bool {
+    let Some(p) = prior else {
+        return false;
+    };
+    match (p.crl_number(), incoming.crl_number()) {
+        // Rollback iff the number already cached is greater than the
+        // one arriving: prior > incoming.
+        (Some(prior_num), Some(inc_num)) => crl_number_gt(prior_num, inc_num),
+        _ => p.this_update() > incoming.this_update(),
     }
 }
 
@@ -2602,15 +2617,21 @@ mod tests {
     #[cfg(feature = "crl")]
     #[test]
     fn is_rollback_false_when_no_prior_entry() {
-        assert!(!is_rollback(None, Some(&[1])));
-        assert!(!is_rollback(None, None));
+        assert!(!is_rollback(None, &entry_with_crl_number(Some(vec![1]))));
+        assert!(!is_rollback(None, &entry_with_crl_number(None)));
     }
 
     #[cfg(feature = "crl")]
     fn entry_with_crl_number(n: Option<Vec<u8>>) -> CachedCrl {
+        entry_with(n, SystemTime::UNIX_EPOCH)
+    }
+
+    /// A cache entry with both orderings set explicitly.
+    #[cfg(feature = "crl")]
+    fn entry_with(n: Option<Vec<u8>>, this_update: SystemTime) -> CachedCrl {
         CachedCrl {
             crl_number: n,
-            this_update: SystemTime::UNIX_EPOCH,
+            this_update,
             next_update: None,
             bytes: Vec::new(),
         }
@@ -2618,29 +2639,80 @@ mod tests {
 
     #[cfg(feature = "crl")]
     #[test]
-    fn is_rollback_false_when_prior_has_no_crl_number() {
-        // Prior entry without a number can't be compared; accept new.
-        let prior = entry_with_crl_number(None);
-        assert!(!is_rollback(Some(&prior), Some(&[1])));
-        assert!(!is_rollback(Some(&prior), None));
+    fn an_unnumbered_entry_is_ordered_by_this_update() {
+        // Neither side can be compared by CRLNumber, so `thisUpdate`
+        // decides -- and it is mandatory in a CRL, so it is always there.
+        let t0 = SystemTime::UNIX_EPOCH;
+        let t1 = t0 + Duration::from_secs(86_400);
+
+        let prior_newer = entry_with(None, t1);
+        assert!(
+            is_rollback(Some(&prior_newer), &entry_with(None, t0)),
+            "an older unnumbered CRL must not displace a newer cached one"
+        );
+
+        let prior_older = entry_with(None, t0);
+        assert!(
+            !is_rollback(Some(&prior_older), &entry_with(None, t1)),
+            "and a newer one must be accepted"
+        );
+        assert!(
+            !is_rollback(Some(&prior_older), &entry_with(None, t0)),
+            "equal thisUpdate is not a rollback"
+        );
     }
 
     #[cfg(feature = "crl")]
     #[test]
-    fn is_rollback_false_when_incoming_has_no_crl_number() {
-        // Same shape on the other side: can't decide rollback against an
-        // unmarked incoming. Default to "accept" rather than "treat any
-        // CRLNumber-less response as suspect" — RFC 5280 §5.2.3 says
-        // CRLNumber SHOULD be present but not MUST.
-        let prior = entry_with_crl_number(Some(vec![5]));
-        assert!(!is_rollback(Some(&prior), None));
+    fn a_numbered_entry_is_not_displaced_by_an_unnumbered_older_one() {
+        // The case that motivated the fallback. RFC 5280 §5.2.3 requires
+        // conforming issuers to include CRLNumber, so an incoming CRL
+        // without one is non-conforming -- and before the fix it was
+        // accepted unconditionally, which let it displace a cached CRL of
+        // any number and any age.
+        let t0 = SystemTime::UNIX_EPOCH;
+        let t1 = t0 + Duration::from_secs(86_400);
+
+        let prior = entry_with(Some(vec![9]), t1);
+        assert!(
+            is_rollback(Some(&prior), &entry_with(None, t0)),
+            "an unnumbered CRL older than the cached one is a rollback"
+        );
+        assert!(
+            !is_rollback(Some(&prior), &entry_with(None, t1 + Duration::from_secs(1))),
+            "but a genuinely newer unnumbered CRL still refreshes the cache"
+        );
+
+        // And symmetrically when the cached entry is the unnumbered one.
+        let prior_unnumbered = entry_with(None, t1);
+        assert!(
+            is_rollback(Some(&prior_unnumbered), &entry_with(Some(vec![9]), t0)),
+            "the fallback applies whichever side lacks the number"
+        );
+    }
+
+    #[cfg(feature = "crl")]
+    #[test]
+    fn an_incoming_unnumbered_crl_of_the_same_age_refreshes() {
+        // Equal `thisUpdate` is not a rollback, so a non-conforming
+        // re-fetch of the same CRL still refreshes the entry rather than
+        // being dropped. Keeping that direction permissive is what stops
+        // the fix from turning every unnumbered CRL into a cache miss.
+        let prior = entry_with(Some(vec![5]), SystemTime::UNIX_EPOCH);
+        assert!(!is_rollback(
+            Some(&prior),
+            &entry_with(None, SystemTime::UNIX_EPOCH)
+        ));
     }
 
     #[cfg(feature = "crl")]
     #[test]
     fn is_rollback_false_when_incoming_is_newer() {
         let prior = entry_with_crl_number(Some(vec![1]));
-        assert!(!is_rollback(Some(&prior), Some(&[2])));
+        assert!(!is_rollback(
+            Some(&prior),
+            &entry_with_crl_number(Some(vec![2]))
+        ));
     }
 
     #[cfg(feature = "crl")]
@@ -2649,14 +2721,20 @@ mod tests {
         // Equal numbers: not a rollback. (Re-fetching the same version
         // is fine — happens on transient cache misses.)
         let prior = entry_with_crl_number(Some(vec![3]));
-        assert!(!is_rollback(Some(&prior), Some(&[3])));
+        assert!(!is_rollback(
+            Some(&prior),
+            &entry_with_crl_number(Some(vec![3]))
+        ));
     }
 
     #[cfg(feature = "crl")]
     #[test]
     fn is_rollback_true_when_incoming_is_older() {
         let prior = entry_with_crl_number(Some(vec![5]));
-        assert!(is_rollback(Some(&prior), Some(&[3])));
+        assert!(is_rollback(
+            Some(&prior),
+            &entry_with_crl_number(Some(vec![3]))
+        ));
     }
 
     #[cfg(feature = "crl")]
@@ -2664,10 +2742,16 @@ mod tests {
     fn is_rollback_handles_different_byte_lengths() {
         // Prior CRLNumber 0x0100 (256), incoming 0xff (255). Rollback.
         let prior = entry_with_crl_number(Some(vec![0x01, 0x00]));
-        assert!(is_rollback(Some(&prior), Some(&[0xff])));
+        assert!(is_rollback(
+            Some(&prior),
+            &entry_with_crl_number(Some(vec![0xff]))
+        ));
         // Reverse: prior 0xff, incoming 0x0100 — not a rollback.
         let prior2 = entry_with_crl_number(Some(vec![0xff]));
-        assert!(!is_rollback(Some(&prior2), Some(&[0x01, 0x00])));
+        assert!(!is_rollback(
+            Some(&prior2),
+            &entry_with_crl_number(Some(vec![0x01, 0x00]))
+        ));
     }
 
     // -----------------------------------------------------------------
