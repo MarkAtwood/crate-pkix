@@ -2525,21 +2525,32 @@ mod tests {
 
         /// The OCSP twins of the CRL wrapper's two freshness tests.
         ///
-        /// Both wrappers convert the caller's `now_unix` into the
-        /// `SystemTime` they compare `nextUpdate` against, and the OCSP
-        /// side had nothing watching that conversion: an arithmetic error
-        /// putting "now" before the epoch leaves every cached entry
-        /// looking live forever, so an expired OCSP response is served
-        /// indefinitely and the responder is never asked again. That is
-        /// the direction revocation cannot afford — a `good` response
-        /// outliving its own validity window hides a revocation that
-        /// happened after it was issued.
+        /// Both wrappers turn the caller's `now_unix` into the
+        /// `SystemTime` they compare a cached entry's `nextUpdate`
+        /// against, and on the OCSP side nothing watched that conversion.
+        /// An arithmetic error there — "now" landing before the epoch,
+        /// say — makes every entry look live, which leaves the cache with
+        /// no expiry at all.
         ///
-        /// The pair is kept for the same reason the CRL pair is. The live
-        /// case alone cannot tell correct freshness from a cache that
-        /// never expires anything; the stale case alone cannot tell it
-        /// from one reading the wall clock, under which `NOW`
-        /// (2026-06-01) is in the past and both entries look expired.
+        /// What that costs is worth stating exactly, because
+        /// [`pkix_revocation::OcspChecker`] re-reads the response's own
+        /// `nextUpdate` against the same `now_unix` and still refuses one
+        /// that has genuinely expired. For an entry this wrapper
+        /// populated the two windows are the same window, so the visible
+        /// cost is a parse and a signature verification spent on bytes
+        /// about to be rejected, and then the refetch anyway. What is
+        /// actually lost is the guarantee [`RevocationCache`] documents:
+        /// `get_ocsp` deliberately does no freshness filtering, because
+        /// the wrapper is the one holding the authoritative clock. An
+        /// out-of-crate store restoring entries from Redis or from disk
+        /// writes that metadata itself, and this comparison is the only
+        /// thing that ever reads it.
+        ///
+        /// The pair is kept for the reason the CRL pair is. The live case
+        /// alone cannot tell correct freshness from a cache that expires
+        /// nothing; the stale case alone cannot tell it from one reading
+        /// the wall clock, under which `NOW` (2026-06-01) is long past
+        /// and both entries look expired.
         #[test]
         fn a_cached_response_live_at_now_unix_is_served_without_a_fetch() {
             let fetcher = CountingOcspFetcher {
