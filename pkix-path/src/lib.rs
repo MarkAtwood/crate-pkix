@@ -2959,6 +2959,74 @@ fn matches_dns_name(subject: &str, constraint: &str) -> bool {
     }
 }
 
+/// Whether a wildcard dNSName SAN can authenticate a name inside an
+/// excluded subtree that the SAN's own spelling does not fall into.
+///
+/// RFC 5280 §4.2.1.10 compares a dNSName SAN against an excluded subtree
+/// as a name, and a wildcard SAN is not the name it stands for: the
+/// string `*.example.com` is not within the subtree `bar.example.com`,
+/// so the literal comparison reports no violation. But RFC 9525 §6.3
+/// lets that certificate authenticate `bar.example.com`, which is
+/// exactly the name the CA was forbidden to certify. Neither rule is
+/// wrong alone; read together they leave a dNSName exclusion
+/// unenforceable against the certificate shape most used in practice.
+/// That gap is CVE-2025-61727.
+///
+/// So the exclusion is tested against the names the wildcard can
+/// authenticate rather than against its spelling. The wildcard replaces
+/// exactly one label, so `*.D` stands for `{<label>.D}`, and that set
+/// meets the subtree rooted at `E` when either
+///
+/// - `D` lies within `E` -- which makes `*.D` a strict subdomain of `E`
+///   as a string, so [`matches_dns_name`] already reports it; or
+/// - `E` is itself one of the names the wildcard stands for, that is
+///   `<one label>.D`. That is the case this adds.
+///
+/// Nothing else meets it. A deeper exclusion such as
+/// `foo.bar.example.com` is out of reach of `*.example.com`, because the
+/// wildcard cannot cross a label boundary, and a leading-period
+/// exclusion covers only strict subdomains of its apex, which the
+/// wildcard likewise cannot reach past one label.
+///
+/// The wildcard test mirrors `pkix-identity`'s matcher exactly -- a
+/// leftmost single `*` label, a non-empty remainder carrying no further
+/// `*` and at least one label separator. It has to: a spelling that
+/// matcher refuses authenticates nothing, and one it accepts must be
+/// bounded here, so any disagreement between the two is either a
+/// refusal of a harmless certificate or a hole of this same shape.
+///
+/// Permitted subtrees need no equivalent. There the test is containment
+/// rather than intersection, and a wildcard that is not itself within a
+/// permitted subtree already fails [`matches_dns_name`] -- which is why
+/// the `nc-permits` half of the CVE's testcases was already rejected.
+fn wildcard_san_reaches_excluded_dns(san: &str, constraint: &str) -> bool {
+    let san = strip_root_dot(san);
+    let constraint = strip_root_dot(constraint);
+
+    let Some(rest) = san.strip_prefix("*.") else {
+        return false;
+    };
+    if rest.is_empty() || rest.contains('*') || !rest.contains('.') {
+        return false;
+    }
+    // A leading-period exclusion covers only strict subdomains of its
+    // apex; `*.rest` reaches no subdomain of a child of `rest`.
+    if constraint.starts_with('.') {
+        return false;
+    }
+
+    // Is the excluded name `<one non-empty label>.rest`?
+    let c = constraint.to_ascii_lowercase();
+    let r = rest.to_ascii_lowercase();
+    let Some(prefix) = c.strip_suffix(&r) else {
+        return false;
+    };
+    let Some(label) = prefix.strip_suffix('.') else {
+        return false;
+    };
+    !label.is_empty() && !label.contains('.')
+}
+
 /// `a ⊆ b` for two dNSName constraints (see [`subtree_within`]).
 ///
 /// `x` denotes `{x} ∪ subdomains(x)` and `.x` denotes `subdomains(x)`, so
@@ -3172,8 +3240,9 @@ fn ip_constraint_within(a: &[u8], b: &[u8]) -> bool {
 #[cfg(test)]
 mod tests_constraint_forms {
     use super::{
-        ip_constraint_within, is_ipv4_literal, is_strict_subdomain, matches_ip_address,
-        subtree_within, uri_constraint_within,
+        ip_constraint_within, is_ipv4_literal, is_strict_subdomain, matches_dns_name,
+        matches_ip_address, subtree_within, uri_constraint_within,
+        wildcard_san_reaches_excluded_dns,
     };
     use der::Decode as _;
     use x509_cert::ext::pkix::name::GeneralName;
@@ -3203,6 +3272,100 @@ mod tests_constraint_forms {
     /// `equal || is_strict_subdomain`. With `&&` a domain would have to be a
     /// strict subdomain of itself, which nothing is, and a constraint would
     /// stop containing its own subtree.
+    /// CVE-2025-61727: the wildcard stands for the excluded name.
+    ///
+    /// `root -> ICA (exclude bar.example.com) -> EE (SAN *.example.com)`
+    /// with `bar.example.com` requested. The SAN's spelling is not
+    /// within the excluded subtree, so the literal comparison permits
+    /// it, and RFC 9525 then lets it authenticate the one name the CA
+    /// was forbidden to certify.
+    #[test]
+    fn a_wildcard_san_cannot_evade_a_dns_exclusion() {
+        assert!(
+            wildcard_san_reaches_excluded_dns("*.example.com", "bar.example.com"),
+            "the wildcard stands for bar.example.com, which is excluded"
+        );
+        // The literal comparison is the one that misses it, which is why
+        // the check above has to exist.
+        assert!(
+            !matches_dns_name("*.example.com", "bar.example.com"),
+            "precondition: the spelling is not within the excluded subtree"
+        );
+    }
+
+    /// The wildcard replaces exactly one label, so a deeper exclusion is
+    /// out of its reach and must stay permitted.
+    #[test]
+    fn a_wildcard_san_does_not_reach_past_one_label() {
+        for excluded in [
+            "foo.bar.example.com",
+            "a.b.c.example.com",
+            // A leading period covers only strict subdomains of its
+            // apex, which the wildcard cannot reach either.
+            ".bar.example.com",
+        ] {
+            assert!(
+                !wildcard_san_reaches_excluded_dns("*.example.com", excluded),
+                "*.example.com cannot authenticate anything inside {excluded}"
+            );
+        }
+    }
+
+    /// An exclusion at or above the wildcard's own parent is already
+    /// caught by the literal comparison, so both agree it is a
+    /// violation and neither relies on the other.
+    #[test]
+    fn an_exclusion_above_the_wildcard_is_caught_literally() {
+        for excluded in ["example.com", ".example.com", "com"] {
+            assert!(
+                matches_dns_name("*.example.com", excluded),
+                "the spelling of *.example.com is already within {excluded}"
+            );
+        }
+    }
+
+    /// A spelling `pkix-identity` will not honour authenticates nothing,
+    /// so it reaches nothing. Mirroring its rule is what keeps the two
+    /// from disagreeing.
+    #[test]
+    fn a_san_that_matches_no_name_reaches_no_exclusion() {
+        for san in [
+            // Not a leftmost wildcard.
+            "foo.*.example.com",
+            "www*.example.com",
+            // Embedded second wildcard.
+            "*.foo.*.com",
+            // No label separator in the remainder: `*.com` is refused.
+            "*.com",
+            // Bare wildcard.
+            "*.",
+            // Not a wildcard at all: the literal path handles these.
+            "bar.example.com",
+        ] {
+            assert!(
+                !wildcard_san_reaches_excluded_dns(san, "bar.example.com"),
+                "{san} authenticates no name, so it reaches no exclusion"
+            );
+        }
+    }
+
+    /// Case and a trailing root dot do not change what a name reaches.
+    #[test]
+    fn wildcard_reach_ignores_case_and_the_root_dot() {
+        assert!(wildcard_san_reaches_excluded_dns(
+            "*.EXAMPLE.com",
+            "BAR.example.COM"
+        ));
+        assert!(wildcard_san_reaches_excluded_dns(
+            "*.example.com.",
+            "bar.example.com"
+        ));
+        assert!(wildcard_san_reaches_excluded_dns(
+            "*.example.com",
+            "bar.example.com."
+        ));
+    }
+
     #[test]
     fn a_uri_subtree_contains_itself_and_its_subdomains() {
         assert!(uri_constraint_within(".example.com", ".example.com"));
@@ -4424,6 +4587,7 @@ fn check_san_against_subtrees(
     nc_constrained_types: NcTypeMask,
     index: usize,
 ) -> crate::Result<()> {
+    use x509_cert::ext::pkix::constraints::name::GeneralSubtree;
     use x509_cert::ext::pkix::name::GeneralName;
 
     let Some(san_ext) = san else {
@@ -4435,7 +4599,22 @@ fn check_san_against_subtrees(
     for name in &san_ext.0 {
         match mode {
             CheckMode::Excluded => {
-                if subtrees.iter().any(|st| name_matches_subtree(name, st)) {
+                // A wildcard dNSName SAN is not the name it stands for,
+                // so the exclusion is also tested against the names it
+                // can authenticate. See
+                // `wildcard_san_reaches_excluded_dns`.
+                let reaches_excluded = |st: &GeneralSubtree| -> bool {
+                    match (name, &st.base) {
+                        (GeneralName::DnsName(subj), GeneralName::DnsName(constr)) => {
+                            wildcard_san_reaches_excluded_dns(subj.as_str(), constr.as_str())
+                        }
+                        _ => false,
+                    }
+                };
+                if subtrees
+                    .iter()
+                    .any(|st| name_matches_subtree(name, st) || reaches_excluded(st))
+                {
                     return Err(Error::NameConstraintViolation { index });
                 }
             }

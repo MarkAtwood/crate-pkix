@@ -333,6 +333,36 @@ And when ground truth is withheld to make a suite pass, the suite stops
 measuring what its name claims; prefer an exemption list that names each
 vector and fails when one starts passing, so the gap stays countable.
 
+### Two correct crates can compose into a vulnerability
+
+CVE-2025-61727 in this workspace was not a bug in either crate that held
+it. `pkix-path` compares a dNSName SAN against an excluded subtree as a
+string, which RFC 5280 §4.2.1.10 is: `*.example.com` is not within
+`bar.example.com`, so no violation. `pkix-identity` matches a requested
+name against a wildcard SAN, which RFC 9525 §6.3 is: `bar.example.com`
+matches `*.example.com`. Each follows its own specification exactly, and
+together they let an intermediate CA forbidden from `bar.example.com`
+issue a certificate that authenticates `bar.example.com`.
+
+Neither crate's tests could have found it, because neither crate was
+wrong. It surfaced only when a corpus asked both questions about one
+chain -- which is the argument for the differential harness scoring
+whole testcases rather than each crate scoring itself.
+
+So when two layers each interpret a name, ask what the composition
+permits, not whether each layer is right. The specific trap here is a
+name that *stands for* other names: a wildcard, a normalization, an IDN
+A-label, a case fold. A layer that bounds the spelling has not bounded
+what the spelling can authenticate, and the gap is exactly the set the
+transformation adds.
+
+A corollary for the fix: the bounding layer has to mirror the matching
+layer's rule exactly. `wildcard_san_reaches_excluded_dns` reimplements
+`pkix-identity`'s wildcard shape test rather than approximating it,
+because a spelling the matcher refuses authenticates nothing and one it
+accepts must be bounded -- so any disagreement is either a refusal of a
+harmless certificate or another hole of the same shape.
+
 ### Pin an external corpus, or its baseline measures nothing
 
 `pkix-difftest/baseline-limbo.json` records an exact measurement --
