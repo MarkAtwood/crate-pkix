@@ -259,8 +259,22 @@ mod tests {
     //! satisfies the trait, and constructors honour their inputs.
     use super::*;
 
+    /// The documented default body cap is ten mebibytes, and the number
+    /// has to be asserted rather than named.
+    ///
+    /// `assert_eq!(f.max_response_size, DEFAULT_MAX_RESPONSE_SIZE)` is the
+    /// constant standing as its own oracle: it holds for whatever value
+    /// the expression happens to produce, so an arithmetic slip in
+    /// `10 * 1024 * 1024` passes and the shipped cap is whatever the slip
+    /// made it. The cap bounds bytes a certificate's responder can make
+    /// this task buffer, and it is meant to match the sync backend's, so
+    /// both are written out where the other can be compared against it.
     #[test]
     fn default_constructor_uses_default_max_size() {
+        assert_eq!(
+            DEFAULT_MAX_RESPONSE_SIZE, 10_485_760,
+            "the documented default cap is 10 MiB, matching the ureq backend"
+        );
         let f = ReqwestFetcher::new();
         assert_eq!(f.max_response_size, DEFAULT_MAX_RESPONSE_SIZE);
     }

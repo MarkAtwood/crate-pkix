@@ -294,10 +294,61 @@ mod tests {
     //! their inputs.
     use super::*;
 
+    /// The documented default body cap is ten mebibytes, and the number
+    /// has to be asserted rather than named.
+    ///
+    /// `assert_eq!(f.max_response_size, DEFAULT_MAX_RESPONSE_SIZE)` is
+    /// the constant standing as its own oracle: it holds for any value
+    /// the expression happens to produce, so an arithmetic slip in
+    /// `10 * 1024 * 1024` passes and the shipped cap is whatever the slip
+    /// made it. The cap is a denial-of-service bound on bytes a
+    /// certificate's distribution point can make this process buffer, so
+    /// the direction that matters is upward and it is not self-limiting.
     #[test]
     fn default_constructor_uses_default_max_size() {
+        assert_eq!(
+            DEFAULT_MAX_RESPONSE_SIZE, 10_485_760,
+            "the documented default cap is 10 MiB"
+        );
         let f = UreqFetcher::new();
         assert_eq!(f.max_response_size, DEFAULT_MAX_RESPONSE_SIZE);
+    }
+
+    /// `with_agent` uses the caller's agent as-is, and `new` pins
+    /// `max_redirects(0)` on the one it builds.
+    ///
+    /// Those are two halves of one contract. `fetch` implements the
+    /// same-origin redirect rule itself, which it can only do if `ureq`
+    /// hands back the 3xx response instead of following it, so `new` must
+    /// set the limit to zero; and a caller who brings their own agent
+    /// must get that agent, not a quietly substituted default — the
+    /// rustdoc warns them that an agent of their own which follows
+    /// redirects bypasses the rule, advice that means nothing if the
+    /// agent were discarded.
+    ///
+    /// Nothing observed either half: the only visible field was the body
+    /// cap, which `with_agent` sets to the same default value anyway, so
+    /// a `with_agent` that threw the agent away and rebuilt a default
+    /// fetcher was indistinguishable.
+    #[test]
+    fn with_agent_keeps_the_callers_agent_and_new_pins_no_redirects() {
+        let agent: ::ureq::Agent = ::ureq::Agent::config_builder()
+            .max_redirects(7)
+            .build()
+            .into();
+        let f = UreqFetcher::with_agent(agent);
+        assert_eq!(
+            f.agent.config().max_redirects(),
+            7,
+            "with_agent must use the caller's agent, not a fresh default one"
+        );
+
+        assert_eq!(
+            UreqFetcher::new().agent.config().max_redirects(),
+            0,
+            "new() must stop ureq following redirects itself, so that fetch \
+             sees the 3xx and can apply the same-origin rule"
+        );
     }
 
     #[test]

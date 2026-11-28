@@ -1771,15 +1771,51 @@ mod tests {
         }
     }
 
+    /// Every method of the `Arc<T>` blanket impl must reach the inner
+    /// cache, not just the two the first version of this test used.
+    ///
+    /// `Arc<dyn RevocationCache>` is the shape the wrappers document for
+    /// sharing one store between the CRL and the OCSP fetcher, so the
+    /// forwarding impl is on the path of every cached check those
+    /// consumers make. A method that forwards nowhere is silent in a
+    /// different way for each one, and `invalidate_ocsp` is the quietest:
+    /// the wrapper calls it when cached bytes fail to parse, precisely so
+    /// that a one-off corruption does not break the key forever. Dropped,
+    /// the corrupt entry stays, and every later check on that certificate
+    /// pays the failing parse and then the network request it was meant
+    /// to save — a permanent miss on one key, with no error reporting it.
+    ///
+    /// Only the three plain methods per protocol are here; the guarded
+    /// inserts have their own test in `tests/cache_public_api.rs`, which
+    /// can observe whether the inner override or the trait default ran.
     #[test]
-    fn arc_trait_object_delegates_through() {
-        // Compile-time + behavioural check that Arc<dyn RevocationCache>
-        // is usable as a RevocationCache.
+    fn arc_trait_object_delegates_every_method_through() {
         let inner: Arc<dyn RevocationCache> = Arc::new(InMemoryCache::new());
         let future = SystemTime::now() + Duration::from_secs(3600);
-        let k = dummy_crl_key(None);
-        inner.put_crl(k.clone(), dummy_crl_entry(None, Some(future)));
-        assert!(inner.get_crl(&k).is_some());
+
+        let crl = dummy_crl_key(None);
+        inner.put_crl(crl.clone(), dummy_crl_entry(None, Some(future)));
+        assert!(
+            inner.get_crl(&crl).is_some(),
+            "put_crl then get_crl must reach the inner cache"
+        );
+        inner.invalidate_crl(&crl);
+        assert!(
+            inner.get_crl(&crl).is_none(),
+            "invalidate_crl must remove the entry from the inner cache"
+        );
+
+        let ocsp = dummy_ocsp_key("http://ocsp.example.com/");
+        inner.put_ocsp(ocsp.clone(), dummy_ocsp_entry(Some(future)));
+        assert!(
+            inner.get_ocsp(&ocsp).is_some(),
+            "put_ocsp then get_ocsp must reach the inner cache"
+        );
+        inner.invalidate_ocsp(&ocsp);
+        assert!(
+            inner.get_ocsp(&ocsp).is_none(),
+            "invalidate_ocsp must remove the entry from the inner cache"
+        );
     }
 
     // -----------------------------------------------------------------
@@ -1815,6 +1851,67 @@ mod tests {
         let _ = format!("{err}");
     }
 
+    /// The rollback comparator is `id-ce-cRLNumber` specifically, and
+    /// `thisUpdate` / `nextUpdate` are seconds *after* the Unix epoch.
+    ///
+    /// RFC 5280 §5.2.4 gives `deltaCRLIndicator` the `BaseCRLNumber`
+    /// type, which is `CRLNumber` — an INTEGER, encoded exactly like the
+    /// §5.2.3 `cRLNumber` it sits beside. So a parser that matched any
+    /// CRL extension rather than that OID would decode a perfectly
+    /// well-formed number out of the wrong extension and hand it to
+    /// [`is_rollback`] as the series counter. `delta-crl.der` carries
+    /// `cRLNumber` 2 and `deltaCRLIndicator` 1 for this reason: the two
+    /// numbers differ and the wrong one is numerically lower, so a
+    /// mismatched OID both reads a plausible value and reads it low,
+    /// which is the direction that lets a genuine refresh look like a
+    /// rollback and be dropped.
+    ///
+    /// The timestamps are a known answer, not a plausibility check. The
+    /// other tests here assert only `thisUpdate <= nextUpdate`, which
+    /// holds just as well when both are reflected to before 1970 — and a
+    /// reflected `nextUpdate` makes [`is_live`] call every entry expired,
+    /// so the cache serves nothing it stores. The review fixtures pin
+    /// their times as literal `GeneralizedTime` strings
+    /// (`pkix-revocation/tests/gen_review_fixtures.py`), so there is a
+    /// right answer to assert; `python3 -c 'import calendar;
+    /// print(calendar.timegm((2026,1,1,0,0,0)))'` is the oracle.
+    #[cfg(feature = "crl")]
+    #[test]
+    fn crl_metadata_reads_the_crl_number_extension_and_epoch_seconds() {
+        /// 2026-01-01T00:00:00Z — `thisUpdate` on every review CRL.
+        const THIS_UPDATE: u64 = 1_767_225_600;
+        /// 2027-01-01T00:00:00Z — `nextUpdate` on the base and delta CRLs.
+        const NEXT_UPDATE: u64 = 1_798_761_600;
+
+        const BASE: &[u8] = include_bytes!("../tests/fixtures/review/base-crl.der");
+        const DELTA: &[u8] = include_bytes!("../tests/fixtures/review/delta-crl.der");
+
+        let delta = parse_crl_metadata(DELTA).expect("delta CRL parses");
+        assert_eq!(
+            delta.crl_number.as_deref(),
+            Some(&[2u8][..]),
+            "delta-crl.der carries cRLNumber 2 and deltaCRLIndicator 1; the \
+             comparator must be the former"
+        );
+
+        let base = parse_crl_metadata(BASE).expect("base CRL parses");
+        assert_eq!(
+            base.crl_number.as_deref(),
+            Some(&[1u8][..]),
+            "base-crl.der carries cRLNumber 1"
+        );
+        assert_eq!(
+            base.this_update,
+            SystemTime::UNIX_EPOCH + Duration::from_secs(THIS_UPDATE),
+            "thisUpdate is 2026-01-01T00:00:00Z, after the epoch"
+        );
+        assert_eq!(
+            base.next_update,
+            Some(SystemTime::UNIX_EPOCH + Duration::from_secs(NEXT_UPDATE)),
+            "nextUpdate is 2027-01-01T00:00:00Z, after the epoch"
+        );
+    }
+
     // -----------------------------------------------------------------
     // OCSP metadata parser
     // -----------------------------------------------------------------
@@ -1840,6 +1937,50 @@ mod tests {
         // producedAt must be a positive duration since the Unix epoch
         // (sanity — not 1970-01-01).
         assert!(meta.produced_at > SystemTime::UNIX_EPOCH);
+    }
+
+    /// An OCSP response's three timestamps are seconds *after* the Unix
+    /// epoch (RFC 6960 §4.2.2.1).
+    ///
+    /// `thisUpdate` is the one that decides, not just reports.
+    /// [`is_staler_ocsp`] compares the cached entry's `thisUpdate` against
+    /// the incoming one, so reflecting both to before the epoch reverses
+    /// their order: the guard that exists to stop an older `good`
+    /// displacing a cached `revoked` would start doing exactly that, and
+    /// every later cache hit on that certificate would report it good.
+    /// Asserting `thisUpdate <= nextUpdate`, which the structural test
+    /// does, cannot see it — both sides move together.
+    ///
+    /// Known answer from `ocsp-serial2-revoked.der`, whose times are
+    /// literals in `pkix-revocation/tests/gen_review_fixtures.py`:
+    /// `producedAt` and `thisUpdate` 2026-05-31T00:00:00Z, `nextUpdate`
+    /// 2026-06-07T00:00:00Z.
+    #[cfg(feature = "ocsp")]
+    #[test]
+    fn ocsp_metadata_timestamps_are_seconds_after_the_epoch() {
+        /// 2026-05-31T00:00:00Z — `producedAt` and `thisUpdate`.
+        const PRODUCED_AT: u64 = 1_780_185_600;
+        /// 2026-06-07T00:00:00Z — `nextUpdate`.
+        const NEXT_UPDATE: u64 = 1_780_790_400;
+
+        const RESP: &[u8] = include_bytes!("../tests/fixtures/review/ocsp-serial2-revoked.der");
+        let meta = parse_ocsp_metadata(RESP).expect("review OCSP response parses");
+
+        assert_eq!(
+            meta.produced_at,
+            SystemTime::UNIX_EPOCH + Duration::from_secs(PRODUCED_AT),
+            "producedAt is 2026-05-31T00:00:00Z"
+        );
+        assert_eq!(
+            meta.this_update,
+            SystemTime::UNIX_EPOCH + Duration::from_secs(PRODUCED_AT),
+            "SingleResponse.thisUpdate is 2026-05-31T00:00:00Z"
+        );
+        assert_eq!(
+            meta.next_update,
+            Some(SystemTime::UNIX_EPOCH + Duration::from_secs(NEXT_UPDATE)),
+            "SingleResponse.nextUpdate is 2026-06-07T00:00:00Z"
+        );
     }
 
     #[cfg(feature = "ocsp")]
@@ -2359,6 +2500,97 @@ mod tests {
             assert!(
                 cache.get_ocsp(&key).is_some(),
                 "OCSP response must be cached under (serial, ikh, url) key"
+            );
+        }
+
+        /// The cache key the wrapper will look under for this fixture.
+        fn fixture_key() -> OcspCacheKey {
+            use crate::{build_ocsp_request, OcspHashAlg};
+            let req = build_ocsp_request(&cert(LEAF_GOOD), &cert(CA), OcspHashAlg::Sha256).unwrap();
+            OcspCacheKey {
+                cert_serial: req.cert_serial,
+                issuer_key_hash: req.issuer_key_hash,
+                responder_url: "http://ocsp.example.com/".to_string(),
+            }
+        }
+
+        fn entry_expiring_at(next_update: u64) -> CachedOcspResponse {
+            CachedOcspResponse {
+                produced_at: SystemTime::UNIX_EPOCH,
+                this_update: SystemTime::UNIX_EPOCH,
+                next_update: Some(SystemTime::UNIX_EPOCH + Duration::from_secs(next_update)),
+                bytes: RESP_GOOD.to_vec(),
+            }
+        }
+
+        /// The OCSP twins of the CRL wrapper's two freshness tests.
+        ///
+        /// Both wrappers turn the caller's `now_unix` into the
+        /// `SystemTime` they compare a cached entry's `nextUpdate`
+        /// against, and on the OCSP side nothing watched that conversion.
+        /// An arithmetic error there — "now" landing before the epoch,
+        /// say — makes every entry look live, which leaves the cache with
+        /// no expiry at all.
+        ///
+        /// What that costs is worth stating exactly, because
+        /// [`pkix_revocation::OcspChecker`] re-reads the response's own
+        /// `nextUpdate` against the same `now_unix` and still refuses one
+        /// that has genuinely expired. For an entry this wrapper
+        /// populated the two windows are the same window, so the visible
+        /// cost is a parse and a signature verification spent on bytes
+        /// about to be rejected, and then the refetch anyway. What is
+        /// actually lost is the guarantee [`RevocationCache`] documents:
+        /// `get_ocsp` deliberately does no freshness filtering, because
+        /// the wrapper is the one holding the authoritative clock. An
+        /// out-of-crate store restoring entries from Redis or from disk
+        /// writes that metadata itself, and this comparison is the only
+        /// thing that ever reads it.
+        ///
+        /// The pair is kept for the reason the CRL pair is. The live case
+        /// alone cannot tell correct freshness from a cache that expires
+        /// nothing; the stale case alone cannot tell it from one reading
+        /// the wall clock, under which `NOW` (2026-06-01) is long past
+        /// and both entries look expired.
+        #[test]
+        fn a_cached_response_live_at_now_unix_is_served_without_a_fetch() {
+            let fetcher = CountingOcspFetcher {
+                resp_bytes: RESP_GOOD.to_vec(),
+                seen: RefCell::new(0),
+            };
+            let inner = HttpOcspFetcher::new(fetcher, DefaultVerifier, NOW);
+            let cache = InMemoryCache::new();
+            cache.put_ocsp(fixture_key(), entry_expiring_at(NOW + 3600));
+
+            let cached = CachedHttpOcspFetcher::new(inner, cache);
+            cached
+                .check_revocation(&cert(LEAF_GOOD), &cert(CA))
+                .expect("the cached response is live at now_unix");
+            assert_eq!(
+                *cached.inner.fetcher.seen.borrow(),
+                0,
+                "an entry live at the caller's now_unix must be served without \
+                 a network fetch"
+            );
+        }
+
+        #[test]
+        fn a_cached_response_stale_at_now_unix_is_refetched() {
+            let fetcher = CountingOcspFetcher {
+                resp_bytes: RESP_GOOD.to_vec(),
+                seen: RefCell::new(0),
+            };
+            let inner = HttpOcspFetcher::new(fetcher, DefaultVerifier, NOW);
+            let cache = InMemoryCache::new();
+            cache.put_ocsp(fixture_key(), entry_expiring_at(NOW - 3600));
+
+            let cached = CachedHttpOcspFetcher::new(inner, cache);
+            cached
+                .check_revocation(&cert(LEAF_GOOD), &cert(CA))
+                .expect("must succeed after refetching");
+            assert_eq!(
+                *cached.inner.fetcher.seen.borrow(),
+                1,
+                "an entry stale at the caller's now_unix must be refetched"
             );
         }
     }

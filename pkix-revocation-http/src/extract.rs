@@ -413,6 +413,50 @@ mod tests {
         );
     }
 
+    /// `AiaUrls::is_empty` means "this certificate advertised no usable
+    /// HTTP AIA URL at all" — both buckets empty, not either one.
+    ///
+    /// The two buckets answer different questions and a certificate
+    /// routinely fills one without the other: an `id-ad-caIssuers` entry
+    /// with no `id-ad-ocsp` entry is the ordinary shape for a CA
+    /// certificate, and the reverse happens wherever the issuer is
+    /// already distributed out of band. Collapsing the test to `||` makes
+    /// `is_empty` true whenever *either* list is short, so a caller using
+    /// it to decide whether the extension is worth looking at throws away
+    /// URLs the extractor successfully read.
+    ///
+    /// The existing fixtures cannot see this. Every one of them is either
+    /// empty in both buckets or populated in both, and on those inputs
+    /// `&&` and `||` agree, so the only assertion in the suite was
+    /// `assert!(aia.is_empty())` on the doubly-empty case — satisfied as
+    /// well by a body that answers `true` unconditionally. A table of
+    /// hand-written cases covers the two mixed rows no certificate in
+    /// `tests/fixtures/` provides.
+    #[test]
+    fn aia_urls_is_empty_only_when_both_buckets_are_empty() {
+        const OCSP: &str = "http://ocsp.example.com/";
+        const CA_ISSUERS: &str = "http://ca.example.com/ca.cer";
+
+        let cases: [(&[&str], &[&str], bool); 4] = [
+            (&[], &[], true),
+            (&[OCSP], &[], false),
+            (&[], &[CA_ISSUERS], false),
+            (&[OCSP], &[CA_ISSUERS], false),
+        ];
+
+        for (ocsp, ca_issuers, expected) in cases {
+            let urls = AiaUrls {
+                ocsp: ocsp.iter().map(|s| (*s).to_owned()).collect(),
+                ca_issuers: ca_issuers.iter().map(|s| (*s).to_owned()).collect(),
+            };
+            assert_eq!(
+                urls.is_empty(),
+                expected,
+                "is_empty() for ocsp={ocsp:?} ca_issuers={ca_issuers:?}"
+            );
+        }
+    }
+
     #[test]
     fn aia_returns_err_on_malformed_der() {
         let cert = parse_cert(FIXTURE_HTTP);
