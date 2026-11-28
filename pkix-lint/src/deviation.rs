@@ -774,6 +774,13 @@ fn validate_scope(scope: &DeviationScope) -> Result<(), DeviationAddError> {
     };
 
     match scope.kind.as_str() {
+        // Deleting this arm is an equivalent mutation: `pkix-lint.scope.any`
+        // would fall through to the catch-all below, which also returns
+        // `Ok(())`, and no input can tell the two apart. The arm is written
+        // out anyway because `any` is a *canonical* kind with a
+        // deliberately empty prop schema, not an unrecognized kind being
+        // waved through -- and if the catch-all ever stops accepting
+        // unknown kinds, `any` must keep validating.
         SCOPE_KIND_ANY => Ok(()),
         SCOPE_KIND_ISSUER_DN_CONTAINS => match scope.get_prop(PROP_ISSUER_DN_SUBSTRING) {
             None => Err(missing(PROP_ISSUER_DN_SUBSTRING)),
@@ -2376,6 +2383,43 @@ mod tests {
         assert_eq!(dev.id, "dev-intermediate-scope");
     }
 
+    /// `find_deviation_for_chain` resolves competing deviations by
+    /// priority, exactly as `find_deviation` does for a single cert.
+    ///
+    /// The single-cert variant had a priority test and this one did not,
+    /// so two mutants of its guard survived: forcing the guard `false`
+    /// (first match always wins) and reversing the comparison (lowest
+    /// priority wins). Both leave the path-scope resolution order
+    /// disagreeing with the cert-scope one, which is the shape an
+    /// operator cannot debug — the same two deviation files resolve
+    /// differently depending on whether the finding happened to be
+    /// cert-scope or path-scope.
+    #[test]
+    fn find_deviation_for_chain_higher_priority_wins() {
+        let chain = [cert_webpki(), cert_smime()];
+        let mut store = DeviationStore::new();
+        store
+            .add(Deviation {
+                priority: 0,
+                ..make_deviation("wildcard", "test.path.lint")
+            })
+            .expect("add wildcard");
+        store
+            .add(Deviation {
+                priority: 100,
+                ..make_deviation("specific", "test.path.lint")
+            })
+            .expect("add specific");
+
+        let dev = store
+            .find_deviation_for_chain("test.path.lint", &chain, 1_000_000)
+            .expect("at least one deviation must match");
+        assert_eq!(
+            dev.id, "specific",
+            "highest priority must win over insertion order"
+        );
+    }
+
     #[test]
     fn find_deviation_for_chain_returns_none_when_no_cert_in_scope() {
         // Negative control: a deviation whose scope substring matches
@@ -2563,6 +2607,138 @@ mod tests {
         let expired: Vec<_> = store.expired_at(1000).collect();
         assert_eq!(expired.len(), 1);
         assert_eq!(expired[0].id, "d1");
+    }
+
+    /// `active_at` is `expired_at`'s complement over the same store: it
+    /// yields the deviations whose window contains `now_unix`, in store
+    /// order.
+    ///
+    /// `expired_at` had a test and this had none, so nothing distinguished
+    /// the accessor from one that returns nothing. An empty `active_at` is
+    /// the dangerous direction for a reporting tool: a renewal dashboard
+    /// that lists no active waivers reads as "no waivers to review."
+    ///
+    /// Oracle: the window rule on `Deviation::is_active_at` — start is
+    /// inclusive, end exclusive — applied to three deviations at t=1000.
+    #[test]
+    fn store_active_at_reports_only_deviations_in_window() {
+        let mut store = DeviationStore::new();
+        store
+            .add(Deviation {
+                effective_end: Some(500), // expired before 1000
+                ..make_deviation("expired", "test.lint.a")
+            })
+            .expect("add should succeed");
+        store
+            .add(Deviation {
+                effective_start: Some(2000), // not yet started at 1000
+                ..make_deviation("future", "test.lint.b")
+            })
+            .expect("add should succeed");
+        store
+            .add(Deviation {
+                effective_start: Some(1000), // start is inclusive
+                effective_end: Some(1001),   // end is exclusive
+                ..make_deviation("current", "test.lint.c")
+            })
+            .expect("add should succeed");
+        store
+            .add(make_deviation("unbounded", "test.lint.d"))
+            .expect("add should succeed");
+
+        let active: Vec<&str> = store.active_at(1000).map(|d| d.id.as_str()).collect();
+        assert_eq!(active, vec!["current", "unbounded"]);
+    }
+
+    /// `active_for_lint` requires **both** an exact `target_lint` match
+    /// and an active window; neither alone admits a deviation.
+    ///
+    /// Three mutants of that conjunction survived: dropping the accessor
+    /// to an empty iterator, widening `&&` to `||`, and inverting the id
+    /// comparison. The fixture therefore has to separate the two
+    /// conditions — a deviation that targets the lint but has expired,
+    /// and an active one that targets a different lint — so that a
+    /// disjunction admits two extra entries and an inverted comparison
+    /// admits the wrong one.
+    ///
+    /// Getting this wrong widens a waiver past the lint it was written
+    /// for, which is the failure the deviation mechanism exists to
+    /// prevent: deviations are lint-ID scoped, never severity- or
+    /// category-scoped.
+    #[test]
+    fn store_active_for_lint_requires_both_id_match_and_active_window() {
+        let mut store = DeviationStore::new();
+        store
+            .add(Deviation {
+                effective_end: Some(500),
+                ..make_deviation("right-lint-expired", "test.lint.target")
+            })
+            .expect("add should succeed");
+        store
+            .add(make_deviation("wrong-lint-active", "test.lint.other"))
+            .expect("add should succeed");
+        store
+            .add(make_deviation("right-lint-active", "test.lint.target"))
+            .expect("add should succeed");
+
+        let hits: Vec<&str> = store
+            .active_for_lint("test.lint.target", 1000)
+            .map(|d| d.id.as_str())
+            .collect();
+        assert_eq!(hits, vec!["right-lint-active"]);
+    }
+
+    /// `ScopePropValue::Bytes` serialises as lowercase, zero-padded hex
+    /// with no separator.
+    ///
+    /// The scope's DER bytes are the lossless half of a serialised
+    /// deviation — the human-readable DN beside them is decoration. Both
+    /// mutants of `hex_encode` (empty string, constant string) left every
+    /// test passing, because the only tests that serialise a scope check
+    /// the surrounding shape and not the digits.
+    ///
+    /// Oracle: hand-encoded. `30 00 ff 0a` exercises a byte needing no
+    /// padding, a zero byte, an all-ones byte, and a byte whose high
+    /// nibble is zero — the one a `{:x}` without the `02` width would
+    /// render as a single digit and silently shorten the string.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn scope_bytes_serialise_as_lowercase_padded_hex() {
+        let scope = DeviationScope::issuer_dn_exact(vec![0x30, 0x00, 0xff, 0x0a]);
+        let json = serde_json::to_string(&scope).expect("scope serialises");
+        assert!(
+            json.contains(r#""hex":"3000ff0a""#),
+            "DER bytes must render as lowercase padded hex; got: {json}"
+        );
+    }
+
+    /// `DeviationAddError` renders each variant with the offending name
+    /// in it.
+    ///
+    /// These strings reach the operator through `std::error::Error`, and
+    /// the whole point of rejecting at insertion time (PKIX-hy2e.9) is
+    /// that the operator learns *which* field or scope is wrong instead
+    /// of watching a deviation silently never match. A `Display` that
+    /// writes nothing gives back the silence the check was added to end.
+    #[test]
+    fn deviation_add_error_display_names_the_offender() {
+        assert_eq!(
+            DeviationAddError::DuplicateId("agency-x-2026-q1".to_owned()).to_string(),
+            "deviation id 'agency-x-2026-q1' already exists in the store"
+        );
+        assert_eq!(
+            DeviationAddError::EmptyField("justification".to_owned()).to_string(),
+            "deviation field 'justification' must not be empty"
+        );
+        assert_eq!(
+            DeviationAddError::MalformedScope {
+                kind: SCOPE_KIND_ISSUER_DN_CONTAINS.to_owned(),
+                reason: "missing required prop 'pkix-lint.issuer-dn-substring'".to_owned(),
+            }
+            .to_string(),
+            "deviation scope kind 'pkix-lint.scope.issuer-dn-contains' is malformed: \
+             missing required prop 'pkix-lint.issuer-dn-substring'"
+        );
     }
 
     #[test]
@@ -2800,5 +2976,211 @@ mod tests {
 
         assert_eq!(result.deviated.len(), 1);
         assert_eq!(result.deviated[0].evidence_uri, None);
+    }
+
+    // -----------------------------------------------------------------------
+    // The three DeviationRunner entry points besides run_cert
+    //
+    // Only `run_cert` had tests, so `run_cert_at_issuance`, `run_chain`
+    // and `run_path` could each return an empty `DeviationRunResult` and
+    // the suite stayed green. An empty result is the worst available
+    // answer here: no findings and no deviated findings is exactly what a
+    // fully compliant chain produces, so the evidence pack would assert
+    // compliance for a chain nobody evaluated.
+    // -----------------------------------------------------------------------
+
+    /// `run_cert_at_issuance` evaluates as of the certificate's
+    /// `notBefore`, so a deviation whose window covers only that instant
+    /// still applies.
+    ///
+    /// Oracle: `openssl x509 -startdate` on the fixture reports
+    /// `Jan 1 00:00:00 2026 GMT`, which is Unix 1 767 225 600. The
+    /// deviation's window is `[notBefore, notBefore + 1)` — active at
+    /// issuance and at no other second a test might pass by accident.
+    #[test]
+    fn deviation_runner_run_cert_at_issuance_uses_not_before() {
+        const NOT_BEFORE: u64 = 1_767_225_600; // 2026-01-01T00:00:00Z
+        let cert = load_cert();
+
+        let mut store = DeviationStore::new();
+        store
+            .add(Deviation {
+                effective_start: Some(NOT_BEFORE),
+                effective_end: Some(NOT_BEFORE + 1),
+                ..make_deviation("at-issuance", "test.always_error")
+            })
+            .expect("add should succeed");
+
+        let runner = crate::LintRunner::new(vec![Box::new(AlwaysError)]);
+        let dev_runner = DeviationRunner::new(runner, store);
+        let result = dev_runner.run_cert_at_issuance(&cert, crate::SubjectKind::Leaf, 0);
+
+        assert!(result.findings.is_empty(), "the finding must be deviated");
+        assert_eq!(result.deviated.len(), 1);
+        assert_eq!(result.deviated[0].deviation_id, "at-issuance");
+        assert_eq!(
+            result.deviated[0].evaluated_at_unix, NOT_BEFORE,
+            "run_cert_at_issuance must evaluate as of notBefore"
+        );
+    }
+
+    /// `run_chain` evaluates every certificate and matches each
+    /// finding's deviation against *that* certificate, not against the
+    /// leaf for all of them.
+    ///
+    /// The two fixtures have different issuer DNs (`PKIX-webpki-self`
+    /// and `PKIX-smime-self`), and the deviation is scoped to the
+    /// second. A deviation resolved against chain[0] for every index
+    /// would waive nothing; one resolved against the whole chain would
+    /// waive both.
+    #[test]
+    fn deviation_runner_run_chain_resolves_per_certificate() {
+        let chain = [cert_webpki(), cert_smime()];
+        let kinds = [crate::SubjectKind::Leaf, crate::SubjectKind::IntermediateCa];
+        let now: u64 = 1_000_000;
+
+        let mut store = DeviationStore::new();
+        store
+            .add(Deviation {
+                scope: DeviationScope::issuer_dn_contains("smime"),
+                ..make_deviation("smime-only", "test.always_error")
+            })
+            .expect("add should succeed");
+
+        let runner = crate::LintRunner::new(vec![Box::new(AlwaysError)]);
+        let dev_runner = DeviationRunner::new(runner, store);
+        let result = dev_runner.run_chain(&chain, &kinds, now);
+
+        assert_eq!(
+            result.findings.len(),
+            1,
+            "the webpki cert's finding is out of scope and stays a finding"
+        );
+        assert_eq!(result.findings[0].cert_index, Some(0));
+        assert_eq!(
+            result.deviated.len(),
+            1,
+            "the smime cert's finding is in scope and is deviated"
+        );
+        assert_eq!(result.deviated[0].cert_index, Some(1));
+        assert_eq!(result.deviated[0].deviation_id, "smime-only");
+    }
+
+    /// A path-scope lint that always errors.
+    #[derive(Clone)]
+    struct AlwaysErrorPath;
+    impl crate::Lint for AlwaysErrorPath {
+        fn id(&self) -> &'static str {
+            "test.path.always_error"
+        }
+        fn citation(&self) -> &'static str {
+            "test"
+        }
+        fn severity(&self) -> crate::Severity {
+            crate::Severity::Error
+        }
+        fn scope(&self) -> crate::Scope {
+            crate::Scope::Path
+        }
+        fn applies_to(&self) -> crate::SubjectKind {
+            crate::SubjectKind::Any
+        }
+        fn check_path(
+            &self,
+            _chain: &[Certificate],
+            _path: &crate::ValidatedPath,
+            _now: u64,
+        ) -> crate::LintResult {
+            crate::LintResult::error("path always errors")
+        }
+    }
+
+    /// A path-scope lint that always passes.
+    #[derive(Clone)]
+    struct AlwaysPassPath;
+    impl crate::Lint for AlwaysPassPath {
+        fn id(&self) -> &'static str {
+            "test.path.always_pass"
+        }
+        fn citation(&self) -> &'static str {
+            "test"
+        }
+        fn severity(&self) -> crate::Severity {
+            crate::Severity::Info
+        }
+        fn scope(&self) -> crate::Scope {
+            crate::Scope::Path
+        }
+        fn applies_to(&self) -> crate::SubjectKind {
+            crate::SubjectKind::Any
+        }
+        fn check_path(
+            &self,
+            _chain: &[Certificate],
+            _path: &crate::ValidatedPath,
+            _now: u64,
+        ) -> crate::LintResult {
+            crate::LintResult::Pass
+        }
+    }
+
+    fn validated_self_signed_path() -> (Vec<Certificate>, crate::ValidatedPath) {
+        use pkix_path::{EcdsaP256Verifier, TrustAnchor, ValidationPolicy};
+        let cert = load_cert();
+        let anchor = TrustAnchor::from_cert(cert.clone());
+        // 2026-01-01 is the fixture's notBefore, so it is inside validity.
+        let policy = ValidationPolicy::new(1_767_225_600);
+        let path = pkix_path::validate_path(
+            std::slice::from_ref(&cert),
+            &[anchor],
+            &policy,
+            &EcdsaP256Verifier,
+        )
+        .expect("fixture cert must validate against itself as anchor");
+        (vec![cert], path)
+    }
+
+    /// `run_path` deviates the actionable path findings and leaves the
+    /// non-actionable ones alone.
+    ///
+    /// Two lints run, one erroring and one passing, with a deviation
+    /// targeting only the erroring one. The partition is what
+    /// `apply_deviations_for_chain` decides, and three mutants of it
+    /// survived: an empty result from `run_path`, an empty result from
+    /// the helper, and dropping the `!` from `if !finding.result
+    /// .is_finding()` — which sends actionable findings straight to
+    /// `findings` and offers the `Pass` ones for waiving instead.
+    /// Inverted, a waived violation reappears as a live finding and a
+    /// clean check becomes waivable: the deviation mechanism applied to
+    /// precisely the wrong half of the report.
+    #[test]
+    fn deviation_runner_run_path_deviates_only_actionable_findings() {
+        let (chain, path) = validated_self_signed_path();
+        let now: u64 = 1_767_225_600;
+
+        let mut store = DeviationStore::new();
+        store
+            .add(make_deviation("path-waiver", "test.path.always_error"))
+            .expect("add should succeed");
+
+        let runner =
+            crate::LintRunner::new(vec![Box::new(AlwaysErrorPath), Box::new(AlwaysPassPath)]);
+        let dev_runner = DeviationRunner::new(runner, store);
+        let result = dev_runner.run_path(&chain, &path, now);
+
+        assert_eq!(
+            result.deviated.len(),
+            1,
+            "the erroring path lint must be deviated"
+        );
+        assert_eq!(result.deviated[0].lint_id, "test.path.always_error");
+        assert_eq!(result.deviated[0].deviation_id, "path-waiver");
+        assert_eq!(
+            result.findings.len(),
+            1,
+            "the passing path lint must stay a plain finding"
+        );
+        assert_eq!(result.findings[0].lint_id, "test.path.always_pass");
+        assert!(result.findings[0].result.is_pass());
     }
 }
