@@ -35,6 +35,10 @@ same commit.
   247 PKITS chains the harness can classify. Every chain where
   `pkix-path` and OpenSSL disagree is documented below as either
   intentional or harness limitation.
+* That is a statement about PKITS, not about everything. §9 below is a
+  divergence found by building a chain PKITS has no vector for, and it
+  is the only entry here where `pkix-path` is the **more lenient** of
+  the two. A corpus cannot report a gap it contains no case for.
 
 ## 1. pyca rejects critical PolicyMappings, InhibitAnyPolicy, PolicyConstraints
 
@@ -216,6 +220,44 @@ same commit.
   `known_gaps()` in `pkix-difftest/tests/pkits_ground_truth.rs`, which
   fails if either starts passing, so implementing DSA means removing
   them in the same change. Tracked as PKIX-vb4o.
+
+## 9. pkix-path never applies dNSName constraints to the commonName; OpenSSL does
+
+* **Characteristic chains**: not from PKITS — built for this finding.
+  `root -> ICA (nameConstraints) -> EE`, where the EE presents **no**
+  dNSName SAN and carries a hostname in its `commonName`.
+* **Verdicts**:
+
+  | EE `commonName` | EE SANs | ICA constraint | `openssl` | `pkix-path` |
+  | --- | --- | --- | --- | --- |
+  | `bar.example.com` | none | excluded `DNS:bar.example.com` | Fail — excluded subtree violation | **Pass** |
+  | `John Smith` | email only | permitted `DNS:example.com` | OK | — |
+  | `notallowed.test` | email only | permitted `DNS:example.com` | Fail — permitted subtree violation | **Pass** |
+
+* **Reasoning**: OpenSSL applies dNSName constraints to the
+  `commonName` when a certificate presents no dNSName SAN, in both
+  directions, skipping a CN that is not hostname-shaped — which is why
+  `John Smith` is accepted and `notallowed.test` is not. `pkix-path`
+  consults only dNSName SANs, so a certificate with no SAN escapes
+  dNSName constraints entirely. RFC 5280 does not require the CN check,
+  and reading a CN as a hostname is deprecated by RFC 6125 §6.4.4 —
+  which `pkix_identity::verify_dns_name` honours, returning
+  `MissingSan` rather than falling back.
+* **Why it still matters**: RFC 7672 §3.2.3 *requires* CN fallback for
+  SMTP DANE, and `pkix_dane::verify_smtp_name` performs it. That path is
+  reachable only under `TlsaUsage::DaneTa` — DANE-EE(3) returns
+  `NotRequired` per §3.2.1 and the PKIX usages are refused — and
+  DANE-TA validates a chain, so an intermediate's constraints are in
+  play. Composed: an intermediate forbidden from `bar.example.com`
+  issues a SAN-less certificate with that CN, the path validates because
+  no dNSName SAN exists to violate the exclusion, and the DANE name
+  check then matches the CN.
+* **Status**: **real divergence, and the lenient direction** — unlike
+  every other entry here, where `pkix-path` is the stricter one. No
+  wildcard is involved; this is distinct from PKIX-bhtl, whose fix
+  bounds a wildcard SAN's coverage and cannot see a certificate with no
+  SAN. Tracked as PKIX-55jb, which records the recommended fix and the
+  one decision it needs: what counts as hostname-shaped.
 
 ## Reproducing these findings
 
