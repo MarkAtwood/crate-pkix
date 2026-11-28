@@ -33,3 +33,4 @@ __pycache__/
 # Personal Claude Code overrides (machine-specific paths, local permissions).
 # The team-wide config is .claude/settings.json, which is committed.
 .claude/settings.local.json
+.claude/worktrees/
