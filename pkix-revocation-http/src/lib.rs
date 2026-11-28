@@ -868,6 +868,46 @@ mod tests {
         );
     }
 
+    /// `ExtractError` must report the DER failure it wraps, both in its
+    /// own message and through [`std::error::Error::source`].
+    ///
+    /// `ExtractError::Der` is the only variant the extractors return, so
+    /// the `der::Error` inside it is the entire content of the report: an
+    /// operator told "the extension did not decode" and nothing more has
+    /// no way to tell a truncated SEQUENCE from a wrong tag. Both
+    /// `HttpCrlFetcher` and `HttpOcspFetcher` interpolate this `Display`
+    /// into the `RevocationFetchFailed` description with `{e}`, and a
+    /// caller walking the chain with `anyhow`/`eyre`-style reporting
+    /// reaches the same `der::Error` through `source()` instead. Neither
+    /// route has an in-crate caller that asserts anything, which is why
+    /// an empty `fmt` and a `source` returning `None` both went
+    /// unnoticed.
+    #[test]
+    fn extract_error_reports_the_der_failure_it_wraps() {
+        let inner = der::Error::from(der::ErrorKind::Failed);
+        let inner_message = inner.to_string();
+        let err = ExtractError::Der(inner);
+
+        let shown = format!("{err}");
+        assert!(
+            shown.contains("extension DER decode error"),
+            "Display must say which stage failed: {shown:?}"
+        );
+        assert!(
+            shown.contains(&inner_message),
+            "Display must carry the wrapped der::Error's own message \
+             ({inner_message:?}): {shown:?}"
+        );
+
+        let source = std::error::Error::source(&err)
+            .expect("ExtractError::Der must expose its der::Error as source()");
+        assert_eq!(
+            source.to_string(),
+            inner_message,
+            "source() must be the der::Error the variant carries"
+        );
+    }
+
     #[cfg(feature = "crl")]
     #[test]
     fn http_crl_fetcher_constructs_with_verifier() {
