@@ -470,6 +470,14 @@ fn an_out_of_crate_cache_works_as_the_wrappers_cache_parameter() {
 /// The defaulted guarded inserts must actually guard for an
 /// implementation that does not override them. `FlatStore` overrides
 /// neither, so these exercise the trait's own default bodies.
+///
+/// Both halves assert both directions, reject *and* accept. A default
+/// that rejects everything guards perfectly and caches nothing: every
+/// revocation check refetches from the network, at full latency, with no
+/// error anywhere to say the cache stopped working. The accept direction
+/// was asserted for `put_crl_unless_rollback` and not for
+/// `put_ocsp_unless_staler`, so a body that always answered "suppressed
+/// as staler" was invisible on the OCSP side alone.
 #[test]
 fn the_default_guarded_inserts_reject_a_rollback_and_a_staler_response() {
     let store = FlatStore::default();
@@ -524,6 +532,21 @@ fn the_default_guarded_inserts_reject_a_rollback_and_a_staler_response() {
         ),
     ));
     assert_eq!(store.get_crl(&crl_key()).expect("entry").bytes(), b"newest");
+
+    // Same for OCSP: a later thisUpdate is not staler, so it must be
+    // reported as inserted and must actually displace the entry.
+    assert!(
+        store.put_ocsp_unless_staler(
+            ocsp_key(),
+            CachedOcspResponse::new(at(3_000), at(3_000), Some(at(99_999)), b"fresh".to_vec()),
+        ),
+        "a later thisUpdate is not staler and must be inserted by the \
+         default implementation"
+    );
+    assert_eq!(
+        store.get_ocsp(&ocsp_key()).expect("entry").bytes(),
+        b"fresh"
+    );
 }
 
 /// `Arc<T>` and `Arc<dyn RevocationCache>` must forward the guarded
