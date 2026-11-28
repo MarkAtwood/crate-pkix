@@ -1,0 +1,9 @@
+{
+  "cert_len": 70336,
+  "cert_len_u24_top_octet": 1,
+  "timestamp_ms": 1767225600000,
+  "log_id_hex": "25d3e965c73752c37470ff253812d646f8fec12070fb39ce90a3d87bfe67c3a3",
+  "signed_input_len": 70353,
+  "precert_tbs_len": 70256,
+  "precert_tbs_u24_top_octet": 1
+}
