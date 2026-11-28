@@ -820,6 +820,10 @@ pub(super) fn uuid_v8(namespace: &str, seed: &[u8]) -> String {
     let mut bytes = [0u8; 16];
     bytes.copy_from_slice(&digest[..16]);
     // Set version 8: bits 48..52 (i.e. high nibble of byte 6) = 1000b.
+    //
+    // Both masks clear every bit the constant beside them sets, so `|`
+    // and `^` compute the same byte on all 256 inputs. A sweep's
+    // `| -> ^` mutant of either line survives by construction.
     bytes[6] = (bytes[6] & 0x0f) | 0x80;
     // Set variant 10b: bits 64..66 (i.e. top two bits of byte 8).
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
@@ -959,6 +963,13 @@ fn unix_to_rfc3339(unix: u64) -> String {
     // civil_from_days: invert the same algorithm used in the reverse
     // direction by limbo.rs / bettertls.rs.
     let z = days_since_epoch + 719_468;
+    // `unix` is a `u64`, so `days_since_epoch` is never negative and `z`
+    // is never below 719_468. The `z - 146_096` branch is Hinnant's
+    // handling for dates in year 0 or earlier, which no caller can reach
+    // here; it is kept so the algorithm matches the published form
+    // rather than a trimmed version of it. Two mutants of that
+    // subtraction survive a sweep and always will: both change a value
+    // that is never computed.
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let doe = z - era * 146_097; // [0, 146096]
     let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365; // [0, 399]
@@ -1076,6 +1087,39 @@ mod tests {
     fn test_rfc3339_leap_year_feb_29() {
         // 2024-02-29T00:00:00Z = 1709164800. Oracle: `date -u -d "@1709164800"`.
         assert_eq!(unix_to_rfc3339(1_709_164_800), "2024-02-29T00:00:00Z");
+    }
+
+    /// The first day of March 1970 — the day the era-relative day count
+    /// restarts on.
+    ///
+    /// `civil_from_days` counts days from 1 March, so `doy` is 0 here and
+    /// `yoe` sits exactly on a 365-day boundary. That is what makes this
+    /// date sensitive to the `+ doe / 36_524` term: every other date the
+    /// tests used had enough slack in the division that flipping that
+    /// term's sign, or neutralising it, left the same year. Here it moves
+    /// the answer back a day, into a 29 February 1970 that does not
+    /// exist.
+    ///
+    /// Oracle: `date -u -d @5097600` → `Sun Mar  1 12:00:00 AM UTC 1970`.
+    #[test]
+    fn test_rfc3339_first_of_march_1970() {
+        assert_eq!(unix_to_rfc3339(5_097_600), "1970-03-01T00:00:00Z");
+    }
+
+    /// The last day of a 400-year Gregorian era.
+    ///
+    /// 29 February 2000 is day 146 096 of the era that began on 1 March
+    /// 1600, the only day on which `doe / 146_096` is 1 rather than 0 —
+    /// so it is the only input that can see the `- doe / 146_096`
+    /// correction at all. Without it the date reads as 1 March, which is
+    /// also the wrong answer for the leap day that the 400-year rule
+    /// exists to grant.
+    ///
+    /// Oracle: `date -u -d @951782400` → `Tue Feb 29 12:00:00 AM UTC
+    /// 2000`.
+    #[test]
+    fn test_rfc3339_end_of_era_feb_29_2000() {
+        assert_eq!(unix_to_rfc3339(951_782_400), "2000-02-29T00:00:00Z");
     }
 
     /// Regression test for PKIX-7f92.6: large u64 inputs must not
@@ -1846,5 +1890,318 @@ mod tests {
     fn test_hex_encode_lowercase() {
         assert_eq!(hex(&[0x00, 0xff, 0xab, 0xcd]), "00ffabcd");
         assert_eq!(hex(&[]), "");
+    }
+
+    // -------------------------------------------------------------------
+    // Label helpers
+    //
+    // Oracle: the strings named in each helper's own source and in the
+    // module-level mapping table. Every one of these feeds a `prop`
+    // value that a downstream OSCAL consumer keys off, so a wrong label
+    // is a silently mis-filed finding rather than a parse failure. They
+    // were reachable only through assertions on the surrounding JSON
+    // shape, which never read the values back.
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn test_scope_label_covers_both_variants() {
+        assert_eq!(scope_label(crate::Scope::Certificate), "certificate");
+        assert_eq!(scope_label(crate::Scope::Path), "path");
+    }
+
+    #[test]
+    fn test_subject_kind_label_covers_every_variant() {
+        use crate::SubjectKind;
+        assert_eq!(subject_kind_label(SubjectKind::Leaf), "leaf");
+        assert_eq!(
+            subject_kind_label(SubjectKind::IntermediateCa),
+            "intermediate-ca"
+        );
+        assert_eq!(
+            subject_kind_label(SubjectKind::AnchorIssued),
+            "anchor-issued"
+        );
+        assert_eq!(subject_kind_label(SubjectKind::Any), "any");
+    }
+
+    #[test]
+    fn test_lint_result_severity_label_covers_every_variant() {
+        assert_eq!(lint_result_severity_label(&LintResult::Pass), "pass");
+        assert_eq!(
+            lint_result_severity_label(&LintResult::NotApplicable),
+            "not-applicable"
+        );
+        assert_eq!(lint_result_severity_label(&LintResult::warn("x")), "warn");
+        assert_eq!(lint_result_severity_label(&LintResult::error("x")), "error");
+        assert_eq!(lint_result_severity_label(&LintResult::fatal("x")), "fatal");
+    }
+
+    /// `result_detail` yields the detail text for the three actionable
+    /// results and `None` for the two that carry none.
+    ///
+    /// The `None` direction is the one that matters for output: it is
+    /// what keeps `": <detail>"` off a passing Finding's description and
+    /// what makes a Risk fall back to `"Original lint result"`. The
+    /// `Some` direction carries the only human-readable account of why a
+    /// lint fired.
+    #[test]
+    fn test_result_detail_present_only_for_actionable_results() {
+        assert_eq!(result_detail(&LintResult::Pass), None);
+        assert_eq!(result_detail(&LintResult::NotApplicable), None);
+        assert_eq!(
+            result_detail(&LintResult::warn("advisory")),
+            Some("advisory")
+        );
+        assert_eq!(result_detail(&LintResult::error("broken")), Some("broken"));
+        assert_eq!(result_detail(&LintResult::fatal("stop")), Some("stop"));
+    }
+
+    #[test]
+    fn test_deviation_action_label_covers_both_variants() {
+        use crate::deviation::DeviationAction;
+        assert_eq!(
+            deviation_action_label(&DeviationAction::Suppress),
+            "suppress"
+        );
+        assert_eq!(
+            deviation_action_label(&DeviationAction::DowngradeSeverityTo(crate::Severity::Info)),
+            "downgrade"
+        );
+    }
+
+    /// `decode_name_display` renders DER `Name` bytes as RFC 4514 and
+    /// falls back to a marker string when they do not decode.
+    ///
+    /// Both halves are informational — the lossless value is the
+    /// `pkix-lint.issuer-dn-der` prop beside it — but the `title` an
+    /// operator reads in an OSCAL viewer is this string, and a blank or
+    /// constant one leaves every scoped deviation looking alike.
+    ///
+    /// Oracle: a `Name` built from an RFC 4514 string and rendered back.
+    /// `x509-cert`'s RFC 4514 parser and printer are separate code paths
+    /// from the emitter under test.
+    #[test]
+    fn test_decode_name_display_renders_rfc4514_and_marks_malformed() {
+        use der::Encode as _;
+        use std::str::FromStr as _;
+
+        let name = x509_cert::name::Name::from_str("CN=PKIX-webpki-self").expect("parse DN");
+        let der = name.to_der().expect("encode DN");
+        assert_eq!(decode_name_display(&der), "CN=PKIX-webpki-self");
+
+        // Not a SEQUENCE; cannot be a Name.
+        assert_eq!(decode_name_display(&[0x05, 0x00]), "<malformed DN>");
+        assert_eq!(decode_name_display(&[]), "<malformed DN>");
+    }
+
+    // -------------------------------------------------------------------
+    // Metadata props
+    //
+    // Oracle: the module-level mapping table. Each of the three
+    // report-identifying props is emitted only when its source field is
+    // non-empty, so the absence of a prop means "the run did not record
+    // this", not "the run recorded the empty string". Inverting any of
+    // the three emptiness tests swaps those two meanings, and nothing
+    // read the props array back.
+    // -------------------------------------------------------------------
+
+    fn prop_names(v: &Value) -> Vec<String> {
+        v["assessment-results"]["metadata"]["props"]
+            .as_array()
+            .expect("metadata props array")
+            .iter()
+            .map(|p| p["name"].as_str().expect("prop name").to_string())
+            .collect()
+    }
+
+    #[test]
+    fn test_metadata_props_carry_every_non_empty_report_field() {
+        let r = EvaluationReport::new("cabf.br.tls", "SC-081", "bundle-v0.2.0", 3, 0);
+        let v = assessment_results(&r);
+        assert_eq!(
+            prop_names(&v),
+            vec![
+                "pkix-lint.profile-id",
+                "pkix-lint.profile-version",
+                "pkix-lint.rule-bundle-version",
+                "pkix-lint.chain-length",
+            ]
+        );
+        let props = v["assessment-results"]["metadata"]["props"].clone();
+        let value_of = |name: &str| -> String {
+            props
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|p| p["name"].as_str() == Some(name))
+                .and_then(|p| p["value"].as_str())
+                .unwrap_or_default()
+                .to_string()
+        };
+        assert_eq!(value_of("pkix-lint.profile-id"), "cabf.br.tls");
+        assert_eq!(value_of("pkix-lint.profile-version"), "SC-081");
+        assert_eq!(value_of("pkix-lint.rule-bundle-version"), "bundle-v0.2.0");
+        assert_eq!(value_of("pkix-lint.chain-length"), "3");
+    }
+
+    #[test]
+    fn test_metadata_props_omit_empty_report_fields() {
+        // chain-length is unconditional; the other three are not.
+        let r = EvaluationReport::new("", "", "", 1, 0);
+        let v = assessment_results(&r);
+        assert_eq!(prop_names(&v), vec!["pkix-lint.chain-length"]);
+    }
+
+    // -------------------------------------------------------------------
+    // UUID seed distinctness
+    //
+    // Oracle: the rustdoc on each seed helper — "so two distinct reports
+    // do not collide", and the Observation/Finding split that exists so
+    // Findings sharing evidence still get distinct Finding UUIDs. Every
+    // one of the four seed helpers could be replaced by a constant and
+    // the suite stayed green, because the UUID tests assert determinism
+    // (identical input, identical output) and never the converse.
+    //
+    // Determinism without distinctness is what a constant seed gives
+    // you: every Finding in every report carrying the same UUID, which
+    // an OSCAL consumer reads as one Finding reported many times.
+    // -------------------------------------------------------------------
+
+    fn report_uuid(r: &EvaluationReport) -> String {
+        assessment_results(r)["assessment-results"]["uuid"]
+            .as_str()
+            .expect("report uuid")
+            .to_string()
+    }
+
+    #[test]
+    fn test_report_uuid_distinguishes_every_seeded_field() {
+        let base = EvaluationReport::new("p", "v", "r", 2, 1_780_272_000);
+        let baseline = report_uuid(&base);
+
+        let variants = [
+            (
+                "profile_id",
+                EvaluationReport::new("p2", "v", "r", 2, 1_780_272_000),
+            ),
+            (
+                "profile_version",
+                EvaluationReport::new("p", "v2", "r", 2, 1_780_272_000),
+            ),
+            (
+                "rule_bundle_version",
+                EvaluationReport::new("p", "v", "r2", 2, 1_780_272_000),
+            ),
+            (
+                "chain_length",
+                EvaluationReport::new("p", "v", "r", 3, 1_780_272_000),
+            ),
+            (
+                "evaluated_at_unix",
+                EvaluationReport::new("p", "v", "r", 2, 1_780_272_001),
+            ),
+        ];
+        for (field, variant) in variants {
+            assert_ne!(
+                report_uuid(&variant),
+                baseline,
+                "changing {field} must change the report UUID"
+            );
+        }
+    }
+
+    #[test]
+    fn test_finding_uuids_distinguish_position_and_content() {
+        // Two findings sharing one piece of evidence (same cert_index,
+        // same absent hash) but naming different lints, plus a third
+        // repeating the first lint at a later position.
+        let mut r = EvaluationReport::new("p", "v", "r", 1, 0);
+        r.findings.push(pass_finding("test.lint.a", Some(0)));
+        r.findings.push(pass_finding("test.lint.b", Some(0)));
+        r.findings.push(pass_finding("test.lint.a", Some(0)));
+
+        let v = assessment_results(&r);
+        let findings = v["assessment-results"]["results"][0]["findings"]
+            .as_array()
+            .expect("findings array");
+        let uuids: Vec<&str> = findings
+            .iter()
+            .map(|f| f["uuid"].as_str().expect("finding uuid"))
+            .collect();
+        assert_eq!(uuids.len(), 3);
+        assert_ne!(uuids[0], uuids[1], "different lint ids, different UUIDs");
+        assert_ne!(
+            uuids[0], uuids[2],
+            "the same lint at a different position still gets its own UUID"
+        );
+
+        // All three share evidence, so they must share one Observation —
+        // the 1:N cardinality the Finding/Observation seed split exists
+        // to express.
+        let obs = v["assessment-results"]["results"][0]["observations"]
+            .as_array()
+            .expect("observations array");
+        assert_eq!(obs.len(), 1);
+    }
+
+    #[test]
+    fn test_risk_uuids_distinguish_position_and_deviation() {
+        use crate::deviation::{DeviatedFinding, DeviationAction};
+        let deviated = |lint_id: &'static str, deviation_id: &str| DeviatedFinding {
+            lint_id: Cow::Borrowed(lint_id),
+            citation: Cow::Borrowed("RFC X"),
+            original_result: LintResult::error("would-be-error"),
+            deviation_id: deviation_id.to_string(),
+            action: DeviationAction::Suppress,
+            justification: "approved".to_string(),
+            evidence_uri: None,
+            cert_index: Some(0),
+            evaluated_at_unix: 0,
+        };
+        let mut r = EvaluationReport::new("p", "v", "r", 1, 0);
+        r.deviated_findings.push(deviated("test.lint.a", "DEV-1"));
+        r.deviated_findings.push(deviated("test.lint.a", "DEV-2"));
+        r.deviated_findings.push(deviated("test.lint.a", "DEV-1"));
+
+        let v = assessment_results(&r);
+        let risks = v["assessment-results"]["results"][0]["risks"]
+            .as_array()
+            .expect("risks array");
+        let uuids: Vec<&str> = risks
+            .iter()
+            .map(|k| k["uuid"].as_str().expect("risk uuid"))
+            .collect();
+        assert_eq!(uuids.len(), 3);
+        assert_ne!(
+            uuids[0], uuids[1],
+            "different deviation ids, different UUIDs"
+        );
+        assert_ne!(
+            uuids[0], uuids[2],
+            "the same deviation at a different position still gets its own UUID"
+        );
+    }
+
+    #[test]
+    fn test_subject_uuid_distinguishes_chain_position() {
+        let mut r = EvaluationReport::new("p", "v", "r", 2, 0);
+        r.findings.push(pass_finding("test.lint.a", Some(0)));
+        r.findings.push(pass_finding("test.lint.a", Some(1)));
+
+        let v = assessment_results(&r);
+        let obs = v["assessment-results"]["results"][0]["observations"]
+            .as_array()
+            .expect("observations array");
+        assert_eq!(obs.len(), 2, "distinct cert indices are distinct evidence");
+        let subject_uuid = |i: usize| -> &str {
+            obs[i]["subjects"][0]["subject-uuid"]
+                .as_str()
+                .expect("subject uuid")
+        };
+        assert_ne!(
+            subject_uuid(0),
+            subject_uuid(1),
+            "each chain position is its own OSCAL Subject"
+        );
     }
 }

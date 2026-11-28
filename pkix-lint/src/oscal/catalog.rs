@@ -779,4 +779,119 @@ mod tests {
         let ids = lint_ids_from_catalog(&v).expect("parse 1.1.2 catalog");
         assert!(ids.is_empty());
     }
+
+    // -----------------------------------------------------------------------
+    // Optional emission: metadata props and control parts
+    //
+    // Oracle: the source's own "emitted only when non-empty" /
+    // "empty optional collections are omitted" comments. Both are the
+    // same contract the links and params tests above already pin for
+    // their own keys -- these two were the ones nothing read back, so
+    // inverting either emptiness test was invisible.
+    // -----------------------------------------------------------------------
+
+    fn metadata_prop_names(catalog: &Value) -> Vec<String> {
+        catalog["catalog"]["metadata"]["props"]
+            .as_array()
+            .expect("metadata props array")
+            .iter()
+            .map(|p| p["name"].as_str().expect("prop name").to_string())
+            .collect()
+    }
+
+    #[test]
+    fn catalog_metadata_props_carry_id_and_version_when_given() {
+        let catalog = catalog_from_lints(&sample_lints(), "rs.pkix.test", "0.1.0");
+        assert_eq!(
+            metadata_prop_names(&catalog),
+            vec!["pkix-lint.catalog-id", "pkix-lint.catalog-version"]
+        );
+        let props = catalog["catalog"]["metadata"]["props"]
+            .as_array()
+            .unwrap()
+            .clone();
+        assert_eq!(props[0]["value"].as_str(), Some("rs.pkix.test"));
+        assert_eq!(props[1]["value"].as_str(), Some("0.1.0"));
+    }
+
+    /// With no catalog id or version supplied, the props array is empty
+    /// rather than carrying two props whose value is the empty string.
+    ///
+    /// The distinction is what a consumer reads: an absent
+    /// `pkix-lint.catalog-id` says the emitter was given none, while a
+    /// present one with an empty value says the catalog is identified by
+    /// the empty string.
+    #[test]
+    fn catalog_metadata_props_omit_empty_id_and_version() {
+        let catalog = catalog_from_lints(&sample_lints(), "", "");
+        assert!(
+            metadata_prop_names(&catalog).is_empty(),
+            "no catalog id or version means no props"
+        );
+    }
+
+    /// A lint with a `description` contributes an OSCAL
+    /// `parts[name=statement]` carrying it; a lint without one
+    /// contributes no `parts` key at all.
+    ///
+    /// `control.parts` is where the prose explaining a control lives, so
+    /// an empty `parts` array on every control reads to an OSCAL viewer
+    /// as "this control has a statement section and it is blank" rather
+    /// than "this control has no prose".
+    #[test]
+    fn control_parts_present_only_for_lints_with_a_description() {
+        /// A lint that overrides `description`; `PolicyShapedLint` above
+        /// deliberately does not.
+        #[derive(Clone)]
+        struct DescribedLint;
+        impl Lint for DescribedLint {
+            fn id(&self) -> &'static str {
+                "test.described"
+            }
+            fn citation(&self) -> &'static str {
+                "Test Policy §9"
+            }
+            fn severity(&self) -> Severity {
+                Severity::Warn
+            }
+            fn scope(&self) -> Scope {
+                Scope::Certificate
+            }
+            fn applies_to(&self) -> SubjectKind {
+                SubjectKind::Any
+            }
+            fn description(&self) -> Option<&str> {
+                Some("Prose explaining what this control asserts.")
+            }
+            fn check_cert(
+                &self,
+                _cert: &Certificate,
+                _kind: SubjectKind,
+                _now_unix: u64,
+            ) -> LintResult {
+                LintResult::Pass
+            }
+        }
+
+        let lints: Vec<Box<dyn Lint>> =
+            vec![Box::new(DescribedLint), Box::new(POLICY_SHAPED_DEFAULT)];
+        let catalog = catalog_from_lints(&lints, "rs.pkix.test", "0.1.0");
+        let controls = catalog["catalog"]["controls"]
+            .as_array()
+            .expect("controls array");
+
+        let parts = controls[0]["parts"].as_array().expect("described lint");
+        assert_eq!(parts.len(), 1);
+        assert_eq!(parts[0]["id"].as_str(), Some("test.described_smt"));
+        assert_eq!(parts[0]["name"].as_str(), Some("statement"));
+        assert_eq!(
+            parts[0]["prose"].as_str(),
+            Some("Prose explaining what this control asserts.")
+        );
+
+        assert!(
+            controls[1].get("parts").is_none(),
+            "a lint with no description contributes no parts key"
+        );
+    }
 }
