@@ -1815,6 +1815,67 @@ mod tests {
         let _ = format!("{err}");
     }
 
+    /// The rollback comparator is `id-ce-cRLNumber` specifically, and
+    /// `thisUpdate` / `nextUpdate` are seconds *after* the Unix epoch.
+    ///
+    /// RFC 5280 §5.2.4 gives `deltaCRLIndicator` the `BaseCRLNumber`
+    /// type, which is `CRLNumber` — an INTEGER, encoded exactly like the
+    /// §5.2.3 `cRLNumber` it sits beside. So a parser that matched any
+    /// CRL extension rather than that OID would decode a perfectly
+    /// well-formed number out of the wrong extension and hand it to
+    /// [`is_rollback`] as the series counter. `delta-crl.der` carries
+    /// `cRLNumber` 2 and `deltaCRLIndicator` 1 for this reason: the two
+    /// numbers differ and the wrong one is numerically lower, so a
+    /// mismatched OID both reads a plausible value and reads it low,
+    /// which is the direction that lets a genuine refresh look like a
+    /// rollback and be dropped.
+    ///
+    /// The timestamps are a known answer, not a plausibility check. The
+    /// other tests here assert only `thisUpdate <= nextUpdate`, which
+    /// holds just as well when both are reflected to before 1970 — and a
+    /// reflected `nextUpdate` makes [`is_live`] call every entry expired,
+    /// so the cache serves nothing it stores. The review fixtures pin
+    /// their times as literal `GeneralizedTime` strings
+    /// (`pkix-revocation/tests/gen_review_fixtures.py`), so there is a
+    /// right answer to assert; `python3 -c 'import calendar;
+    /// print(calendar.timegm((2026,1,1,0,0,0)))'` is the oracle.
+    #[cfg(feature = "crl")]
+    #[test]
+    fn crl_metadata_reads_the_crl_number_extension_and_epoch_seconds() {
+        /// 2026-01-01T00:00:00Z — `thisUpdate` on every review CRL.
+        const THIS_UPDATE: u64 = 1_767_225_600;
+        /// 2027-01-01T00:00:00Z — `nextUpdate` on the base and delta CRLs.
+        const NEXT_UPDATE: u64 = 1_798_761_600;
+
+        const BASE: &[u8] = include_bytes!("../tests/fixtures/review/base-crl.der");
+        const DELTA: &[u8] = include_bytes!("../tests/fixtures/review/delta-crl.der");
+
+        let delta = parse_crl_metadata(DELTA).expect("delta CRL parses");
+        assert_eq!(
+            delta.crl_number.as_deref(),
+            Some(&[2u8][..]),
+            "delta-crl.der carries cRLNumber 2 and deltaCRLIndicator 1; the \
+             comparator must be the former"
+        );
+
+        let base = parse_crl_metadata(BASE).expect("base CRL parses");
+        assert_eq!(
+            base.crl_number.as_deref(),
+            Some(&[1u8][..]),
+            "base-crl.der carries cRLNumber 1"
+        );
+        assert_eq!(
+            base.this_update,
+            SystemTime::UNIX_EPOCH + Duration::from_secs(THIS_UPDATE),
+            "thisUpdate is 2026-01-01T00:00:00Z, after the epoch"
+        );
+        assert_eq!(
+            base.next_update,
+            Some(SystemTime::UNIX_EPOCH + Duration::from_secs(NEXT_UPDATE)),
+            "nextUpdate is 2027-01-01T00:00:00Z, after the epoch"
+        );
+    }
+
     // -----------------------------------------------------------------
     // OCSP metadata parser
     // -----------------------------------------------------------------
@@ -1840,6 +1901,50 @@ mod tests {
         // producedAt must be a positive duration since the Unix epoch
         // (sanity — not 1970-01-01).
         assert!(meta.produced_at > SystemTime::UNIX_EPOCH);
+    }
+
+    /// An OCSP response's three timestamps are seconds *after* the Unix
+    /// epoch (RFC 6960 §4.2.2.1).
+    ///
+    /// `thisUpdate` is the one that decides, not just reports.
+    /// [`is_staler_ocsp`] compares the cached entry's `thisUpdate` against
+    /// the incoming one, so reflecting both to before the epoch reverses
+    /// their order: the guard that exists to stop an older `good`
+    /// displacing a cached `revoked` would start doing exactly that, and
+    /// every later cache hit on that certificate would report it good.
+    /// Asserting `thisUpdate <= nextUpdate`, which the structural test
+    /// does, cannot see it — both sides move together.
+    ///
+    /// Known answer from `ocsp-serial2-revoked.der`, whose times are
+    /// literals in `pkix-revocation/tests/gen_review_fixtures.py`:
+    /// `producedAt` and `thisUpdate` 2026-05-31T00:00:00Z, `nextUpdate`
+    /// 2026-06-07T00:00:00Z.
+    #[cfg(feature = "ocsp")]
+    #[test]
+    fn ocsp_metadata_timestamps_are_seconds_after_the_epoch() {
+        /// 2026-05-31T00:00:00Z — `producedAt` and `thisUpdate`.
+        const PRODUCED_AT: u64 = 1_780_185_600;
+        /// 2026-06-07T00:00:00Z — `nextUpdate`.
+        const NEXT_UPDATE: u64 = 1_780_790_400;
+
+        const RESP: &[u8] = include_bytes!("../tests/fixtures/review/ocsp-serial2-revoked.der");
+        let meta = parse_ocsp_metadata(RESP).expect("review OCSP response parses");
+
+        assert_eq!(
+            meta.produced_at,
+            SystemTime::UNIX_EPOCH + Duration::from_secs(PRODUCED_AT),
+            "producedAt is 2026-05-31T00:00:00Z"
+        );
+        assert_eq!(
+            meta.this_update,
+            SystemTime::UNIX_EPOCH + Duration::from_secs(PRODUCED_AT),
+            "SingleResponse.thisUpdate is 2026-05-31T00:00:00Z"
+        );
+        assert_eq!(
+            meta.next_update,
+            Some(SystemTime::UNIX_EPOCH + Duration::from_secs(NEXT_UPDATE)),
+            "SingleResponse.nextUpdate is 2026-06-07T00:00:00Z"
+        );
     }
 
     #[cfg(feature = "ocsp")]
