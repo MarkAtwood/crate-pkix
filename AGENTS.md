@@ -312,6 +312,41 @@ When a rule names a position in a chain -- the leaf, the anchor, an
 intermediate -- the fixture has to differ at that position. A chain whose
 certificates are alike in the property under test cannot see the index at all.
 
+### A corpus specifies its inputs, not just its certificates
+
+RFC 5280 §6.1.1 lists the initial policy inputs alongside the
+certificates as inputs to path validation, so a testcase's expected
+verdict is the answer *under its inputs*. PKITS §4.8, §4.10 and §4.12
+drive one certificate bundle repeatedly with different ones -- the
+"(Subpart N)" suffixes are exactly those repeats.
+
+`PkitsVector` parsed all four and no oracle read any of them. They were
+`pub` fields on a `pub` struct, so dead-code analysis never objected, and
+nothing failed: 35 vectors were simply being scored against the answer to
+a question nobody asked. That reads as the implementation disagreeing
+with NIST, which is the worst shape for a false positive -- it points at
+the code under test instead of at the harness.
+
+Two habits come out of it. A field a loader parses and no consumer reads
+is worth grepping for, because `pub` makes it invisible to the compiler.
+And when ground truth is withheld to make a suite pass, the suite stops
+measuring what its name claims; prefer an exemption list that names each
+vector and fails when one starts passing, so the gap stays countable.
+
+### Count what a suite covers, do not grep for it
+
+`pkix-path/tests/pkits_*.rs` holds 187 hand-written functions naming 106
+of the 249 PKITS vectors. Which vectors those are was discoverable only
+by grepping for quoted test names, and the answer to "do we pass PKITS"
+was whatever anyone had got around to writing.
+
+A manifest that carries its own expected results can be run whole
+(`pkix-difftest/tests/pkits_ground_truth.rs`). Every vector is then
+either scored or named in the failure output, and the exemptions are the
+documentation of what is not supported. The per-section tests still earn
+their place: they assert depth, anchor index and error kinds, which a
+pass/fail direction comparison cannot see.
+
 ## Commit messages: no tool attribution
 
 Never add `Assisted-by`, `Co-Authored-By`, `Generated with`, or any other
