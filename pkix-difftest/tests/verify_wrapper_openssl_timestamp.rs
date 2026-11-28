@@ -137,6 +137,7 @@ fn verify_time_stamper_diff_against_openssl_timestampsign() {
         );
 
         let diff_chain = Chain {
+            expected_peer_names: Vec::new(),
             initial_policy_inputs: InitialPolicyInputs::default(),
             aux_certs_der: Vec::new(),
             certs_der: vec![cert_der(&leaf), cert_der(&root)],

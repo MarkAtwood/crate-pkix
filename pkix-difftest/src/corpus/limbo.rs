@@ -48,8 +48,14 @@
 //!
 //! # Limitations
 //!
-//! * `expected_peer_name` / `expected_peer_names` are deserialised but
-//!   currently ignored. The harness has no SAN-matching oracle yet.
+//! * `expected_peer_name` / `expected_peer_names` are applied: they
+//!   become `Chain::expected_peer_names`, and the pkix-path oracle
+//!   checks the leaf against each after path validation succeeds. Until
+//!   they were, every one of the 2895 ground-truth disagreements in the
+//!   corpus was a testcase stating an identity nobody checked -- a chain
+//!   valid for the wrong name passes RFC 5280 §6.1 and the corpus calls
+//!   that a FAILURE, so the harness reported its own gap as pkix-path
+//!   being wrong.
 //! * `signature_algorithms`, `key_usage`, `extended_key_usage` are
 //!   inert — the corpus does not exercise them as constraints today.
 //! * `peer_certificate_key` (the EE's private key) is deserialised but
@@ -126,7 +132,6 @@ struct Testcase {
     #[allow(dead_code)] // inert (no SAN oracle yet)
     expected_peer_name: Option<PeerName>,
     #[serde(default)]
-    #[allow(dead_code)] // inert (no SAN oracle yet)
     expected_peer_names: Vec<PeerName>,
     #[serde(default)]
     max_chain_depth: Option<u32>,
@@ -281,6 +286,9 @@ struct FilteredTestcase {
     peer_certificate_pem: String,
     intermediates_pem: Vec<String>,
     trusted_certs_pem: Vec<String>,
+    /// RFC 6125 reference identifiers the testcase requires the peer to
+    /// present, resolved from `expected_peer_name(s)` at filter time.
+    expected_peer_names: Vec<String>,
     // Intentionally no `crls` field: the default filter excludes
     // `has-crl` cases. Re-add when CRL coverage lands.
 }
@@ -373,6 +381,9 @@ impl LimboCorpus {
                 },
             };
 
+            // Resolved before `tc` is moved field-by-field below.
+            let peer_names = expected_peer_names(&tc)?;
+
             filtered.push(FilteredTestcase {
                 id: tc.id,
                 expected,
@@ -380,6 +391,7 @@ impl LimboCorpus {
                 peer_certificate_pem: tc.peer_certificate,
                 intermediates_pem: tc.untrusted_intermediates,
                 trusted_certs_pem: tc.trusted_certs,
+                expected_peer_names: peer_names,
             });
         }
 
@@ -428,6 +440,43 @@ fn pem_to_der(pem_text: &str) -> io::Result<Vec<u8>> {
         ));
     }
     Ok(der)
+}
+
+/// The identities this testcase requires the peer certificate to present.
+///
+/// limbo states one in `expected_peer_name` and, for ten testcases, a
+/// list in `expected_peer_names`. Both are collected: the plural form
+/// lists identities a verifier must accept, so each is a requirement
+/// rather than an alternative.
+///
+/// `PeerName.kind` is the schema's discriminator. DNS and IP are the two
+/// the corpus uses (5341 and 4455 testcases at the pinned commit);
+/// anything else is returned as an error rather than skipped, because a
+/// silently dropped identity turns an expected failure into a pass and
+/// scores as the implementation being wrong.
+fn expected_peer_names(tc: &Testcase) -> io::Result<Vec<String>> {
+    let mut out = Vec::new();
+    for p in tc
+        .expected_peer_name
+        .iter()
+        .chain(tc.expected_peer_names.iter())
+    {
+        match p.kind.as_str() {
+            // `ServerName::parse` accepts both forms, so the value
+            // carries the distinction from here on.
+            "DNS" | "IP" => out.push(p.value.clone()),
+            other => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "testcase {}: unsupported expected_peer_name kind {other:?}",
+                        tc.id
+                    ),
+                ))
+            }
+        }
+    }
+    Ok(out)
 }
 
 /// Try to assemble the canonical leaf-first signature chain from a limbo
@@ -554,6 +603,7 @@ fn build_item(tc: &FilteredTestcase) -> io::Result<CorpusItem> {
         try_build_chain(&positional_der, tc.validation_time_unix).unwrap_or(positional_der);
 
     let chain = Chain {
+        expected_peer_names: tc.expected_peer_names.clone(),
         // x509-limbo testcases do not vary the §6.1.1 inputs.
         initial_policy_inputs: InitialPolicyInputs::default(),
         // Limbo ships exactly the chain; nothing is dropped.

@@ -260,6 +260,12 @@ fn run_corpus(cmd: &CorpusCmd) -> std::io::Result<()> {
             {
                 continue;
             }
+            // Same rule for a stated peer identity: an oracle that only
+            // validates the path would pass a chain built for the wrong
+            // name and read as disagreeing with one that checked it.
+            if !name.honours_peer_identity() && !item.chain.expected_peer_names.is_empty() {
+                continue;
+            }
             match run_oracle(name, &item.chain) {
                 Ok(v) => verdicts.push((name, v)),
                 Err(e) => {

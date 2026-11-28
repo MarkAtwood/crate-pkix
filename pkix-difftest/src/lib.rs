@@ -118,6 +118,30 @@ impl OracleName {
         }
     }
 
+    /// Whether this oracle checks the peer identity a corpus testcase
+    /// states, rather than only validating the path.
+    ///
+    /// An oracle that does not must abstain on a chain that states one,
+    /// for the same reason as [`honours_policy_inputs`]: it would answer
+    /// "is this path valid" while the corpus asked "is this path valid
+    /// for this name", pass a chain built for the wrong name, and show up
+    /// as disagreeing with an oracle that got the question right.
+    ///
+    /// Only the pkix-path oracle checks it today. Both others could:
+    /// `openssl verify` has `-verify_hostname` and `-verify_ip`, and
+    /// pyca's `PolicyBuilder` takes the subject directly -- so unlike
+    /// §6.1.1 policy inputs, this one is wirable for all three rather
+    /// than blocked on pyca. Tracked in PKIX-rnsv.
+    ///
+    /// [`honours_policy_inputs`]: Self::honours_policy_inputs
+    #[must_use]
+    pub fn honours_peer_identity(self) -> bool {
+        match self {
+            Self::PkixPath => true,
+            Self::OpenSsl | Self::Pyca => false,
+        }
+    }
+
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -270,6 +294,25 @@ pub struct Chain {
     /// vary them; the PKITS loader sets it from each vector's four
     /// `Initial*` fields.
     pub initial_policy_inputs: InitialPolicyInputs,
+
+    /// The identities the peer certificate is required to present, as
+    /// RFC 6125 §6 reference identifiers.
+    ///
+    /// A chain is only half a question: "is this path valid" and "does
+    /// the leaf speak for the name I asked for" are separate checks, and
+    /// a corpus that states an expected peer name is asking the second
+    /// one too. x509-limbo states it per testcase
+    /// (`expected_peer_name`), and whole suites inside it -- `BetterTLS`'s
+    /// `nameconstraints` in particular -- turn on nothing else: the
+    /// chain is structurally valid and the expected failure is the
+    /// requested name falling outside the CA's permitted subtrees.
+    ///
+    /// Empty means the corpus states no identity and the oracle checks
+    /// the path alone. Every entry must match for the chain to pass:
+    /// limbo's plural `expected_peer_names` lists identities a verifier
+    /// is required to accept, so one that fails is a failure of the
+    /// testcase.
+    pub expected_peer_names: Vec<String>,
 }
 
 impl Chain {
@@ -327,7 +370,9 @@ impl Chain {
         }
 
         Ok(Chain {
-            // A bare PEM bundle states no §6.1.1 inputs.
+            // A bare PEM bundle states no peer identity and no §6.1.1
+            // inputs.
+            expected_peer_names: Vec::new(),
             initial_policy_inputs: InitialPolicyInputs::default(),
             aux_certs_der: Vec::new(),
             certs_der: der_blocks,
@@ -547,6 +592,7 @@ BBBB
         // We do not need a real CRL DER here — the field is a Vec<Vec<u8>>
         // with no parsing contract at the harness layer. Oracles parse it.
         let chain = Chain {
+            expected_peer_names: Vec::new(),
             initial_policy_inputs: InitialPolicyInputs::default(),
             aux_certs_der: Vec::new(),
             certs_der: vec![vec![0u8; 4], vec![1u8; 4]],

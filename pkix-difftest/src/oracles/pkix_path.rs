@@ -30,6 +30,7 @@ use std::io;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use der::Decode;
+use pkix_identity::{verify_dns_name, ServerName};
 use pkix_path::{validate_path, DefaultVerifier, TrustAnchor, ValidationPolicy};
 use pkix_revocation::{
     check_revocation_with_crls, crl_applies_to, CrlChecker, Error as RevError,
@@ -145,6 +146,20 @@ pub fn verify(chain: &Chain) -> io::Result<Verdict> {
         {
             return Ok(Verdict::Fail { reason: rev_reason });
         }
+    }
+
+    // The path is valid and unrevoked. If the corpus states which
+    // identity the peer must present, that is a second question and the
+    // chain has to answer it too: RFC 6125 §6 identity matching is not
+    // part of RFC 5280 §6.1 path validation, so a structurally perfect
+    // chain for the wrong name is still a failed verification.
+    //
+    // This is what BetterTLS's `nameconstraints` suite turns on. Its
+    // chains are valid; the expected failure is the requested name
+    // falling outside the issuing CA's permitted subtrees, which nothing
+    // can see without being told the name.
+    if let Some(reason) = check_peer_identity(&validation_chain, &chain.expected_peer_names) {
+        return Ok(Verdict::Fail { reason });
     }
 
     Ok(Verdict::Pass)
@@ -462,6 +477,31 @@ fn check_revocation(
                 checkers.len(),
                 applicable.len()
             ));
+        }
+    }
+    None
+}
+
+/// Check the leaf against every identity the corpus requires it to
+/// present, returning a failure reason for the first that does not match.
+///
+/// Each entry must match. limbo's plural `expected_peer_names` lists
+/// identities a verifier is required to accept, so one that fails is a
+/// failure of the testcase rather than an alternative that may be
+/// skipped.
+///
+/// A name the identity layer cannot even parse is a failure, not a skip.
+/// Treating it as "no opinion" would turn an expected rejection into a
+/// pass and report it as pkix-path disagreeing with the corpus.
+fn check_peer_identity(chain: &[Certificate], names: &[String]) -> Option<String> {
+    let leaf = chain.first()?;
+    for name in names {
+        let server_name = match ServerName::parse(name) {
+            Ok(n) => n,
+            Err(e) => return Some(format!("unparseable reference identity {name:?}: {e}")),
+        };
+        if let Err(e) = verify_dns_name(leaf, &server_name) {
+            return Some(format!("identity {name:?} not presented by the leaf: {e}"));
         }
     }
     None

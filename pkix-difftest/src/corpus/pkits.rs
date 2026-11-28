@@ -268,6 +268,8 @@ fn build_item(certs_dir: &Path, crls_dir: &Path, vec: &PkitsVector) -> io::Resul
         .collect();
 
     let chain = Chain {
+        // PKITS is a path-validation suite; it states no peer identity.
+        expected_peer_names: Vec::new(),
         initial_policy_inputs: policy_inputs(vec)?,
         aux_certs_der,
         certs_der: chain_der,

@@ -87,6 +87,12 @@ pkix-path-builder = { workspace = true }
 # chain ships with CRLs. Default features pull in the `crl` feature.
 pkix-revocation = { workspace = true, features = ["crl"] }
 
+# The pkix-path oracle checks a corpus-stated peer identity against the
+# leaf's SANs after path validation (RFC 6125 §6), which RFC 5280 §6.1
+# path validation does not cover. `pkix-identity` is also a dev-dep below
+# for the fixture corpus; this entry is the runtime one.
+pkix-identity = { workspace = true }
+
 # Cert parsing. pkix-path's `Certificate` is x509_cert::Certificate, not re-exported.
 x509-cert = { workspace = true }
 der       = { workspace = true }

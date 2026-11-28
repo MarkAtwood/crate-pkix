@@ -151,6 +151,7 @@ fn chain_from_pkix_chain_fixtures(leaf_name: &str) -> Chain {
     let leaf_der = std::fs::read(fix_dir.join(leaf_name)).expect("read leaf");
     let root_der = std::fs::read(fix_dir.join("root.der")).expect("read root");
     Chain {
+        expected_peer_names: Vec::new(),
         initial_policy_inputs: InitialPolicyInputs::default(),
         aux_certs_der: Vec::new(),
         certs_der: vec![leaf_der, root_der],
