@@ -333,6 +333,32 @@ And when ground truth is withheld to make a suite pass, the suite stops
 measuring what its name claims; prefer an exemption list that names each
 vector and fails when one starts passing, so the gap stays countable.
 
+### Pin an external corpus, or its baseline measures nothing
+
+`pkix-difftest/baseline-limbo.json` records an exact measurement --
+9726 testcases, 2978 Agreement, 23 StricterThanWild -- and nothing in it
+named the corpus commit it came from. The manifest was whatever
+`~/GIT/x509-limbo/limbo.json` happened to be on the machine that
+produced it, so two developers could disagree about a regression because
+they were measuring different corpora, and neither could tell.
+
+`third_party/x509-limbo` is now a submodule, which makes the corpus
+version a committed fact and lets Dependabot open a pull request when
+upstream moves (`.github/dependabot.yml`). Pinning it immediately showed
+the drift it was meant to catch: the pinned commit has 9807 testcases,
+81 more than the baseline, so the baseline had already been measured
+against something else.
+
+The corollary for exhaustive enums over someone else's vocabulary.
+`corpus::limbo::Feature` lists upstream's feature tags exhaustively so
+that drift is a parse error rather than a silent skip -- a good trade,
+because a tag read as "no feature" would quietly move a case into
+scope. But the blast radius is the whole manifest: upstream added
+`has-mldsa` and all 9807 testcases stopped loading over six of them.
+Strictness like that is only actionable with something watching
+upstream. Pair the two, or the loud failure just waits for whoever next
+runs the harness.
+
 ### Count what a suite covers, do not grep for it
 
 `pkix-path/tests/pkits_*.rs` holds 187 hand-written functions naming 106

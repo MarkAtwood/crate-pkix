@@ -1,0 +1,63 @@
+# Watches the pinned test corpora for upstream movement.
+#
+# Tracks PKIX-3tjy.
+#
+# Why this exists
+#
+# `third_party/x509-limbo` is a submodule pinned to a commit, and
+# `pkix-difftest/baseline-limbo.json` records an exact measurement of it:
+# 9726 testcases, 2978 Agreement, 23 StricterThanWild, and so on. Nothing
+# in that baseline names the corpus commit it was taken from, so before
+# the submodule the numbers described a corpus version nobody could
+# identify, and a developer pointing the harness at their own clone was
+# comparing against whatever upstream HEAD happened to be that day.
+#
+# Pinning fixes the measurement. This file is what keeps the pin from
+# going quietly stale: Dependabot opens a pull request when x509-limbo
+# moves, so a new corpus arrives as a reviewable diff with CI's verdict
+# attached rather than as a surprise in someone's local run.
+#
+# Scope decisions
+#
+# - Only `gitsubmodule`. Cargo dependency updates are deliberately not
+#   enabled: this workspace pins its own versions and a weekly stream of
+#   patch-bump pull requests across 34 crates would bury the one update
+#   that matters here. If cargo updates are wanted later they belong in
+#   their own entry with a grouping strategy, not bolted onto this one.
+#
+# - Monthly. x509-limbo is actively developed, so weekly would be a
+#   steady trickle of pull requests against a Tier-2 corpus that is not
+#   in the push path anyway. Monthly keeps the pin honest without
+#   training anyone to close these unread -- the same reasoning
+#   external-anchors.yml records for its own cadence.
+#
+# - A corpus pull request is expected to change the harness numbers, and
+#   that change is the signal rather than a failure to be silenced. The
+#   reviewer's job is to decide whether a moved count is upstream adding
+#   cases or pkix-path regressing, and to re-baseline deliberately.
+#
+# What a corpus update will look like
+#
+# `corpus::limbo::Feature` enumerates upstream's feature tags
+# exhaustively on purpose, so that schema drift is a parse error rather
+# than a silent skip. The cost is that a tag this workspace has never
+# seen makes the whole 41 MB manifest fail to deserialize: pinning the
+# submodule immediately surfaced `has-mldsa`, added upstream after the
+# corpus was wired up, which took out all 9807 testcases over six.
+#
+# So expect some corpus pull requests to fail at load with "unknown
+# variant". That is the design working, and the fix is to add the variant
+# -- the default filter drops every feature-tagged case anyway, so a new
+# tag is a drop, not new coverage. It is only actionable because
+# something is watching upstream, which is this file's job.
+version: 2
+updates:
+  - package-ecosystem: "gitsubmodule"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "chore(corpus)"
+    labels:
+      - "corpus"
+    open-pull-requests-limit: 2

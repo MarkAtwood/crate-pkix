@@ -102,12 +102,31 @@ enum CorpusCmd {
     /// rationale. Per-testcase `validation_time` is pinned through every
     /// oracle via `Chain::validation_time_unix`.
     Limbo {
-        /// Path to `limbo.json` (typically `~/GIT/x509-limbo/limbo.json`).
+        /// Path to `limbo.json`. Defaults to the pinned
+        /// `third_party/x509-limbo` submodule, which is the corpus
+        /// version `baseline-limbo.json` was measured against. Pass a
+        /// path to run against a different checkout.
+        #[arg(default_value = DEFAULT_LIMBO_MANIFEST)]
         manifest: PathBuf,
         #[command(flatten)]
         opts: RunOpts,
     },
 }
+
+/// `limbo.json` in the pinned `third_party/x509-limbo` submodule.
+///
+/// Resolved at compile time from this crate's directory. The corpus is a
+/// submodule rather than a developer's own clone so that
+/// `baseline-limbo.json`'s counts describe an identifiable corpus
+/// version: before it was pinned, the baseline recorded 9726 testcases
+/// against whatever upstream HEAD happened to be that day.
+///
+/// This crate is `publish = false` and only ever built in-tree, so a
+/// compile-time path to a sibling directory is sound here.
+const DEFAULT_LIMBO_MANIFEST: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../third_party/x509-limbo/limbo.json"
+);
 
 #[derive(Debug, clap::Args)]
 struct RunOpts {
@@ -187,7 +206,25 @@ fn run_corpus(cmd: &CorpusCmd) -> std::io::Result<()> {
             Box::new(PemMultiCorpus::new(files.clone(), "pem-multi")),
             opts,
         ),
-        CorpusCmd::Limbo { manifest, opts } => (Box::new(LimboCorpus::load(manifest)?), opts),
+        CorpusCmd::Limbo { manifest, opts } => {
+            // The corpus is a submodule, so a fresh clone has an empty
+            // directory here rather than a missing one. Say which
+            // command fixes it instead of reporting a bare ENOENT on a
+            // path the caller never typed.
+            if !manifest.exists() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!(
+                        "{} is missing.\n\nThe x509-limbo corpus is a git submodule. \
+                         Check it out with:\n\n    git submodule update --init \
+                         third_party/x509-limbo\n\nOr pass the path to another \
+                         limbo.json as an argument.",
+                        manifest.display()
+                    ),
+                ));
+            }
+            (Box::new(LimboCorpus::load(manifest)?), opts)
+        }
     };
 
     let oracle_names = parse_oracle_list(&opts.oracles)?;

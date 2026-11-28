@@ -176,6 +176,17 @@ enum Feature {
     Rfc5280IncompatibleWithWebpki,
     DenialOfService,
     HasCrl,
+    /// ML-DSA (FIPS 204) signatures. Upstream added these after the
+    /// corpus was first wired up here, and because this enum is
+    /// deliberately exhaustive their arrival made the whole 41 MB
+    /// manifest fail to deserialize -- "unknown variant `has-mldsa`" --
+    /// rather than dropping six testcases. That is the intended loud
+    /// failure, but it is only actionable if someone is watching
+    /// upstream, which `.github/dependabot.yml` now arranges.
+    ///
+    /// Nothing in this workspace verifies ML-DSA, so the default filter
+    /// dropping these is correct rather than a limitation to lift.
+    HasMldsa,
 }
 
 /// Signature algorithms enumerated in `limbo-schema.json`. Inert today — the
