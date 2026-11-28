@@ -407,18 +407,33 @@ genuine gaps get hidden rather than invented.
 
 ### Test code gets mutated too
 
-`#[cfg(test)]` modules are mutated like anything else, and a mutated test
-helper cannot be caught by the tests it serves, so it is always reported
-MISSED. Adding an in-crate test module therefore adds permanent survivors:
-pkix-revocation went from 276 mutants to 288 that way, one of which is a
-helper asserting that error messages are distinct.
+What gets mutated inside a `#[cfg(test)]` module is its *helper functions*,
+not its `#[test]` functions. A mutated helper cannot be caught by the tests it
+serves, so it is always reported MISSED: pkix-revocation went from 276 mutants
+to 288 when an in-crate test module arrived, one of them a helper asserting
+that error messages are distinct.
 
-`-E` excludes them by name, matched against what `--list` shows:
+So the filter matters exactly when a crate's test modules hold helpers that
+return something. Measured on cargo-mutants 27.1.0, with and without
+`-E 'tests_|_tests::|tests::'`:
 
-    cargo mutants -p <crate> --all-features -E 'tests::|_tests::'
+    pkix-path              549 -> 541   eight helpers (`load`, `policy_at`,
+                                        `make_chain`) across five modules
+    pkix-ac                157 -> 157   test modules, but only `#[test]` fns
+    pkix-revocation-http   252 -> 252   likewise
 
-Check what the regex actually removed rather than assuming -- module names
-vary, and a regex that matches nothing is silent.
+A crate showing no difference is not evidence the filter is pointless; it is
+evidence that crate's tests call nothing. Keep passing it, and keep checking
+what it removed:
+
+    cargo mutants -p <crate> --all-features -E 'tests_|_tests::|tests::'
+    diff <(cargo mutants --list -p <crate> --all-features) \
+         <(cargo mutants --list -p <crate> --all-features -E '...')
+
+That diff is the only way to know. A regex that matches nothing is silent, and
+one that matches too much hides real mutants in code whose *name* happens to
+contain `tests` -- which is why the check is a diff of the two listings and not
+a count.
 
 ### Sweeps are I/O bound, and one mutant class leaves a process behind
 
