@@ -1109,11 +1109,13 @@ mod tests {
     /// The last day of a 400-year Gregorian era.
     ///
     /// 29 February 2000 is day 146 096 of the era that began on 1 March
-    /// 1600, the only day on which `doe / 146_096` is 1 rather than 0 —
-    /// so it is the only input that can see the `- doe / 146_096`
-    /// correction at all. Without it the date reads as 1 March, which is
-    /// also the wrong answer for the leap day that the 400-year rule
-    /// exists to grant.
+    /// 1600 — the last day of it, and the only day in an era on which
+    /// `doe / 146_096` is 1 rather than 0. So the `- doe / 146_096`
+    /// correction is invisible on every date except one per 400 years,
+    /// and this is the one inside any range a test would otherwise pick.
+    /// Without the correction the date reads as 1 March, which is also
+    /// the wrong answer for the leap day the 400-year rule exists to
+    /// grant.
     ///
     /// Oracle: `date -u -d @951782400` → `Tue Feb 29 12:00:00 AM UTC
     /// 2000`.
