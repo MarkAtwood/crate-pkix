@@ -240,6 +240,23 @@ that it carries the value asked for, and that the new signature checks under
 the key that is supposed to have made it -- since a fixture whose signature
 broke tests the error path it was built to avoid.
 
+The same reasoning applies to the fixture *corpus*, not just the builder. Two
+`pkix-lint` lints carried provenance notes saying their negative path could not
+be tested because no certificate in the workspace had the shape -- one saying
+it "requires fixture generation", one calling it out of scope. Neither lint
+verifies a signature, and the in-crate `raw_cert` mirror a few hundred lines
+away in the same file was already splicing DER for other tests. The shape was
+three lines of work; the note outlived whatever made it true. Eleven mutants
+and a whole unreachable conditional branch sat behind it.
+
+So when a comment says a case cannot be tested for want of a fixture, check
+whether that is still true before believing it, and ask first whether the code
+under test needs a *valid* certificate or merely a well-formed one. A lint, a
+parser, or a name comparison usually needs neither a signature nor a chain. If
+a note turns out to be stale, correct the note in the same change -- and grep
+the workspace for the same wording, since a claim like that tends to have been
+copied.
+
 ### "Subsumed" usually means the fixture is the wrong shape
 
 A guard whose verdict a later check reaches anyway looks untestable: mutate it,
