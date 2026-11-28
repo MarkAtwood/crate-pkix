@@ -181,6 +181,42 @@ same commit.
 * **Status**: intentional default; opt-in flag exposed. Tracked as
   PKIX-0x9z.
 
+## 8. PKITS DSA chains — DSA verification is opt-in and not yet implemented
+
+* **Characteristic chains**:
+  * `4.1.4 Valid DSA Signatures Test4`
+  * `4.1.5 Valid DSA Parameter Inheritance Test5`
+* **Verdicts**:
+  * `pkix-path`: `Fail (unsupported signature algorithm)`
+  * `openssl`: Pass
+  * `pyca`: Fail (`Forbidden public key algorithm`)
+  * PKITS metadata: must-pass
+* **Reasoning**: FIPS 186-5 (3 February 2023) removed DSA as an approved
+  algorithm, specifying RSA, ECDSA and EdDSA for generation and
+  retaining DSA "only for the purposes of verifying existing
+  signatures". NIST cited security analysis against DSA implementations
+  and industry's move to ECDSA; the FIPS 186-4 transition ended
+  3 February 2024. TLS 1.3 dropped DSA outright and rustls-webpki never
+  carried it. PKITS predates all of that — version 1.0.1 was posted in
+  April 2011, when DSA was a mainstream federal algorithm.
+* **Project stance**: DSA is **verify-only and opt-in**. Nothing in this
+  workspace signs with DSA, and no default or umbrella feature enables
+  verifying it. Verification stays on the roadmap because a chain issued
+  under DSA before it was retired either verifies or it does not, and a
+  library that cannot tell you which is less useful than one that can.
+  Refusing to *generate* is the part the standard settled. The feature
+  will sit outside `default` and outside the `rustcrypto` umbrella, as
+  the SHA-1 features already do.
+* **Note for implementers**: RFC 3279 §2.3.2 lets a DSA key omit its
+  domain parameters and inherit them from the issuer's certificate.
+  That is DSA-only and is the substance of `4.1.5` — an implicit-state
+  parse reaching outside the certificate under test.
+* **Status**: intentional, not yet implemented. Of the three oracles
+  only OpenSSL accepts these chains. Recorded as exemptions in
+  `known_gaps()` in `pkix-difftest/tests/pkits_ground_truth.rs`, which
+  fails if either starts passing, so implementing DSA means removing
+  them in the same change. Tracked as PKIX-vb4o.
+
 ## Reproducing these findings
 
 ```sh

@@ -163,6 +163,47 @@ The RustCrypto upstream gap is tracked at RustCrypto/formats#838 (open since 202
 - DN comparison must follow RFC 4518 string prep — do not use byte-equality for names.
 - `BasicConstraints` cA=TRUE is mandatory on every intermediate; keyCertSign in KeyUsage must be checked.
 
+## Signature algorithms: DSA
+
+**Project stance (binding): DSA is verify-only and opt-in. Nothing in this
+workspace signs with DSA, and no default or umbrella feature enables
+verifying it.**
+
+This mirrors FIPS 186-5 (3 February 2023), which removed DSA as an
+approved algorithm -- it specifies RSA, ECDSA and EdDSA for generation
+and retains DSA "only for the purposes of verifying existing
+signatures." NIST gave security analysis against DSA implementations
+and industry's move to ECDSA as the reasons; the FIPS 186-4 transition
+ended 3 February 2024. TLS 1.3 dropped DSA outright and rustls-webpki
+never had it.
+
+Verification stays available because keys are facts: a chain issued
+under DSA before it was retired either verifies or it does not, and a
+library that cannot tell you which is less useful than one that can.
+Refusing to *generate* is the part the standard settled.
+
+The feature shape follows the SHA-1 precedent documented above the
+`rsa-sha1` / `ecdsa-sha1` declarations in `pkix-path/Cargo.toml`: a
+dedicated opt-in feature, deliberately outside `default` and outside the
+`rustcrypto` umbrella, because that umbrella means "algorithms we
+recommend" and this is not one.
+
+Two things to know before implementing it.
+
+RFC 3279 §2.3.2 lets a DSA key omit its domain parameters and inherit
+them from the issuer's certificate. That is DSA-only, it is the
+substance of PKITS `4.1.5 Valid DSA Parameter Inheritance`, and it is
+the risky half: an implicit-state parse that reaches outside the
+certificate being checked.
+
+Status: not implemented. PKITS `4.1.4` and `4.1.5` are recorded
+exemptions in `known_gaps()` in
+`pkix-difftest/tests/pkits_ground_truth.rs` and that test fails if
+either starts passing, so implementing this means removing them in the
+same change. Tracked in PKIX-vb4o. Of the three differential oracles,
+pyca refuses these vectors too ("Forbidden public key algorithm") and
+only OpenSSL accepts them.
+
 ## Trust anchor loading: `pkix-truststore`
 
 `pkix-truststore` is a small Tier 1 crate that turns PEM/DER bytes (or files)

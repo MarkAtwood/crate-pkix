@@ -219,13 +219,29 @@ as epic **PKIX-bue** (3 items).
 
 ### Algorithm coverage
 
-`DefaultVerifier` handles RSA-PKCS1v15-SHA-{256,384,512} and
-ECDSA-P-{256,384}. Missing: **RSA-PSS** (increasingly common — Let's
-Encrypt ISRG Root X2, government PKIs), **Ed25519**, **P-521**, and
-**legacy SHA-1** (feature-gated, off by default, for validating old chains).
-This is the single feature addition that most expands the set of real-world
-certificate chains the library can validate. Tracked as epic **PKIX-qws**
-(4 items).
+`DefaultVerifier` dispatches RSA-PKCS1v15-SHA-{256,384,512}, RSA-PSS,
+ECDSA-P-{256,384,521} and Ed25519. The `rustcrypto` umbrella is the
+default feature and enables all of them.
+
+Legacy SHA-1 verification ships too, behind `rsa-sha1` and `ecdsa-sha1`,
+deliberately outside `default` and outside `rustcrypto` — that umbrella
+means "algorithms we recommend" and these are not recommended. They are
+split because the populations differ: RSA-PKCS1v15+SHA-1 is everywhere
+in pre-2018 government PKI, federal bridge cross-certs and long-lived
+enterprise CAs, while ECDSA+SHA-1 is real but rare. Verification only;
+nothing here signs with SHA-1.
+
+**DSA is verify-only and opt-in**, and is the one signature algorithm
+not yet implemented. Nothing here signs with DSA, and no default or
+umbrella feature will enable verifying it — the feature will sit outside
+`default` and outside `rustcrypto`, exactly as the SHA-1 features above
+do. This follows FIPS 186-5 (February 2023), which retains DSA "only
+for the purposes of verifying existing signatures". Verification stays on the roadmap because a chain
+issued under DSA before it was retired either verifies or it does not,
+and a library that cannot tell you which is less useful than one that
+can. See [INTEROP.md](INTEROP.md) §8 for the two PKITS chains this
+affects and the RFC 3279 §2.3.2 parameter-inheritance wrinkle. Tracked
+as **PKIX-vb4o**.
 
 ### Not yet implemented
 

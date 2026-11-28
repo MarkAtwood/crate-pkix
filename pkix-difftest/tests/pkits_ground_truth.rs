@@ -34,18 +34,23 @@ use pkix_difftest::{oracles, Verdict};
 /// a fix cannot leave a stale exemption behind.
 fn known_gaps() -> BTreeMap<&'static str, &'static str> {
     BTreeMap::from([
-        // DSA is unimplemented. Refusing it in 2026 is a deliberate
-        // choice that pyca also makes ("Forbidden public key
-        // algorithm"); of the three oracles only OpenSSL accepts these.
-        // Whether pkix-path intends never to implement DSA is the
-        // decision recorded in PKIX-vb4o.
+        // DSA verification is intended but not implemented. The stance
+        // is settled and recorded in AGENTS.md: verify-only and opt-in,
+        // mirroring FIPS 186-5, which retains DSA "only for the purposes
+        // of verifying existing signatures". So these two are a backlog
+        // item behind a feature flag rather than a permanent refusal,
+        // and implementing it means deleting both entries in the same
+        // change. Tracked in PKIX-vb4o.
+        //
+        // pyca refuses these vectors too ("Forbidden public key
+        // algorithm"); of the three oracles only OpenSSL accepts them.
         (
             "4.1.4 Valid DSA Signatures Test4",
-            "DSA unimplemented (PKIX-vb4o)",
+            "DSA verification not implemented; verify-only/opt-in is the recorded stance (PKIX-vb4o)",
         ),
         (
             "4.1.5 Valid DSA Parameter Inheritance Test5",
-            "DSA unimplemented, same cause as 4.1.4 (PKIX-vb4o)",
+            "same, plus RFC 3279 §2.3.2 parameter inheritance (PKIX-vb4o)",
         ),
         // notBefore is 500101120100Z, which RFC 5280 §4.1.2.5.1 reads as
         // 1950 -- below the 1970 floor of the `der` crate's UtcTime. The

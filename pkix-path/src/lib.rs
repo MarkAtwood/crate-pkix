@@ -62,10 +62,22 @@
 //!   a difference of strictness — NIST PKITS §4.2.3 "Valid pre2000 UTC
 //!   notBefore Date Test3" is exactly this shape, and is the one PKITS
 //!   vector this crate does not evaluate.
-//! - **Legacy signature algorithms** — SHA-1 verifiers (RFC 8017, legacy)
-//!   are intentionally not shipped; deployments requiring legacy SHA-1
-//!   trust must implement [`SignatureVerifier`] themselves. RSA moduli
-//!   outside 1024–8192 bits are refused by the bundled RSA backend.
+//! - **Legacy SHA-1** — shipped, but behind `rsa-sha1` and `ecdsa-sha1`,
+//!   which are deliberately outside `default` and outside the
+//!   `rustcrypto` umbrella: that umbrella means "algorithms we
+//!   recommend" and these are not. Verification only; nothing here
+//!   signs with SHA-1. RSA moduli outside 1024–8192 bits are refused by
+//!   the bundled RSA backend.
+//! - **DSA** — not implemented. The recorded stance is verify-only and
+//!   opt-in, following FIPS 186-5, which retains DSA "only for the
+//!   purposes of verifying existing signatures"; a chain issued under
+//!   DSA before it was retired either verifies or it does not, and
+//!   saying which is more useful than refusing to look. When it lands
+//!   it will sit outside `default` and outside `rustcrypto`, as the
+//!   SHA-1 features do. Until then such a certificate is refused as an
+//!   unsupported algorithm, never misread. NIST PKITS `4.1.4` and
+//!   `4.1.5` are the two vectors this affects, and RFC 3279 §2.3.2
+//!   domain-parameter inheritance is the awkward half of `4.1.5`.
 //! - **RFC 4518 full Unicode NFKC DN normalization** — ASCII case-folding
 //!   plus insignificant-whitespace collapsing is applied. `BMPString` AVA
 //!   values are transcoded UCS-2-BE → UTF-8 and then compared via the same
