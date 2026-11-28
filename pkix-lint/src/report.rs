@@ -271,6 +271,41 @@ mod tests {
         assert_eq!(at_warn_count, 2, "both Error and Warn at Warn threshold");
     }
 
+    /// `findings_at_or_above` ranks `Fatal` above `Error`, so a Fatal
+    /// finding appears at every threshold up to and including `Fatal`.
+    ///
+    /// The severity-threshold tests used only `Warn` and `Error`, so the
+    /// `Fatal` arm of the rank lookup could be deleted — mapping Fatal to
+    /// "carries no severity", the answer `Pass` and `NotApplicable` get —
+    /// and nothing noticed. That omission drops the most serious finding
+    /// class out of every severity-filtered view: a summary panel showing
+    /// `Error` and above would render a Fatal chain as clean.
+    #[test]
+    fn findings_at_or_above_includes_fatal_at_every_threshold() {
+        let mut r = empty_report();
+        r.findings.push(Finding {
+            result: LintResult::fatal("unparseable"),
+            ..pass_finding()
+        });
+        r.findings.push(pass_finding());
+
+        for threshold in [
+            Severity::Info,
+            Severity::Notice,
+            Severity::Warn,
+            Severity::Error,
+            Severity::Fatal,
+        ] {
+            let hits: Vec<&Finding> = r.findings_at_or_above(threshold).collect();
+            assert_eq!(
+                hits.len(),
+                1,
+                "a Fatal finding must appear at threshold {threshold}"
+            );
+            assert!(matches!(hits[0].result, LintResult::Fatal(_)));
+        }
+    }
+
     #[test]
     fn report_metadata_fields_preserved() {
         let r = EvaluationReport::new("cabf.br.tls", "SC-081", "bundle-v1", 3, 999_000);
