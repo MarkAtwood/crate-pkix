@@ -218,11 +218,11 @@ impl Lint for Rfc8398SmimeSanLint {
 /// # Provenance
 ///
 /// Filed under PKIX-9vnx.9.2.1.1 as the third of three deferred lints
-/// from the PKIX-9vnx.9.2.1 batch. Negative-test fixture (cert with
-/// both rfc822Name and SmtpUTF8Mailbox where they disagree) is not yet
-/// present in the workspace fixture corpus; the equivalence-helper free
-/// function is unit-tested exhaustively against a hand-written oracle
-/// table.
+/// from the PKIX-9vnx.9.2.1 batch. No certificate in the workspace
+/// fixture corpus carries both name forms, and none is needed: this
+/// lint verifies no signature, so the tests build the SAN they want and
+/// splice it into a decoded fixture. The equivalence-helper free
+/// function is also unit-tested against a hand-written oracle table.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Rfc8398SmimeMailboxEquivalenceLint;
 

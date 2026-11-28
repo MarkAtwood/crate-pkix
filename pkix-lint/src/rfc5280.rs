@@ -535,10 +535,11 @@ impl Lint for Rfc5280EkuServerAuthLint {
 /// # Provenance
 ///
 /// Filed under PKIX-9vnx.9.2.1.1 as one of the three RFC-conformance
-/// lints deferred from the initial PKIX-9vnx.9.2.1 batch. Negative-test
-/// fixture (empty-subject leaf with missing-or-non-critical SAN) is not
-/// yet present in the workspace fixture corpus; the lint ships with a
-/// positive test only (existing fixtures all have non-empty Subjects).
+/// lints deferred from the initial PKIX-9vnx.9.2.1 batch. No
+/// empty-Subject certificate exists in the workspace fixture corpus and
+/// none is needed: the lint verifies no signature, so the tests splice
+/// an empty `RDNSequence` and the SAN shape they want into a decoded
+/// fixture and re-encode it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Rfc5280SanRequiredWhenSubjectEmptyLint;
 

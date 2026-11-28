@@ -300,7 +300,7 @@ pub(crate) const DETAIL_MAX_BYTES: usize = 256;
 
 /// Truncate an attacker-controlled string for inclusion in a
 /// [`LintResult`] detail message. Values longer than [`DETAIL_MAX_BYTES`]
-/// are cut at the first valid UTF-8 boundary at or below that limit
+/// are cut at the largest valid UTF-8 boundary at or below that limit
 /// and suffixed with `... (truncated, N bytes total)` so operators
 /// can see that truncation happened and what the full size was.
 ///
