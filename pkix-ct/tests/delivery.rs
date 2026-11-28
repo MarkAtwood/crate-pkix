@@ -203,3 +203,59 @@ fn a_successful_response_without_scts_is_still_ok_none() {
         "this response carries no SCT extension, which is an answer"
     );
 }
+
+// --- the top-level responseExtensions branch -----------------------------
+
+/// RFC 6960 §4.2.1 gives a response two places for an extension, and
+/// RFC 6962 §3.3 does not say which to use.
+///
+/// `sct_list_from_ocsp_response` looks in each `SingleResponse`'s
+/// `singleExtensions` first and then falls back to the top-level
+/// `responseExtensions`. Every fixture here carried its SCTs in the
+/// first, so the fallback had no test at all -- not merely its OID
+/// comparison, the whole branch. A responder putting the list at the top
+/// level would have its SCTs silently ignored, and the caller would see
+/// a certificate with no CT evidence rather than one with an SCT.
+///
+/// The fixture carries a nonce *before* the SCT list, so a scan matching
+/// the wrong OID finds something and tries to parse it as a list.
+/// Oracle: `tests/fixtures/ocsp-response-extensions/gen.py`, which
+/// asserts the placement it built.
+#[test]
+#[cfg(feature = "ocsp")]
+fn extracts_sct_list_from_top_level_response_extensions() {
+    let der = fs::read("tests/fixtures/ocsp-response-extensions/with-sct.der")
+        .expect("read the top-level fixture");
+    let list = pkix_ct::sct_list_from_ocsp_response(&der)
+        .expect("the response parses")
+        .expect("and its responseExtensions carry an SCT list");
+
+    assert_eq!(list.scts().len(), 1, "one SCT, from the oracle fixture");
+    let sct = &list.scts()[0];
+    assert_eq!(sct.version, 0);
+    assert_eq!(sct.hash_alg, 4, "SHA-256");
+    assert_eq!(sct.sig_alg, 3, "ECDSA");
+    assert_eq!(
+        sct.timestamp_ms, 1_750_032_000_000,
+        "the same SCT the sct-oracle tests pin"
+    );
+}
+
+/// And a response with no SCT list in either place reports none.
+///
+/// The same response minus the SCT extension, so "no list anywhere" is
+/// distinguishable from "looked in the wrong place". Without it, a
+/// fallback that always answered `None` would be indistinguishable from
+/// one that works.
+#[test]
+#[cfg(feature = "ocsp")]
+fn a_top_level_response_without_an_sct_list_reports_none() {
+    let der = fs::read("tests/fixtures/ocsp-response-extensions/without-sct.der")
+        .expect("read the control fixture");
+    assert!(
+        pkix_ct::sct_list_from_ocsp_response(&der)
+            .expect("the response parses")
+            .is_none(),
+        "no SCT extension in either place means no list"
+    );
+}
