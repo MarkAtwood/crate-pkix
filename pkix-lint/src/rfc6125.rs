@@ -239,6 +239,10 @@ mod tests {
         let lint = Rfc6125TlsServerSanLint;
         assert_eq!(lint.id(), "rfc6125.cert.san.tls_server_dns_or_ip_required");
         assert_eq!(lint.citation(), "RFC 6125 §6.4.1");
+        assert_eq!(
+            lint.title(),
+            "TLS server certificate must include SAN dNSName or iPAddress"
+        );
         assert_eq!(lint.severity(), Severity::Error);
         assert_eq!(lint.scope(), Scope::Certificate);
         assert_eq!(lint.applies_to(), SubjectKind::Leaf);

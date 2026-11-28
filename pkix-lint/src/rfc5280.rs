@@ -535,10 +535,11 @@ impl Lint for Rfc5280EkuServerAuthLint {
 /// # Provenance
 ///
 /// Filed under PKIX-9vnx.9.2.1.1 as one of the three RFC-conformance
-/// lints deferred from the initial PKIX-9vnx.9.2.1 batch. Negative-test
-/// fixture (empty-subject leaf with missing-or-non-critical SAN) is not
-/// yet present in the workspace fixture corpus; the lint ships with a
-/// positive test only (existing fixtures all have non-empty Subjects).
+/// lints deferred from the initial PKIX-9vnx.9.2.1 batch. No
+/// empty-Subject certificate exists in the workspace fixture corpus and
+/// none is needed: the lint verifies no signature, so the tests splice
+/// an empty `RDNSequence` and the SAN shape they want into a decoded
+/// fixture and re-encode it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Rfc5280SanRequiredWhenSubjectEmptyLint;
 
@@ -1049,6 +1050,10 @@ mod tests {
         let lint = Rfc5280MaxSerialLengthLint::default();
         assert_eq!(lint.id(), "rfc5280.cert.serial_number.max_octets");
         assert_eq!(lint.citation(), "RFC 5280 §4.1.2.2");
+        assert_eq!(
+            lint.title(),
+            "Certificate serialNumber must not exceed 20 octets"
+        );
         assert_eq!(lint.spec_section_id(), Some("rfc5280-4.1.2.2"));
         assert_eq!(
             lint.spec_url(),
@@ -1109,6 +1114,10 @@ mod tests {
         let lint = Rfc5280BasicConstraintsCaLeafLint;
         assert_eq!(lint.id(), "rfc5280.cert.bc.ca_false_for_leaf");
         assert_eq!(lint.citation(), "RFC 5280 §4.2.1.9");
+        assert_eq!(
+            lint.title(),
+            "End-entity certificate must not assert BasicConstraints.cA=TRUE"
+        );
         assert_eq!(lint.severity(), Severity::Error);
         assert_eq!(lint.scope(), Scope::Certificate);
         assert_eq!(lint.applies_to(), SubjectKind::Leaf);
@@ -1178,6 +1187,10 @@ mod tests {
         let lint = Rfc5280EkuServerAuthLint;
         assert_eq!(lint.id(), "rfc5280.cert.eku.server_auth_required");
         assert_eq!(lint.citation(), "RFC 5280 §4.2.1.12");
+        assert_eq!(
+            lint.title(),
+            "TLS server certificate must include id-kp-serverAuth EKU"
+        );
         assert_eq!(lint.severity(), Severity::Error);
         assert_eq!(lint.scope(), Scope::Certificate);
         assert_eq!(lint.applies_to(), SubjectKind::Leaf);
@@ -1200,13 +1213,19 @@ mod tests {
     // | leaf-p256-365d-no-san.der            | no             | no       | n/a           |
     // | smime-self-signed-365d.der           | no             | yes      | no            |
     //
-    // No empty-subject fixture currently exists in the workspace. The
-    // positive paths verified here are: (a) non-empty Subject + SAN
-    // present → Pass (lint does not apply), (b) non-empty Subject + SAN
-    // absent → Pass (still does not apply). The negative path (empty
-    // Subject + missing-or-non-critical SAN → Error) requires fixture
-    // generation (pyca/cryptography `Name([])` + matching SAN
-    // configuration) and is filed as out-of-scope per the bead.
+    // No empty-subject fixture exists on disk, and none is needed: the
+    // lint verifies no signature, so the empty-Subject shapes are built
+    // by decoding a fixture into the `raw_cert` mirror, replacing the
+    // Subject with an empty `RDNSequence`, editing the extension list,
+    // and re-encoding. What the generator will emit is a separate
+    // question from what the lint can be shown.
+    //
+    // That distinction had been missed, and the cost was the whole
+    // conditional branch: both tests below have a non-empty Subject, so
+    // the lint returns at its first line in each and nothing past that
+    // line ran. The clause RFC 5280 §4.2.1.6 states -- the one this lint
+    // exists for -- had no test, and a lint that accepted every
+    // empty-Subject certificate would have passed the suite.
     // -----------------------------------------------------------------------
 
     #[test]
@@ -1237,11 +1256,125 @@ mod tests {
         );
     }
 
+    /// Build an empty-Subject certificate from `leaf-p256-365d-san-eku.der`,
+    /// letting `edit` reshape the extension list first.
+    ///
+    /// The fixture's extensions are, in order, basicConstraints, SAN and
+    /// extendedKeyUsage, all three non-critical (`openssl x509 -text`,
+    /// verified 2026-11-27) — which matters for the SAN-lookup tests
+    /// below: SAN is not the first extension, so a predicate that found
+    /// any extension other than SAN would find basicConstraints and read
+    /// its criticality instead.
+    fn empty_subject_cert(edit: impl FnOnce(&mut x509_cert::ext::Extensions)) -> Certificate {
+        let base = load_cert("leaf-p256-365d-san-eku.der");
+        let cert = crate::raw_cert::edit_cert(&base, |c| {
+            c.tbs_certificate.subject = x509_cert::name::Name::default();
+            let exts = c
+                .tbs_certificate
+                .extensions
+                .as_mut()
+                .expect("fixture carries extensions");
+            edit(exts);
+        });
+        assert!(
+            cert.tbs_certificate().subject().is_empty(),
+            "the edited certificate must have an empty Subject"
+        );
+        cert
+    }
+
+    /// RFC 5280 §4.2.1.6: an empty-Subject certificate carrying a
+    /// critical `subjectAltName` satisfies the clause.
+    ///
+    /// Also the test that pins *which* extension the lint looks at. The
+    /// predicate selecting the SAN survived inversion, because with a
+    /// non-empty Subject the lint never reaches it; here, inverted, it
+    /// selects basicConstraints and reports the non-critical extension
+    /// the certificate is allowed to have.
+    #[test]
+    fn san_required_when_subject_empty_passes_with_critical_san() {
+        let lint = Rfc5280SanRequiredWhenSubjectEmptyLint;
+        let cert = empty_subject_cert(|exts| {
+            let san = exts
+                .iter_mut()
+                .find(|e| e.extn_id == OID_SUBJECT_ALT_NAME)
+                .expect("fixture carries a SAN extension");
+            san.critical = true;
+        });
+        assert_eq!(
+            lint.check_cert(&cert, SubjectKind::Any, 0),
+            LintResult::Pass
+        );
+    }
+
+    /// RFC 5280 §4.2.1.6: the `subjectAltName` an empty-Subject
+    /// certificate carries must be marked critical.
+    ///
+    /// A non-critical SAN is the subtle half of the rule. The extension
+    /// is present and names the subject, so a relying party that reads it
+    /// anyway sees an identity — but one it was permitted to ignore,
+    /// which is the whole reason the RFC requires criticality here: with
+    /// no Subject DN there is no other binding to fall back on.
+    #[test]
+    fn san_required_when_subject_empty_errors_on_non_critical_san() {
+        let lint = Rfc5280SanRequiredWhenSubjectEmptyLint;
+        // The fixture's SAN is non-critical already; leave it alone.
+        let cert = empty_subject_cert(|_exts| {});
+        match lint.check_cert(&cert, SubjectKind::Any, 0) {
+            LintResult::Error(detail) => assert!(
+                detail.contains("not marked critical"),
+                "detail must name the criticality failure; got: {detail}"
+            ),
+            other => panic!("expected Error, got: {other:?}"),
+        }
+    }
+
+    /// RFC 5280 §4.2.1.6: an empty-Subject certificate with no
+    /// `subjectAltName` at all names nothing and is refused.
+    #[test]
+    fn san_required_when_subject_empty_errors_when_san_absent() {
+        let lint = Rfc5280SanRequiredWhenSubjectEmptyLint;
+        let cert = empty_subject_cert(|exts| {
+            exts.retain(|e| e.extn_id != OID_SUBJECT_ALT_NAME);
+        });
+        match lint.check_cert(&cert, SubjectKind::Any, 0) {
+            LintResult::Error(detail) => assert!(
+                detail.contains("omits subjectAltName"),
+                "detail must say the extension is absent, not uncritical; got: {detail}"
+            ),
+            other => panic!("expected Error, got: {other:?}"),
+        }
+    }
+
+    /// An empty-Subject certificate with no extensions whatsoever is the
+    /// same violation reached by a different route.
+    #[test]
+    fn san_required_when_subject_empty_errors_when_no_extensions() {
+        let lint = Rfc5280SanRequiredWhenSubjectEmptyLint;
+        let base = load_cert("leaf-p256-365d-san-eku.der");
+        let cert = crate::raw_cert::edit_cert(&base, |c| {
+            c.tbs_certificate.subject = x509_cert::name::Name::default();
+            c.tbs_certificate.extensions = None;
+        });
+        assert!(cert.tbs_certificate().extensions().is_none());
+        match lint.check_cert(&cert, SubjectKind::Any, 0) {
+            LintResult::Error(detail) => assert!(
+                detail.contains("no extensions"),
+                "detail must name the absent extension list; got: {detail}"
+            ),
+            other => panic!("expected Error, got: {other:?}"),
+        }
+    }
+
     #[test]
     fn san_required_when_subject_empty_metadata_matches_rfc_section() {
         let lint = Rfc5280SanRequiredWhenSubjectEmptyLint;
         assert_eq!(lint.id(), "rfc5280.cert.san.required_when_subject_empty");
         assert_eq!(lint.citation(), "RFC 5280 §4.2.1.6");
+        assert_eq!(
+            lint.title(),
+            "Empty-subject certificate must include a critical subjectAltName"
+        );
         assert_eq!(lint.severity(), Severity::Error);
         assert_eq!(lint.scope(), Scope::Certificate);
         assert_eq!(lint.applies_to(), SubjectKind::Any);
@@ -1425,6 +1558,10 @@ mod tests {
         let lint = Rfc5280SignatureAlgorithmMatchLint;
         assert_eq!(lint.id(), "rfc5280.cert.signature_algorithm_match");
         assert_eq!(lint.citation(), "RFC 5280 §4.1.1.2");
+        assert_eq!(
+            lint.title(),
+            "Outer signatureAlgorithm must equal tbsCertificate.signature"
+        );
         assert_eq!(lint.severity(), Severity::Error);
         assert_eq!(lint.scope(), Scope::Certificate);
         assert_eq!(lint.applies_to(), SubjectKind::Any);

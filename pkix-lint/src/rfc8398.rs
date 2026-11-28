@@ -218,11 +218,11 @@ impl Lint for Rfc8398SmimeSanLint {
 /// # Provenance
 ///
 /// Filed under PKIX-9vnx.9.2.1.1 as the third of three deferred lints
-/// from the PKIX-9vnx.9.2.1 batch. Negative-test fixture (cert with
-/// both rfc822Name and SmtpUTF8Mailbox where they disagree) is not yet
-/// present in the workspace fixture corpus; the equivalence-helper free
-/// function is unit-tested exhaustively against a hand-written oracle
-/// table.
+/// from the PKIX-9vnx.9.2.1 batch. No certificate in the workspace
+/// fixture corpus carries both name forms, and none is needed: this
+/// lint verifies no signature, so the tests build the SAN they want and
+/// splice it into a decoded fixture. The equivalence-helper free
+/// function is also unit-tested against a hand-written oracle table.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Rfc8398SmimeMailboxEquivalenceLint;
 
@@ -513,11 +513,101 @@ mod tests {
         }
     }
 
+    /// `id-on-UPN` — RFC 4556 §3.2.3, used here only as a well-known
+    /// `otherName` type that is *not* `id-on-SmtpUTF8Mailbox`.
+    const ID_ON_UPN: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.311.20.2.3");
+
+    /// An `otherName` of the given type carrying `value` as a UTF8String.
+    fn other_name(type_id: ObjectIdentifier, value: &str) -> GeneralName {
+        let any = der::asn1::Any::new(der::Tag::Utf8String, value.as_bytes())
+            .expect("UTF8String Any is well-formed");
+        GeneralName::OtherName(x509_cert::ext::pkix::name::OtherName {
+            type_id,
+            value: any,
+        })
+    }
+
+    /// An `rfc822Name` carrying `value`.
+    fn rfc822_name(value: &str) -> GeneralName {
+        GeneralName::Rfc822Name(der::asn1::Ia5String::new(value).expect("address is IA5"))
+    }
+
+    /// Replace the SAN of `smime-self-signed-365d.der` with exactly
+    /// `names`.
+    ///
+    /// No fixture in the workspace carries an `id-on-SmtpUTF8Mailbox`
+    /// `otherName`, which is why every branch that depends on one was
+    /// untested. Neither lint here verifies a signature, so the SAN is
+    /// re-encoded into the `raw_cert` mirror rather than generated: what
+    /// a certificate generator will emit is a different question from
+    /// what the lint can be shown.
+    fn cert_with_san(names: Vec<GeneralName>) -> Certificate {
+        use der::Encode as _;
+        let san_der = x509_cert::ext::pkix::SubjectAltName(names)
+            .to_der()
+            .expect("encode SubjectAltName");
+        crate::raw_cert::edit_cert(&load_cert("smime-self-signed-365d.der"), |c| {
+            let exts = c
+                .tbs_certificate
+                .extensions
+                .as_mut()
+                .expect("fixture carries extensions");
+            exts.retain(|e| e.extn_id != OID_SUBJECT_ALT_NAME);
+            exts.push(x509_cert::ext::Extension {
+                extn_id: OID_SUBJECT_ALT_NAME,
+                critical: false,
+                extn_value: der::asn1::OctetString::new(san_der).expect("wrap SAN in OCTET STRING"),
+            });
+        })
+    }
+
+    /// RFC 8398 §3: an `id-on-SmtpUTF8Mailbox` `otherName` alone satisfies
+    /// the S/MIME mailbox requirement — an `rfc822Name` is not additionally
+    /// required.
+    ///
+    /// This is the name form RFC 8398 was written to introduce, and it had
+    /// no test: no fixture carried one, so the `otherName` arm of the SAN
+    /// scan could be deleted outright, or its OID comparison inverted, and
+    /// the suite stayed green. A certificate for an internationalized
+    /// mailbox carries this and nothing else, so either mutation refuses
+    /// exactly the certificates the RFC exists to admit.
+    #[test]
+    fn smime_san_lint_accepts_smtputf8_mailbox_alone() {
+        let lint = Rfc8398SmimeSanLint;
+        let cert = cert_with_san(vec![other_name(ID_ON_SMTP_UTF8_MAILBOX, "π@café.example")]);
+        assert_eq!(
+            lint.check_cert(&cert, SubjectKind::Leaf, 0),
+            LintResult::Pass
+        );
+    }
+
+    /// RFC 8398 §3: an `otherName` of some other type is not a mailbox.
+    ///
+    /// `id-on-UPN` is a Microsoft principal name, not an email address.
+    /// Accepting it would let a smart-card logon certificate pass as an
+    /// S/MIME certificate with no mailbox binding at all.
+    #[test]
+    fn smime_san_lint_rejects_other_name_of_a_different_type() {
+        let lint = Rfc8398SmimeSanLint;
+        let cert = cert_with_san(vec![other_name(ID_ON_UPN, "alice@example.com")]);
+        match lint.check_cert(&cert, SubjectKind::Leaf, 0) {
+            LintResult::Error(detail) => assert!(
+                detail.contains("SmtpUTF8Mailbox"),
+                "detail must name the required otherName type; got: {detail}"
+            ),
+            other => panic!("expected Error, got: {other:?}"),
+        }
+    }
+
     #[test]
     fn smime_san_lint_metadata_matches_rfc_section() {
         let lint = Rfc8398SmimeSanLint;
         assert_eq!(lint.id(), "rfc8398.cert.san.smime_mailbox_required");
         assert_eq!(lint.citation(), "RFC 8398 §3 (+ RFC 5280 §4.2.1.6)");
+        assert_eq!(
+            lint.title(),
+            "S/MIME certificate must include SAN rfc822Name or SmtpUTF8Mailbox"
+        );
         assert_eq!(lint.severity(), Severity::Error);
         assert_eq!(lint.scope(), Scope::Certificate);
         assert_eq!(lint.applies_to(), SubjectKind::Leaf);
@@ -584,11 +674,108 @@ mod tests {
         );
     }
 
+    /// RFC 8398 §3: both name forms present and naming the same mailbox
+    /// satisfies the equivalence rule.
+    ///
+    /// Two cases, because the rule has two halves. The ASCII pair is
+    /// byte-identical; the IDN pair is the case the rule was written for
+    /// — the `rfc822Name` carries the A-label domain, the
+    /// `SmtpUTF8Mailbox` the U-label, and they are the same domain.
+    ///
+    /// This is also the only shape that can see the direction of the two
+    /// cross-match loops. Inverted, each reports a violation precisely
+    /// when a match *was* found, so a correctly paired certificate is
+    /// refused.
+    #[test]
+    fn smime_mailbox_equiv_lint_passes_on_equivalent_pair() {
+        let lint = Rfc8398SmimeMailboxEquivalenceLint;
+
+        let ascii = cert_with_san(vec![
+            rfc822_name("alice@example.com"),
+            other_name(ID_ON_SMTP_UTF8_MAILBOX, "alice@example.com"),
+        ]);
+        assert_eq!(
+            lint.check_cert(&ascii, SubjectKind::Leaf, 0),
+            LintResult::Pass,
+            "byte-identical addresses are equivalent"
+        );
+
+        // "café" encodes to the A-label "xn--caf-dma" (IDNA2008
+        // Punycode, cross-checked with `python3 -c 'import idna;
+        // print(idna.encode("café.example").decode())'`).
+        let idn = cert_with_san(vec![
+            rfc822_name("alice@xn--caf-dma.example"),
+            other_name(ID_ON_SMTP_UTF8_MAILBOX, "alice@café.example"),
+        ]);
+        assert_eq!(
+            lint.check_cert(&idn, SubjectKind::Leaf, 0),
+            LintResult::Pass,
+            "A-label and U-label spellings of one domain are equivalent"
+        );
+    }
+
+    /// RFC 8398 §3: both name forms present and naming *different*
+    /// mailboxes is a violation.
+    ///
+    /// Every existing fixture carries at most one of the two forms, so
+    /// the rule was vacuously satisfied everywhere and the lint's whole
+    /// body past the collection loop was unreachable. Four mutants lived
+    /// there: dropping either collection arm, and inverting or forcing
+    /// the `SmtpUTF8Mailbox` OID guard — each of which empties one side
+    /// of the comparison, and an empty side means "rule does not apply",
+    /// which is `Pass`.
+    ///
+    /// A certificate asserting two different mailboxes binds one key to
+    /// two identities, and a relying party that reads whichever form it
+    /// understands gets a different answer than one that reads the other.
+    #[test]
+    fn smime_mailbox_equiv_lint_rejects_disagreeing_pair() {
+        let lint = Rfc8398SmimeMailboxEquivalenceLint;
+        let cert = cert_with_san(vec![
+            rfc822_name("alice@example.com"),
+            other_name(ID_ON_SMTP_UTF8_MAILBOX, "bob@example.com"),
+        ]);
+        match lint.check_cert(&cert, SubjectKind::Leaf, 0) {
+            LintResult::Error(detail) => assert!(
+                detail.contains("no matching"),
+                "detail must report the unmatched entry; got: {detail}"
+            ),
+            other => panic!("expected Error, got: {other:?}"),
+        }
+    }
+
+    /// An `otherName` that is not `id-on-SmtpUTF8Mailbox` takes no part
+    /// in the equivalence rule, however email-shaped its value is.
+    ///
+    /// The certificate here carries an `rfc822Name` and an `id-on-UPN`
+    /// `otherName` naming a different address. The rule does not apply,
+    /// so the verdict is `Pass` — and a lint that treated every
+    /// `otherName` as a mailbox would refuse it for disagreeing with
+    /// itself. Which mutation does exactly that: a dual-use smart-card
+    /// and S/MIME certificate, with a UPN that is not the mailbox, is an
+    /// ordinary enterprise shape to refuse by mistake.
+    #[test]
+    fn smime_mailbox_equiv_lint_ignores_other_name_of_a_different_type() {
+        let lint = Rfc8398SmimeMailboxEquivalenceLint;
+        let cert = cert_with_san(vec![
+            rfc822_name("alice@example.com"),
+            other_name(ID_ON_UPN, "alice.smartcard@corp.example"),
+        ]);
+        assert_eq!(
+            lint.check_cert(&cert, SubjectKind::Leaf, 0),
+            LintResult::Pass
+        );
+    }
+
     #[test]
     fn smime_mailbox_equiv_lint_metadata_matches_rfc_section() {
         let lint = Rfc8398SmimeMailboxEquivalenceLint;
         assert_eq!(lint.id(), "rfc8398.cert.san.smime_mailbox_equivalent");
         assert_eq!(lint.citation(), "RFC 8398 §3");
+        assert_eq!(
+            lint.title(),
+            "rfc822Name and SmtpUTF8Mailbox SAN entries must agree on the same address"
+        );
         assert_eq!(lint.severity(), Severity::Error);
         assert_eq!(lint.scope(), Scope::Certificate);
         assert_eq!(lint.applies_to(), SubjectKind::Leaf);
@@ -674,6 +861,32 @@ mod tests {
     fn mailbox_equiv_empty_local_or_domain_errors() {
         assert!(mailbox_equivalent("@example.com", "@example.com").is_err());
         assert!(mailbox_equivalent("alice@", "alice@").is_err());
+    }
+
+    /// An empty local-part or domain on **either** side alone is an
+    /// error; the emptiness need not be symmetric.
+    ///
+    /// The test above empties the same component on both sides at once,
+    /// which cannot tell the four-way disjunction from a conjunction of
+    /// pairs: each of the three `||` mutants is satisfied by having both
+    /// operands true. Reduced to a conjunction, a half-empty address
+    /// escapes the guard and comes back as `Ok(false)` — reported as
+    /// "these two names disagree" instead of "this name is malformed",
+    /// which sends an operator looking for the wrong defect.
+    #[test]
+    fn mailbox_equiv_one_sided_empty_part_errors() {
+        for (rfc822, smtputf8) in [
+            ("@example.com", "alice@example.com"),
+            ("alice@example.com", "@example.com"),
+            ("alice@", "alice@example.com"),
+            ("alice@example.com", "alice@"),
+        ] {
+            assert!(
+                mailbox_equivalent(rfc822, smtputf8).is_err(),
+                "({rfc822:?}, {smtputf8:?}) has an empty part and must be an error, \
+                 not a non-match"
+            );
+        }
     }
 
     // ---- validate_mailbox_for_equivalence helper (PKIX-hy2e.35) ----

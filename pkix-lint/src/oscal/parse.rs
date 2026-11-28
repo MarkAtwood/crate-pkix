@@ -922,19 +922,27 @@ fn find_prop_value<'a>(props: Option<&'a [Value]>, name: &str) -> Option<&'a str
 /// just for this parser. Matches the encoder at
 /// [`super::emit`]: lowercase emit, parser accepts mixed case.
 fn hex_decode(s: &str) -> Option<Vec<u8>> {
-    if !s.len().is_multiple_of(2) {
+    let bytes = s.as_bytes();
+    if !bytes.len().is_multiple_of(2) {
         return None;
     }
-    let mut out = Vec::with_capacity(s.len() / 2);
-    let bytes = s.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() {
-        let hi = nibble(bytes[i])?;
-        let lo = nibble(bytes[i + 1])?;
-        out.push((hi << 4) | lo);
-        i += 2;
-    }
-    Some(out)
+    // Fixed-size chunks rather than an index stepped by two, deliberately.
+    // The counter form carried an `i += 2` that a sweep rewrites as
+    // `i *= 2`, leaving the index at zero and the loop pushing the same
+    // byte until memory runs out -- and this function decodes
+    // caller-supplied OSCAL JSON. An operator a mutation can turn into a
+    // non-terminating loop is better not written.
+    //
+    // `nibble` returns 0..=15, so `hi << 4` occupies only the high
+    // nibble and `lo` only the low one: the two share no set bit, which
+    // makes `|` and `^` the same function here and the `| -> ^` mutant
+    // of this line uncatchable.
+    bytes
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|&[hi, lo]| Some((nibble(hi)? << 4) | nibble(lo)?))
+        .collect()
 }
 
 fn nibble(b: u8) -> Option<u8> {
@@ -1778,6 +1786,44 @@ mod tests {
             }
             other => panic!("unexpected error: {other:?}"),
         }
+    }
+
+    /// `ParseError::source` hands back the wrapped cause for the two
+    /// variants that wrap one, and `None` for the rest.
+    ///
+    /// Only the outer `Display` text was ever asserted, and both wrapping
+    /// variants interpolate their cause into it — so the chain itself was
+    /// untested and could be severed, arm by arm or wholesale. A caller
+    /// using `anyhow`, `eyre` or `std`'s own `Error::sources` walker
+    /// prints the chain rather than the outer message, and a severed
+    /// chain tells that caller "Risk at index 1 could not be added" with
+    /// nothing saying why.
+    #[test]
+    fn error_source_exposes_the_wrapped_cause() {
+        use std::error::Error as _;
+
+        let add = ParseError::AddFailed {
+            index: 1,
+            source: DeviationAddError::DuplicateId("agency-x-2026-q1".to_owned()),
+        };
+        assert_eq!(
+            add.source().map(ToString::to_string).as_deref(),
+            Some("deviation id 'agency-x-2026-q1' already exists in the store")
+        );
+
+        let override_err = ParseError::InvalidParameterOverride {
+            param_id: "rfc5280.cert.serial_number.max_octets.max-octets".to_owned(),
+            source: crate::ParameterError::UnknownParameter("max-octets".to_owned()),
+        };
+        assert_eq!(
+            override_err.source().map(ToString::to_string).as_deref(),
+            Some("unknown lint parameter 'max-octets'")
+        );
+
+        assert!(
+            ParseError::NotArray.source().is_none(),
+            "a variant that wraps nothing has no source"
+        );
     }
 
     #[test]
