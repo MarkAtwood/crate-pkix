@@ -1053,6 +1053,16 @@ pub fn verify_inclusion_proof(
     }
     // Maximum audit path length for a tree of N leaves is ceil(log2(N))
     // (no path elements for N=1). Any longer is malformed.
+    //
+    // This is a fast path, and the loop below enforces the same bound
+    // exactly: it consumes a path element only while `sn != 0`, and `sn`
+    // starts at N-1 and is shifted right once per element, so it admits
+    // precisely `64 - leading_zeros(N - 1)` of them before reporting
+    // `MerkleProofMalformed` itself. The two bounds are the same
+    // expression, not merely similar, so every mutation of the
+    // arithmetic here produces the same verdict by the other route --
+    // three survive a sweep and always will. Kept because rejecting an
+    // absurd path before hashing anything is worth the four lines.
     let max_path_len = if proof.tree_size <= 1 {
         0
     } else {

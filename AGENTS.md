@@ -263,6 +263,24 @@ If it asks "does this match something required", a name that matches nothing
 fails it for you. If it asks "does this match something forbidden", a name that
 matches nothing passes. Those are opposite, and one of them needs the guard.
 
+Sometimes, though, subsumed means subsumed. The test is whether the two checks
+compute the *same expression*, not merely whether they usually agree.
+`verify_inclusion_proof` rejects an audit path longer than
+`64 - leading_zeros(N - 1)`, and the loop below it consumes an element only
+while `sn != 0`, where `sn` starts at `N - 1` and shifts right once per
+element -- so the loop admits exactly that many and reports the same error.
+Not similar bounds: the same bound, twice. Three mutants of the arithmetic
+survive and always will.
+
+Contrast `max_age` in `pkix-mta-sts`, where the length guard and the
+`MAX_AGE_LIMIT` check looked equally redundant and were not:
+`0031557600` is ten digits worth exactly the limit and `00000000001` is
+eleven worth one, so each bound admits something the other refuses. The
+difference is that there the two checks measure different things -- character
+count against numeric value -- and here they are two spellings of one count.
+Work out which before concluding either way; hand-verify the mutant, and if it
+survives, say in a comment at the code why it must.
+
 ### A test can be thorough about a rule and blind to where it applies
 
 `required_leaf_policy_oids` and `required_leaf_subject_dn_attrs` are checked
