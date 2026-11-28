@@ -347,6 +347,16 @@ impl Lint for Rfc8398SmimeMailboxEquivalenceLint {
         // the equivalence relation, modulo duplicates which we tolerate).
         // Pre-validation above guarantees mailbox_equivalent returns
         // Ok(_); the .expect() carries that invariant in the type.
+        //
+        // The guarantee is that `validate_mailbox_for_equivalence` is at
+        // least as strict as everything `mailbox_equivalent` reports as
+        // an error: no '@', an empty local-part, an empty domain, a
+        // domain IDN will not convert. That relationship is asserted by
+        // `the_validator_rejects_everything_the_comparison_can_error_on`,
+        // so widening `mailbox_equivalent` without widening the
+        // validator fails a test rather than turning a lint finding into
+        // a panic -- which matters because this crate's contract is that
+        // a lint reports and does not abort.
         for r in &rfc822_addrs {
             if !smtputf8_addrs.iter().any(|u| {
                 mailbox_equivalent(r, u).expect("pre-validation ensures inputs are well-formed")
@@ -386,6 +396,10 @@ impl Lint for Rfc8398SmimeMailboxEquivalenceLint {
 /// surfaces as a specific error rather than silently being treated as
 /// non-matching against every counterpart.
 fn validate_mailbox_for_equivalence(addr: &str) -> Result<(), &'static str> {
+    // Must stay at least as strict as every error `mailbox_equivalent`
+    // can return: the equivalence lint validates with this and then
+    // `.expect()`s that. See
+    // `the_validator_rejects_everything_the_comparison_can_error_on`.
     let (local, domain) = split_mailbox(addr).ok_or("no '@' delimiter")?;
     if local.is_empty() {
         return Err("empty local-part");
@@ -897,6 +911,86 @@ mod tests {
     // runs assuming well-formedness; the two share their validity
     // predicate so a well-formed input passes both and any malformed
     // input fails both.
+
+    /// Every input `mailbox_equivalent` can reject, the validator rejects
+    /// first.
+    ///
+    /// `Rfc8398SmimeMailboxEquivalenceLint::check_cert` runs
+    /// `validate_mailbox_for_equivalence` over both collections and then
+    /// calls `mailbox_equivalent(..).expect(..)` inside its cross-match
+    /// loops. That `expect` is sound only while the validator is at
+    /// least as strict as the comparison, and the coupling lived in a
+    /// comment: anyone adding an error case to `mailbox_equivalent` -- a
+    /// length cap, a forbidden character, a stricter IDN profile --
+    /// would turn a lint finding into a process abort, in a crate whose
+    /// contract is that a lint reports and does not panic.
+    ///
+    /// This asserts the implication directly. Each input is malformed in
+    /// one of the ways `mailbox_equivalent` reports: no `@`, an empty
+    /// local-part, an empty domain, or a domain IDN cannot convert. For
+    /// each, the validator must reject it -- on either side of the
+    /// comparison, since `check_cert` validates both collections but the
+    /// loops pass rfc822 first and SmtpUTF8Mailbox second.
+    ///
+    /// It fails the moment either predicate moves out from under the
+    /// other, which is what the comment could not do.
+    #[test]
+    fn the_validator_rejects_everything_the_comparison_can_error_on() {
+        // A well-formed counterpart, so the only malformed side is the
+        // one under test.
+        const OK: &str = "user@example.com";
+
+        for bad in [
+            "no-at-sign",   // split_mailbox returns None
+            "",             // likewise, and empty
+            "@example.com", // empty local-part
+            "user@",        // empty domain
+            "user@xn--",    // domain IDN cannot convert
+        ] {
+            assert!(
+                validate_mailbox_for_equivalence(bad).is_err(),
+                "the validator must reject {bad:?} before the comparison sees it"
+            );
+
+            // And confirm the comparison really is the weaker predicate:
+            // with the validator bypassed, each of these either errors or
+            // answers without panicking -- never the reverse of the
+            // implication, which would be the comparison accepting what
+            // the validator refused.
+            let as_rfc822 = mailbox_equivalent(bad, OK);
+            let as_smtputf8 = mailbox_equivalent(OK, bad);
+            assert!(
+                as_rfc822.is_err() || as_smtputf8.is_err(),
+                "{bad:?} is malformed, so at least one side must report it; \
+                 got {as_rfc822:?} and {as_smtputf8:?}"
+            );
+        }
+    }
+
+    /// And the validator does not reject what the comparison needs.
+    ///
+    /// The other direction of the same relationship: a validator that
+    /// rejected everything would satisfy the test above while making the
+    /// lint useless, since no pair would ever reach the comparison.
+    #[test]
+    fn the_validator_accepts_what_the_comparison_is_for() {
+        for good in [
+            "user@example.com",
+            "user@EXAMPLE.COM",
+            "user@xn--bcher-kva.example",
+            "user@bücher.example",
+            "user.name+tag@sub.example.com",
+        ] {
+            assert!(
+                validate_mailbox_for_equivalence(good).is_ok(),
+                "the validator must admit {good:?}"
+            );
+            assert!(
+                mailbox_equivalent(good, good).is_ok(),
+                "and the comparison must not error on it either"
+            );
+        }
+    }
 
     #[test]
     fn validate_mailbox_accepts_well_formed_ascii() {
