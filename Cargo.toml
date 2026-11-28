@@ -159,7 +159,7 @@ debug = "line-tables-only"
 
 [workspace.dependencies]
 # Internal crates
-pkix-path             = { path = "pkix-path",             version = "0.4.8" }
+pkix-path             = { path = "pkix-path",             version = "0.4.9" }
 pkix-revocation       = { path = "pkix-revocation",       version = "0.5.3" }
 pkix-path-builder     = { path = "pkix-path-builder",     version = "0.5.3" }
 pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.3.3" }

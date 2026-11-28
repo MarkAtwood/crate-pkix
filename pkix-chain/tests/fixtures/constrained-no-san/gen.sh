@@ -84,7 +84,32 @@ openssl ca -batch -config "$WORK/ca.cnf" -in "$WORK/leaf.csr" \
   -out "$WORK/leaf.pem" >/dev/null 2>&1
 openssl x509 -in "$WORK/leaf.pem" -out leaf-cn-only.der -outform DER
 
-for f in ca-constrained.der leaf-cn-only.der; do
+# A second leaf whose CN is INSIDE the permitted subtree, still with no SAN.
+#
+# pkix-path now reads a host-name-shaped CN as a dNSName identity and
+# bounds it (see `cn_dns_identities`), so it refuses the evil.example
+# leaf above at path validation. That is defence in depth, but it would
+# leave `SmtpDaneFailure::ConstrainedPathWithoutDnsId` untested: the
+# composition refusal is unconditional once the path constrains dNSName
+# names and the leaf presents none, and this is the leaf that reaches it
+# -- the path is valid, and the refusal is still correct, because the
+# constraint remains unenforceable against a CN.
+cat > "$WORK/leaf2.cnf" <<'CNF'
+[req]
+distinguished_name = dn
+prompt             = no
+[dn]
+CN = mx.good.example
+CNF
+openssl ecparam -name prime256v1 -genkey -noout -out "$WORK/leaf2.key"
+openssl req -new -key "$WORK/leaf2.key" -config "$WORK/leaf2.cnf" -out "$WORK/leaf2.csr"
+openssl ca -batch -config "$WORK/ca.cnf" -in "$WORK/leaf2.csr" \
+  -extensions leaf_ext \
+  -startdate 20260101000000Z -enddate 20360101000000Z \
+  -out "$WORK/leaf2.pem" >/dev/null 2>&1
+openssl x509 -in "$WORK/leaf2.pem" -out leaf-cn-in-subtree.der -outform DER
+
+for f in ca-constrained.der leaf-cn-only.der leaf-cn-in-subtree.der; do
   echo "== $f"
   openssl x509 -in "$f" -inform DER -noout -subject -dates | sed 's/^/  /'
   openssl x509 -in "$f" -inform DER -noout -text \

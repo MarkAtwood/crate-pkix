@@ -402,7 +402,54 @@ layer's rule exactly. `wildcard_san_reaches_excluded_dns` reimplements
 `pkix-identity`'s wildcard shape test rather than approximating it,
 because a spelling the matcher refuses authenticates nothing and one it
 accepts must be bounded -- so any disagreement is either a refusal of a
-harmless certificate or another hole of the same shape.
+harmless certificate or another hole of the same shape. The same
+requirement governs `is_dns_identity_shaped`, which has to admit
+wildcard spellings even though a wildcard is not host-name shaped.
+
+### A second layer's defence does not make the first layer's gap safe
+
+Chasing a variant of the above found that `pkix-path` never consulted
+the `commonName`, so a dNSName constraint was unenforceable against a
+certificate carrying its name only there. OpenSSL rejects such a chain;
+`pkix-path` accepted it.
+
+It was not exploitable. `pkix-chain`'s SMTP DANE entry point already
+refused the whole shape, unconditionally, with
+`SmtpDaneFailure::ConstrainedPathWithoutDnsId` -- the hazard was known
+and closed under PKIX-skxt, with a fixture and two tests. The
+reachability analysis that called it live had stopped at `pkix-dane` and
+never looked at the umbrella above it.
+
+Two lessons, and the second is the one that cost time.
+
+When tracing whether a gap is reachable, follow the call path to the
+outermost layer a consumer actually calls. Stopping one crate short
+turns "the composition is unsafe" into a claim the code already
+disproves, and in a workspace of 34 crates the composing layer is
+usually not the one holding the bug.
+
+A third, learned by getting it wrong: an implementation is evidence
+about a rule, not the rule. OpenSSL rejects the chain above, so matching
+OpenSSL looked like the fix, and three hand-built chains agreed. It
+broke 88 `bettertls::nameconstraints` testcases, because OpenSSL bounds
+the CN whenever no *dNSName* SAN is present, and a certificate
+presenting `IP:127.0.0.1` with `CN=test.localhost` is asserting the
+address. Once `subjectAltName` is present the CN is not an identity
+(RFC 5280 §4.1.2.6), so constraining it refuses certificates nobody can
+misuse -- and x509-limbo's ground truth says so while OpenSSL does not.
+Three chosen fixtures agreed with the wrong rule; 9731 corpus cases
+found it in one run. Check a behaviour against the corpus before
+adopting it, especially when the corpus is already wired up.
+
+And a gap closed downstream is still worth closing where it lives:
+`pkix-path` is published on its own, so a consumer validating a path
+without the umbrella got the lenient answer. But fixing it moved the
+refusal earlier, which made the downstream refusal unreachable from the
+two tests that covered it -- so closing it required a *new* fixture
+whose path validates cleanly, to keep the backstop exercised. Fixing an
+outer layer's redundancy into a dead branch is a coverage regression
+that no test failure announces; here two tests failed and said so, which
+is the only reason it was visible.
 
 ### Pin an external corpus, or its baseline measures nothing
 

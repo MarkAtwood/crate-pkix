@@ -2971,6 +2971,168 @@ fn matches_dns_name(subject: &str, constraint: &str) -> bool {
     }
 }
 
+/// `id-at-commonName` (RFC 4519 §2.3).
+const OID_AT_COMMON_NAME: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.4.3");
+
+/// A `commonName` AVA value as a string, for the string types that can
+/// hold a host name.
+///
+/// This must accept at least everything `pkix-identity`'s own CN reader
+/// accepts, because that is the function that will match the value
+/// against a requested name. It reads `PrintableString`, `UTF8String`
+/// and `IA5String`, and this reads the same three. A value neither can
+/// read is one nothing will match a host name against, so the sets
+/// agreeing is what matters rather than either being generous.
+fn cn_value_as_str(value: &der::Any) -> Option<&str> {
+    if let Ok(s) = value.decode_as::<der::asn1::PrintableStringRef<'_>>() {
+        return Some(s.as_str());
+    }
+    if let Ok(s) = value.decode_as::<der::asn1::Utf8StringRef<'_>>() {
+        return Some(s.as_str());
+    }
+    if let Ok(s) = value.decode_as::<der::asn1::Ia5StringRef<'_>>() {
+        return Some(s.as_str());
+    }
+    None
+}
+
+/// Whether a string is shaped like a host name: at least one label
+/// separator, and every label non-empty and LDH (letters, digits,
+/// hyphen).
+///
+/// This is the heuristic that decides whether a `commonName` is read as
+/// a DNS identity, and it is deliberately narrow. A descriptive CN such
+/// as `Example Corp Issuing CA` has no dot and a space, so it is never
+/// read as a host name and never constrained as one; `notallowed.test`
+/// is.
+fn is_hostname_shaped(s: &str) -> bool {
+    let s = strip_root_dot(s);
+    if s.is_empty() || !s.contains('.') {
+        return false;
+    }
+    s.split('.').all(|label| {
+        !label.is_empty()
+            && label
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    })
+}
+
+/// Whether a `commonName` could be matched against a requested DNS name.
+///
+/// Either a host name, or a wildcard of the one shape
+/// `pkix-identity`'s matcher honours. The wildcard case has to be here:
+/// a CN of `*.example.com` is not a host name by
+/// [`is_hostname_shaped`], but it will match `bar.example.com`, so
+/// leaving it out would constrain the literal spelling and miss the
+/// wildcard -- the very gap closed for SANs in
+/// [`wildcard_san_reaches_excluded_dns`].
+fn is_dns_identity_shaped(s: &str) -> bool {
+    let s = strip_root_dot(s);
+    match s.strip_prefix("*.") {
+        Some(rest) => !rest.contains('*') && is_hostname_shaped(rest),
+        None => is_hostname_shaped(s),
+    }
+}
+
+/// The `commonName` values this certificate asserts as DNS identities.
+///
+/// RFC 5280 §4.2.1.10 does not require checking the CN, and RFC 6125
+/// §6.4.4 deprecated reading one as a host name -- which
+/// `pkix_identity::verify_dns_name` honours, refusing to fall back. But
+/// RFC 7672 §3.2.3 still *requires* CN fallback for SMTP DANE, so the
+/// name is read as an identity there, and a constraint that cannot see
+/// it cannot bound it. OpenSSL applies dNSName constraints to the CN in
+/// exactly this case, and a chain it rejects as an excluded-subtree
+/// violation was being accepted here.
+///
+/// Empty when the certificate carries a `subjectAltName` extension at
+/// all, not merely when it carries a dNSName one.
+///
+/// That distinction is the whole rule, and getting it wrong rejects
+/// valid certificates. A certificate presenting `IP:127.0.0.1` and
+/// `CN=test.localhost` is asserting the address, not the name: RFC 5280
+/// §4.1.2.6 makes `subjectAltName` *the* place identities live once it
+/// is present, so the CN is not an identity and bounding it as one
+/// refuses a certificate nobody can misuse. x509-limbo's
+/// `bettertls::nameconstraints` suite is full of exactly that shape --
+/// 88 of its testcases -- and expects them to validate.
+///
+/// OpenSSL does bound the CN in that case, and rejects those chains as
+/// excluded-subtree violations. It is over-strict here, and matching it
+/// was a mistake worth naming: an implementation is evidence about a
+/// rule, not the rule.
+///
+/// The residual gap this leaves is real but covered. `pkix-identity`'s
+/// CN fallback triggers on the absence of a dNSName SAN, not on the
+/// absence of every SAN, so a certificate with an IP SAN and a
+/// host-name CN can still be CN-matched for a DNS name by
+/// `verify_dns_name_with_cn_fallback` while unbounded here.
+/// `pkix-chain`'s SMTP DANE entry point refuses that whole shape
+/// unconditionally -- `SmtpDaneFailure::ConstrainedPathWithoutDnsId`,
+/// PKIX-skxt -- which is the right place for it, because only that
+/// layer holds both the path and the requested name.
+fn cn_dns_identities<'a>(
+    subject: &'a x509_cert::name::Name,
+    san: Option<&x509_cert::ext::pkix::SubjectAltName>,
+) -> Vec<&'a str> {
+    if san.is_some() {
+        return Vec::new();
+    }
+    // `Name::iter` flattens across RelativeDistinguishedNames: a
+    // multi-valued RDN carrying a commonName is unusual but legal, and
+    // every CN the certificate asserts has to be bounded.
+    subject
+        .iter()
+        .filter(|ava| ava.oid == OID_AT_COMMON_NAME)
+        .filter_map(|ava| cn_value_as_str(&ava.value))
+        .filter(|s| is_dns_identity_shaped(s))
+        .collect()
+}
+
+/// Check each `commonName` read as a DNS identity against the dNSName
+/// subtrees, with the same rules a dNSName SAN gets.
+fn check_cn_dns_against_subtrees(
+    cns: &[&str],
+    subtrees: &[x509_cert::ext::pkix::constraints::name::GeneralSubtree],
+    mode: CheckMode,
+    nc_constrained_types: NcTypeMask,
+    index: usize,
+) -> crate::Result<()> {
+    use x509_cert::ext::pkix::name::GeneralName;
+
+    if cns.is_empty() {
+        return Ok(());
+    }
+    let dns_subtrees = || {
+        subtrees.iter().filter_map(|st| match &st.base {
+            GeneralName::DnsName(c) => Some(c.as_str()),
+            _ => None,
+        })
+    };
+
+    for cn in cns {
+        match mode {
+            CheckMode::Excluded => {
+                if dns_subtrees()
+                    .any(|c| matches_dns_name(cn, c) || wildcard_san_reaches_excluded_dns(cn, c))
+                {
+                    return Err(Error::NameConstraintViolation { index });
+                }
+            }
+            CheckMode::Permitted => {
+                if nc_constrained_types.intersects(NcTypeMask::DNS)
+                    && !dns_subtrees().any(|c| matches_dns_name(cn, c))
+                {
+                    return Err(Error::NameConstraintViolation { index });
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Whether a wildcard dNSName SAN can authenticate a name inside an
 /// excluded subtree that the SAN's own spelling does not fall into.
 ///
@@ -3252,9 +3414,9 @@ fn ip_constraint_within(a: &[u8], b: &[u8]) -> bool {
 #[cfg(test)]
 mod tests_constraint_forms {
     use super::{
-        ip_constraint_within, is_ipv4_literal, is_strict_subdomain, matches_dns_name,
-        matches_ip_address, subtree_within, uri_constraint_within,
-        wildcard_san_reaches_excluded_dns,
+        ip_constraint_within, is_dns_identity_shaped, is_hostname_shaped, is_ipv4_literal,
+        is_strict_subdomain, matches_dns_name, matches_ip_address, subtree_within,
+        uri_constraint_within, wildcard_san_reaches_excluded_dns,
     };
     use der::Decode as _;
     use x509_cert::ext::pkix::name::GeneralName;
@@ -3284,6 +3446,94 @@ mod tests_constraint_forms {
     /// `equal || is_strict_subdomain`. With `&&` a domain would have to be a
     /// strict subdomain of itself, which nothing is, and a constraint would
     /// stop containing its own subtree.
+    /// A descriptive commonName is never read as a host name.
+    ///
+    /// This is the false-rejection boundary: were it looser, a CA
+    /// constrained to a DNS subtree could not issue a certificate whose
+    /// CN is a person or an organisation, which is most certificates
+    /// that carry no dNSName SAN. OpenSSL draws the line in the same
+    /// place -- it accepts `CN=John Smith` under a `permitted
+    /// DNS:example.com` constraint and rejects `CN=notallowed.test`.
+    #[test]
+    fn only_a_host_name_shaped_cn_is_read_as_one() {
+        for not_a_host in [
+            "John Smith",
+            "Example Corp Issuing CA",
+            // No label separator: a bare label is not treated as a host
+            // name, matching the wildcard rule's refusal of `*.com`.
+            "localhost",
+            "",
+            ".",
+            // Empty labels.
+            "a..b",
+            ".leading",
+            // Characters no host name carries.
+            "under_score.example",
+            "space in.example",
+            "quote\".example",
+        ] {
+            assert!(
+                !is_hostname_shaped(not_a_host),
+                "{not_a_host:?} must not be read as a host name"
+            );
+        }
+
+        for host in [
+            "notallowed.test",
+            "mx.good.example",
+            "a.b",
+            "xn--bcher-kva.example",
+            "has-hyphens.example.com",
+            "MixedCase.Example",
+            // A trailing root dot is the same name.
+            "trailing.example.",
+        ] {
+            assert!(is_hostname_shaped(host), "{host:?} is host-name shaped");
+        }
+    }
+
+    /// The shape test must admit every spelling `pkix-identity`'s
+    /// matcher can match a requested name against.
+    ///
+    /// That matcher honours a leftmost single `*` label whose remainder
+    /// has no further `*` and contains a separator, and otherwise
+    /// matches literally. Anything it can match is an identity this
+    /// certificate asserts, so anything it can match must be bounded by
+    /// the constraints -- and a wildcard is not host-name shaped, which
+    /// is why `is_dns_identity_shaped` exists on top of
+    /// [`is_hostname_shaped`].
+    #[test]
+    fn a_wildcard_cn_is_also_read_as_a_dns_identity() {
+        for wildcard in ["*.example.com", "*.good.example", "*.a.b"] {
+            assert!(
+                !is_hostname_shaped(wildcard),
+                "precondition: a wildcard is not itself host-name shaped"
+            );
+            assert!(
+                is_dns_identity_shaped(wildcard),
+                "{wildcard:?} can match a requested name, so it must be bounded"
+            );
+        }
+
+        // Spellings that matcher refuses, so they assert nothing.
+        for refused in [
+            // Remainder has no separator.
+            "*.com",
+            // Embedded second wildcard.
+            "*.foo.*.com",
+            // Not leftmost.
+            "foo.*.example.com",
+            "www*.example.com",
+            "*",
+            "*.",
+        ] {
+            assert!(
+                !is_dns_identity_shaped(refused),
+                "{refused:?} matches no requested name"
+            );
+        }
+    }
+
     /// CVE-2025-61727: the wildcard stands for the excluded name.
     ///
     /// `root -> ICA (exclude bar.example.com) -> EE (SAN *.example.com)`
@@ -4663,6 +4913,9 @@ fn check_name_constraints(
 ) -> crate::Result<()> {
     let subject = cert.tbs_certificate().subject();
     let subject_is_empty = subject.is_empty();
+    // Computed once: the SAN scan and the shape tests do not depend on
+    // which mode `check_names` is running in.
+    let cn_dns = cn_dns_identities(subject, san);
 
     // Dispatch the subject DN and the SAN entries against `subtrees` in the
     // requested mode. See `check_subject_dn_against_subtrees` and
@@ -4679,6 +4932,9 @@ fn check_name_constraints(
             index,
         )?;
         check_san_against_subtrees(san, subtrees, mode, nc_constrained_types, index)?;
+        // A commonName read as a DNS identity is bounded like a dNSName
+        // SAN. See `cn_dns_identities`.
+        check_cn_dns_against_subtrees(&cn_dns, subtrees, mode, nc_constrained_types, index)?;
         Ok(())
     };
 

@@ -452,6 +452,12 @@ fn dane_ta_with_an_unrelated_anchor_fails_path_building() {
 // tests/fixtures/constrained-no-san/gen.sh.
 const CONSTRAINED_CA_DER: &[u8] = include_bytes!("fixtures/constrained-no-san/ca-constrained.der");
 const CN_ONLY_LEAF_DER: &[u8] = include_bytes!("fixtures/constrained-no-san/leaf-cn-only.der");
+/// Same CA, same missing SAN, but the CN is *inside* the permitted
+/// subtree, so path validation has nothing to object to and the
+/// composition refusal is the only thing standing between this
+/// certificate and delivery.
+const CN_IN_SUBTREE_LEAF_DER: &[u8] =
+    include_bytes!("fixtures/constrained-no-san/leaf-cn-in-subtree.der");
 
 /// A `dNSName` name constraint must not be escaped by omitting the SAN.
 ///
@@ -486,13 +492,21 @@ fn dane_ta_refuses_a_constrained_path_when_the_leaf_has_no_dns_id() {
     )
     .expect("well-formed call");
 
+    // Refused during path validation now, not by the composition check
+    // below it. `pkix-path` reads a host-name-shaped CN as a dNSName
+    // identity and bounds it against the subtrees, so this leaf never
+    // reaches the name check -- `evil.example` is outside the CA's
+    // permitted subtree. The composition refusal is still the backstop
+    // for the case path validation cannot see; see
+    // `the_composition_refusal_fires_when_the_path_itself_is_valid`.
     assert!(
         matches!(
             verdict,
-            SmtpDaneVerdict::Failed(SmtpDaneFailure::ConstrainedPathWithoutDnsId)
+            SmtpDaneVerdict::Failed(SmtpDaneFailure::PathValidationFailed(_))
         ),
         "a constrained path with no DNS-ID must be refused, got {verdict:?}"
     );
+    assert!(!verdict.rfc7672_permits_delivery());
 }
 
 /// The same CA authenticates nothing by this route even when the CN is
@@ -520,12 +534,58 @@ fn the_refusal_does_not_depend_on_which_name_the_cn_carries() {
     )
     .expect("well-formed call");
 
+    // Still refused, and still for a reason that has nothing to do with
+    // the requested name: the leaf's own CN puts it outside the CA's
+    // permitted subtree whichever name is asked for.
+    assert!(
+        matches!(
+            verdict,
+            SmtpDaneVerdict::Failed(SmtpDaneFailure::PathValidationFailed(_))
+        ),
+        "the refusal must not depend on the requested name, got {verdict:?}"
+    );
+    assert!(!verdict.rfc7672_permits_delivery());
+}
+
+/// The composition refusal fires even when the path is entirely valid.
+///
+/// This is the case `pkix-path` cannot reach. The CN is
+/// `mx.good.example`, inside the CA's permitted subtree, so bounding the
+/// CN as a dNSName identity finds nothing wrong and the path validates.
+/// The refusal is still correct: RFC 5280 §4.2.1.10 applies dNSName
+/// constraints to the SAN, so a CA's constraint is unenforceable against
+/// a certificate that carries its name only in the CN, and whether this
+/// particular CN happens to fall inside the subtree is not something a
+/// relying party should have to depend on.
+///
+/// Without this test the fix in `pkix-path` would make
+/// `ConstrainedPathWithoutDnsId` unreachable from the suite while
+/// leaving it reachable in production -- the two tests above now stop at
+/// path validation.
+#[test]
+fn the_composition_refusal_fires_when_the_path_itself_is_valid() {
+    let leaf = load(CN_IN_SUBTREE_LEAF_DER);
+    let ca = load(CONSTRAINED_CA_DER);
+    let target = target_for(
+        "mx.good.example",
+        vec![full_cert_record(TlsaUsage::DaneTa, CONSTRAINED_CA_DER)],
+    );
+
+    let verdict = verify_at(
+        &target,
+        &[leaf, ca],
+        &[CN_IN_SUBTREE_LEAF_DER, CONSTRAINED_CA_DER],
+        FIXTURE_NOW,
+    )
+    .expect("well-formed call");
+
     assert!(
         matches!(
             verdict,
             SmtpDaneVerdict::Failed(SmtpDaneFailure::ConstrainedPathWithoutDnsId)
         ),
-        "the refusal is unconditional once the path constrains dNSName names \
-         and the leaf presents none, got {verdict:?}"
+        "a valid constrained path whose leaf presents no DNS-ID must still \
+         be refused, got {verdict:?}"
     );
+    assert!(!verdict.rfc7672_permits_delivery());
 }

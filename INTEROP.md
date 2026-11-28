@@ -230,9 +230,9 @@ same commit.
 
   | EE `commonName` | EE SANs | ICA constraint | `openssl` | `pkix-path` |
   | --- | --- | --- | --- | --- |
-  | `bar.example.com` | none | excluded `DNS:bar.example.com` | Fail — excluded subtree violation | **Pass** |
-  | `John Smith` | email only | permitted `DNS:example.com` | OK | — |
-  | `notallowed.test` | email only | permitted `DNS:example.com` | Fail — permitted subtree violation | **Pass** |
+  | `bar.example.com` | none | excluded `DNS:bar.example.com` | Fail — excluded subtree violation | Pass → **Fail** |
+  | `John Smith` | email only | permitted `DNS:example.com` | OK | Pass |
+  | `notallowed.test` | email only | permitted `DNS:example.com` | Fail — permitted subtree violation | Pass — **deliberate** |
 
 * **Reasoning**: OpenSSL applies dNSName constraints to the
   `commonName` when a certificate presents no dNSName SAN, in both
@@ -252,12 +252,33 @@ same commit.
   issues a SAN-less certificate with that CN, the path validates because
   no dNSName SAN exists to violate the exclusion, and the DANE name
   check then matches the CN.
-* **Status**: **real divergence, and the lenient direction** — unlike
-  every other entry here, where `pkix-path` is the stricter one. No
-  wildcard is involved; this is distinct from PKIX-bhtl, whose fix
-  bounds a wildcard SAN's coverage and cannot see a certificate with no
-  SAN. Tracked as PKIX-55jb, which records the recommended fix and the
-  one decision it needs: what counts as hostname-shaped.
+* **Status**: **fixed, narrowly** — `pkix-path` now reads a
+  host-name-shaped `commonName` as a dNSName identity and bounds it
+  against the subtrees in both directions, but **only when the
+  certificate carries no `subjectAltName` extension at all**. Wildcard
+  CN spellings are included, since `pkix-identity`'s matcher honours
+  them. A CN that is not host-name shaped is never read as one.
+  Tracked as PKIX-55jb.
+* **Where OpenSSL goes too far**: it bounds the CN whenever no *dNSName*
+  SAN is present, which rejects a certificate presenting
+  `IP:127.0.0.1` with `CN=test.localhost` under an excluded
+  `DNS:localhost`. That certificate asserts the address — RFC 5280
+  §4.1.2.6 makes `subjectAltName` the place identities live once it is
+  present — so the CN is not an identity and bounding it refuses a
+  certificate nobody can misuse. x509-limbo's
+  `bettertls::nameconstraints` suite expects 88 such chains to validate,
+  and `pkix-path` matching OpenSSL here broke every one of them. Row
+  three above is the same shape and is now a deliberate divergence from
+  OpenSSL.
+* **Not a live bypass**: `pkix-chain`'s SMTP DANE entry point already
+  refused this whole shape unconditionally with
+  `SmtpDaneFailure::ConstrainedPathWithoutDnsId`, closed earlier under
+  PKIX-skxt. The divergence was real and worth fixing — `pkix-path` is
+  published on its own, and a consumer validating a path without the
+  umbrella got the lenient answer — but the DANE composition was never
+  exploitable. No wildcard is involved either, so this is distinct from
+  PKIX-bhtl, whose fix bounds a wildcard SAN's coverage and cannot see a
+  certificate with no SAN at all.
 
 ## Reproducing these findings
 
