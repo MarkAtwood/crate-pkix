@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-dn4q",
+  "title": "external-anchors.yml signals by going red, which is the weakest alert for a rare event",
+  "description": "external-anchors.yml watches IANA's DNSSEC root anchors and Google's CT log-list signing key on a monthly cron (0 6 1 * *). It signals by failing the job, with an 'Explain a failure' step printing the reason into the log.\n\nThe notification is therefore an email about a red run on a scheduled workflow. Nobody is waiting on that run and its failure blocks nothing, so if the watcher fires in eight months the realistic outcome is that it sits red until someone happens to look. The workflow's own comments identify the hazard precisely -- a stale anchor set fails quietly, a consumer simply stops getting DANE -- and then reports it through the quietest channel GitHub has.\n\nTwo changes:\n\n1. Open an issue instead of only going red. A 'gh issue create' step on failure, guarded against duplicates (search for an open issue with the same title first, comment on it rather than opening a second). That puts the event in the tracker, where it has an owner and a history, instead of in a notification you have to be lucky to read. Keep the job failing as well -- the red run is still the cheapest signal for anyone already looking at Actions.\n\n2. Survive repository inactivity. GitHub disables scheduled workflows after 60 days with no repository activity. For a repo under daily work that never fires; for one that goes quiet for two months the watcher silently stops, which is the same quiet-failure shape the workflow exists to prevent. Options: accept it and note it in the workflow's comments, or have the monthly run touch something (a no-op commit is worse than the disease; a repository_dispatch from an external scheduler means owning an external scheduler). Probably: document the limit and rely on a human noticing, since the watched events are announced well in advance anyway.\n\nItem 1 is worth doing on its own. Item 2 may be a comment rather than code.",
+  "status": "open",
+  "priority": 3,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-28T03:23:49.832608719Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-28T03:23:49.832608719Z"
+}
