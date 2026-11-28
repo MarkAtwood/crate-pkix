@@ -640,6 +640,12 @@ mod google_schema {
             return Err(Error::ParseError);
         }
         let y = if month <= 2 { year - 1 } else { year };
+        // The `y - 399` branch is for negative `y`, which means year 0
+        // or earlier -- and `parse_rfc3339_to_unix_ms` refuses anything
+        // before 1970 on the `secs < 0` check below, so no caller
+        // reaches it with a year that survives. Two mutants of that
+        // subtraction survive a sweep for that reason: both change a
+        // result that is discarded.
         let era = if y >= 0 { y } else { y - 399 } / 400;
         let yoe = (y - era * 400) as u32; // [0, 399]
         let m = month;
@@ -765,9 +771,20 @@ mod google_schema {
                 parse_rfc3339_to_unix_ms("2024-02-29T00:00:00Z").is_ok(),
                 "2024 is divisible by 4 and not by 100"
             );
+            // 2100, not 1900. 1900 is the textbook example and it is
+            // useless here: it is before the epoch, so `secs < 0`
+            // refuses it whatever the leap rule decides, and an
+            // assertion that it is an error passes with the rule
+            // inverted. A sweep caught exactly that -- the first
+            // version of this test used 1900 and left both `% 100`
+            // mutants alive while reading as though it covered them.
             assert!(
-                parse_rfc3339_to_unix_ms("1900-02-29T00:00:00Z").is_err(),
-                "1900 is divisible by 100 and not by 400, so it is not a leap year"
+                parse_rfc3339_to_unix_ms("2100-02-29T00:00:00Z").is_err(),
+                "2100 is divisible by 100 and not by 400, so it is not a leap year"
+            );
+            assert!(
+                parse_rfc3339_to_unix_ms("2100-02-28T00:00:00Z").is_ok(),
+                "and the 28th of that February is an ordinary day"
             );
             assert!(
                 parse_rfc3339_to_unix_ms("2000-02-29T00:00:00Z").is_ok(),

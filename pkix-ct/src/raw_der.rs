@@ -91,6 +91,12 @@ pub(crate) fn read_tlv(input: &[u8]) -> Option<Tlv> {
     } else {
         // Long form: the low seven bits count the length octets.
         let count = (first & 0x7F) as usize;
+        // `after_first.len() < count` read as `<=` also survives a
+        // sweep, and equivalently: `==` there means the length octets
+        // consume the rest of the input, leaving no value bytes, while
+        // the long form is only reached for lengths of 0x80 or more --
+        // so the final `input.len() - header_len < value_len` refuses
+        // it either way.
         if count == 0 || count > 4 || after_first.len() < count {
             // Zero means indefinite length, which DER forbids; more
             // than four octets means a value larger than any
@@ -104,6 +110,9 @@ pub(crate) fn read_tlv(input: &[u8]) -> Option<Tlv> {
         }
         let mut len = 0usize;
         for &b in octets {
+            // `|` and `^` agree here: the shift leaves the low eight
+            // bits zero and `b` touches only those. A sweep reports the
+            // `^` form as surviving, and it is equivalent.
             len = (len << 8) | b as usize;
         }
         if len < 0x80 {
@@ -150,6 +159,9 @@ pub(crate) fn push_header(out: &mut Vec<u8>, tag: u8, value_len: usize) {
     let significant = &be[start..];
     // At most `size_of::<usize>()` octets, far below the 0x7F the
     // count field can hold.
+    // `0x80 |` and `0x80 ^` agree: a significant-octet count is at most
+    // `size_of::<usize>()`, so it never sets the 0x80 bit. Equivalent,
+    // and reported as surviving.
     out.push(0x80 | significant.len() as u8);
     out.extend_from_slice(significant);
 }
