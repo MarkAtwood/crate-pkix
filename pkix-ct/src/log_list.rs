@@ -652,6 +652,140 @@ mod google_schema {
     mod schema_tests {
         use super::*;
 
+        /// Every separator is checked, in its own position.
+        ///
+        /// The format checks are chains of `||`, which is why each
+        /// position needs its own malformed case: narrowed to `&&` the
+        /// whole chain is satisfied by almost nothing, so a date with
+        /// exactly one separator wrong is accepted and the fields are
+        /// then read from the wrong offsets. Six mutants of those chains
+        /// survived, one per `||`.
+        ///
+        /// Oracle: RFC 3339 §5.6 `date-time`, which fixes every one of
+        /// these positions. Python refuses all of them too.
+        #[test]
+        fn rfc3339_requires_each_separator_in_its_place() {
+            for s in [
+                "2024_01-02T03:04:05Z", // '-' at index 4
+                "2024-01_02T03:04:05Z", // '-' at index 7
+                "2024-01-02X03:04:05Z", // 'T' at index 10
+                "2024-01-02T03_04:05Z", // ':' at index 13
+                "2024-01-02T03:04_05Z", // ':' at index 16
+                "2024-01-02T03:04:05z", // no trailing 'Z'
+                "2024-01-02T03:04:0Z",  // too short
+            ] {
+                assert!(
+                    parse_rfc3339_to_unix_ms(s).is_err(),
+                    "{s:?} is not an RFC 3339 date-time"
+                );
+            }
+            // And the well-formed version of the same instant is.
+            assert_eq!(
+                parse_rfc3339_to_unix_ms("2024-01-02T03:04:05Z").expect("well-formed"),
+                1_704_164_645_000,
+                "oracle: date -d '2024-01-02T03:04:05Z' +%s = 1704164645"
+            );
+        }
+
+        /// Fractional seconds: one to six digits, and the trailing `Z`
+        /// is not one of them.
+        ///
+        /// `frac_str` is taken as `&s[20..s.len() - 1]` to strip the
+        /// `Z`; with `s.len() / 1` it keeps it and the digit parse
+        /// fails, so any fractional timestamp stops parsing. The length
+        /// bounds are their own pair: empty is not a fraction, and RFC
+        /// 3339 allows arbitrarily many digits but this parser accepts
+        /// at most six, so six must work and seven must not.
+        #[test]
+        fn rfc3339_reads_fractional_seconds() {
+            assert_eq!(
+                parse_rfc3339_to_unix_ms("2024-01-02T03:04:05.123Z").expect("three digits"),
+                1_704_164_645_123,
+                "milliseconds are taken as written"
+            );
+            assert_eq!(
+                parse_rfc3339_to_unix_ms("2024-01-02T03:04:05.1Z").expect("one digit"),
+                1_704_164_645_100,
+                "one digit is a tenth of a second, so it pads to 100 ms"
+            );
+            assert_eq!(
+                parse_rfc3339_to_unix_ms("2024-01-02T03:04:05.123456Z").expect("six digits"),
+                1_704_164_645_123,
+                "six digits is the widest accepted; the sub-millisecond part is dropped"
+            );
+            for s in [
+                "2024-01-02T03:04:05.Z",        // no digits
+                "2024-01-02T03:04:05.1234567Z", // seven
+            ] {
+                assert!(
+                    parse_rfc3339_to_unix_ms(s).is_err(),
+                    "{s:?} is not a fraction this parser accepts"
+                );
+            }
+        }
+
+        /// The epoch itself is a valid timestamp, and anything before it
+        /// is not.
+        ///
+        /// The guard is `secs < 0`, and the window these values feed is
+        /// a `u64` of milliseconds, so there is nothing before 1970 to
+        /// represent. Read as `<=` the epoch is refused; read as `==`
+        /// only the epoch is, and a pre-1970 date flows through as a
+        /// nonsense `u64`.
+        #[test]
+        fn rfc3339_admits_the_epoch_and_nothing_before_it() {
+            assert_eq!(
+                parse_rfc3339_to_unix_ms("1970-01-01T00:00:00Z").expect("the epoch"),
+                0,
+                "the epoch is second zero, not an error"
+            );
+            assert_eq!(
+                parse_rfc3339_to_unix_ms("1970-01-01T00:00:01Z").expect("one second later"),
+                1_000
+            );
+            assert!(
+                parse_rfc3339_to_unix_ms("1969-12-31T23:59:59Z").is_err(),
+                "one second before the epoch has no u64 representation"
+            );
+        }
+
+        /// The Gregorian leap rule, at both of its exceptions.
+        ///
+        /// `leap` is `(year % 4 == 0 && year % 100 != 0) || year % 400
+        /// == 0`, and the two `%` operators that survived are the two
+        /// exceptions: 1900 is divisible by 4 and by 100, so it is not a
+        /// leap year, and 2000 is divisible by 400, so it is. A year
+        /// merely divisible by four exercises neither.
+        ///
+        /// Getting this wrong admits 29 February in a year that has no
+        /// such day, and the date then feeds a log's usable window.
+        #[test]
+        fn rfc3339_applies_the_gregorian_leap_exceptions() {
+            assert!(
+                parse_rfc3339_to_unix_ms("2024-02-29T00:00:00Z").is_ok(),
+                "2024 is divisible by 4 and not by 100"
+            );
+            assert!(
+                parse_rfc3339_to_unix_ms("1900-02-29T00:00:00Z").is_err(),
+                "1900 is divisible by 100 and not by 400, so it is not a leap year"
+            );
+            assert!(
+                parse_rfc3339_to_unix_ms("2000-02-29T00:00:00Z").is_ok(),
+                "2000 is divisible by 400, so it is"
+            );
+            assert!(
+                parse_rfc3339_to_unix_ms("2023-02-29T00:00:00Z").is_err(),
+                "2023 is not divisible by 4 at all"
+            );
+            // A known answer for the leap day itself, so the branch is
+            // pinned to a value and not only to Ok-ness.
+            assert_eq!(
+                parse_rfc3339_to_unix_ms("2000-02-29T00:00:00Z").expect("a leap day"),
+                951_782_400_000,
+                "oracle: date -d '2000-02-29T00:00:00Z' +%s = 951782400"
+            );
+        }
+
         /// Digits in the right places are not a timestamp.
         ///
         /// Oracle: RFC 3339 §5.6 — `time-hour` is 00-23, `time-minute`

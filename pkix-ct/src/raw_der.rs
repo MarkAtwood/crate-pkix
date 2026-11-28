@@ -262,4 +262,114 @@ mod tests {
     fn walking_stops_on_a_malformed_triple() {
         assert!(tlvs(&[0x02, 0x01, 0x05, 0x30, 0x7F]).is_none());
     }
+    // -----------------------------------------------------------------
+    // The length octets' edges
+    // -----------------------------------------------------------------
+    //
+    // `read_tlv` is deliberately stricter than it needs to be: a length
+    // `der` would refuse must be refused here too, because the offsets
+    // it reports are used to splice a TBSCertificate and re-emit it as
+    // the bytes a log signed. A length this accepts and `der` does not
+    // means a signed input over bytes no CA ever issued.
+
+    /// 0x80 is the indefinite-length marker, not the length 128.
+    ///
+    /// DER forbids it (BER's indefinite form), and the long-form reading
+    /// gives a count of zero, which the count check refuses. Read as a
+    /// short form it claims 128 value octets.
+    #[test]
+    fn an_indefinite_length_marker_is_refused() {
+        assert!(read_tlv(&[0x30, 0x80]).is_none());
+        let mut der = vec![0x30, 0x80];
+        der.extend(core::iter::repeat_n(0u8, 128));
+        assert!(
+            read_tlv(&der).is_none(),
+            "even with 128 octets following, 0x80 is not a short-form length"
+        );
+    }
+
+    /// Five length octets is over-long; four is the widest accepted.
+    ///
+    /// Four octets is checked with a value that genuinely needs them, so
+    /// the bound is pinned as the last accepted width rather than the
+    /// first rejected one. That costs a 16 MiB buffer, which is cheaper
+    /// than leaving the comparison unpinned: narrowed to three, every
+    /// certificate over 16 MiB stops parsing; widened, a length no
+    /// certificate can have is accepted and the arithmetic below it runs
+    /// on a number the buffer cannot support.
+    #[test]
+    fn the_long_form_accepts_four_length_octets_and_not_five() {
+        assert!(
+            read_tlv(&[0x30, 0x85, 0x01, 0x00, 0x00, 0x00, 0x00]).is_none(),
+            "five length octets is refused"
+        );
+
+        // 0x01000000 = 16 777 216 value octets, which needs all four.
+        let value_len = 0x0100_0000usize;
+        let mut der = vec![0x30, 0x84, 0x01, 0x00, 0x00, 0x00];
+        der.resize(6 + value_len, 0u8);
+        let tlv = read_tlv(&der).expect("four length octets is within DER");
+        assert_eq!(tlv.header_len, 6);
+        assert_eq!(tlv.value_len, value_len);
+    }
+
+    /// Fewer length octets present than the count claims is truncation.
+    ///
+    /// The check is `after_first.len() < count`, and it guards the slice
+    /// that follows: without it the indexing panics rather than
+    /// returning `None`, so a truncated certificate would abort a
+    /// verifier instead of being refused by it.
+    #[test]
+    fn a_truncated_long_form_length_is_refused() {
+        assert!(
+            read_tlv(&[0x30, 0x84, 0x01, 0x00]).is_none(),
+            "four octets claimed, two present"
+        );
+        assert!(
+            read_tlv(&[0x30, 0x82]).is_none(),
+            "two claimed, none present"
+        );
+    }
+
+    /// A long form that the short form could have carried is non-minimal.
+    ///
+    /// Both spellings: a leading zero octet, and a value under 0x80.
+    #[test]
+    fn a_non_minimal_long_form_length_is_refused() {
+        assert!(
+            read_tlv(&[0x30, 0x82, 0x00, 0x80]).is_none(),
+            "a leading zero length octet"
+        );
+        let mut der = vec![0x30, 0x81, 0x7F];
+        der.extend(core::iter::repeat_n(0u8, 0x7F));
+        assert!(
+            read_tlv(&der).is_none(),
+            "0x7F fits the short form, so the long form is non-minimal"
+        );
+        let mut minimal = vec![0x30, 0x81, 0x80];
+        minimal.extend(core::iter::repeat_n(0u8, 0x80));
+        assert_eq!(
+            read_tlv(&minimal)
+                .expect("0x80 needs the long form")
+                .value_len,
+            0x80,
+            "and 0x80 is the first value that does need it"
+        );
+    }
+
+    /// A value running past the end of the input is refused.
+    ///
+    /// The last check, and the one that makes every length above a claim
+    /// about bytes that are actually present.
+    #[test]
+    fn a_value_longer_than_the_input_is_refused() {
+        assert!(
+            read_tlv(&[0x30, 0x03, 0xAA]).is_none(),
+            "three value octets claimed, one present"
+        );
+        assert!(
+            read_tlv(&[0x30, 0x03, 0xAA, 0xBB, 0xCC]).is_some(),
+            "and exactly three is enough"
+        );
+    }
 }
