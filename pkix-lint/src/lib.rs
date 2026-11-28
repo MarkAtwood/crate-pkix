@@ -235,6 +235,11 @@ mod serde_helpers {
                     .ok_or_else(|| serde::de::Error::custom("non-hex char in cert_sha256"))?;
                 let lo = nibble(bytes[i * 2 + 1])
                     .ok_or_else(|| serde::de::Error::custom("non-hex char in cert_sha256"))?;
+                // `nibble` returns 0..=15, so `hi << 4` occupies only the
+                // high nibble and `lo` only the low one. The two operands
+                // share no set bit, which makes `|` and `^` the same
+                // function here; a sweep's `| -> ^` mutant of this line
+                // survives by construction and no input can catch it.
                 *byte = (hi << 4) | lo;
             }
             Ok(Some(out))
@@ -307,12 +312,19 @@ pub(crate) fn truncate_for_detail(s: &str) -> Cow<'_, str> {
         return Cow::Borrowed(s);
     }
     // Find the last UTF-8 char boundary at or below DETAIL_MAX_BYTES.
-    // `str::is_char_boundary` is true at indices 0..=s.len(), so the
-    // loop terminates on the longest valid prefix that fits.
-    let mut cut = DETAIL_MAX_BYTES;
-    while !s.is_char_boundary(cut) {
-        cut -= 1;
-    }
+    // `str::is_char_boundary` is true at index 0 for every `str`, so the
+    // search always finds one and the `unwrap_or` arm is unreachable.
+    //
+    // A reverse search rather than a decrementing counter, deliberately:
+    // `while !s.is_char_boundary(cut) { cut -= 1 }` says the same thing,
+    // but a sweep that rewrites the `-=` as `/=` turns it into a loop
+    // that never leaves `cut`, and this function sits on the path every
+    // cert-derived string takes. The operator a mutation can spoil is
+    // better not written at all.
+    let cut = (0..=DETAIL_MAX_BYTES)
+        .rev()
+        .find(|&i| s.is_char_boundary(i))
+        .unwrap_or(0);
     Cow::Owned(format!(
         "{}... (truncated, {} bytes total)",
         &s[..cut],
@@ -1048,6 +1060,13 @@ pub trait Lint: LintClone + Send + Sync {
     /// use [`set_parameter`](Self::set_parameter).
     ///
     /// Default: empty slice (no tunable parameters).
+    //
+    // A sweep replaces this body with `Vec::leak(Vec::new())`, which is
+    // also an empty `&[LintParameter]`. The two differ only in where the
+    // (zero-length) allocation came from, and nothing a caller can
+    // observe distinguishes them, so that mutant survives by
+    // construction. `lint_parameters_default_is_empty` pins the contract
+    // the default is actually here for.
     fn parameters(&self) -> &[LintParameter] {
         &[]
     }
@@ -2064,6 +2083,44 @@ mod tests {
         assert!(out.starts_with(&"a".repeat(super::DETAIL_MAX_BYTES - 1)));
     }
 
+    /// The cut lands on the **largest** char boundary at or below the
+    /// cap, never the next one above it.
+    ///
+    /// `truncate_for_detail_respects_utf8_char_boundaries` above pins
+    /// that the output is valid UTF-8 and starts with the ASCII run,
+    /// which both the correct cut (255) and a cut at the boundary above
+    /// the cap (257, taking the whole `ü`) satisfy — so it could not
+    /// tell a backwards search from a forwards one. The direction
+    /// matters: searching upward returns a prefix longer than
+    /// `DETAIL_MAX_BYTES`, and the point of the cap is that the detail
+    /// string carries a bounded amount of attacker-chosen input
+    /// (PKIX-7f92.52).
+    ///
+    /// Oracle: hand-computed. 255 `a` occupy indices 0..=254; the 101
+    /// `ü` are 2 bytes each and occupy 255..=456, so index 256 sits
+    /// inside the first one and 255 is the boundary below it. Total
+    /// length is 255 + 202 = 457 bytes.
+    #[test]
+    fn truncate_for_detail_cuts_at_the_boundary_below_the_cap() {
+        let mut s = String::new();
+        s.push_str(&"a".repeat(255));
+        for _ in 0..101 {
+            s.push('ü');
+        }
+        assert_eq!(s.len(), 457, "test oracle: input is 457 bytes");
+        assert!(
+            !s.is_char_boundary(256),
+            "test oracle: the cap falls inside a multi-byte char"
+        );
+
+        let out = super::truncate_for_detail(&s);
+        assert_eq!(
+            out,
+            format!("{}... (truncated, 457 bytes total)", "a".repeat(255)),
+            "the prefix must stop at byte 255, not take the ü that straddles the cap"
+        );
+    }
+
     // -----------------------------------------------------------------------
     // Severity rank stability tests
     //
@@ -2146,6 +2203,179 @@ mod tests {
         assert!(r.is_finding());
         assert!(r.is_fatal());
         assert_eq!(r.detail(), Some("fatal error"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Display rendering
+    //
+    // Oracle: the strings written by each `Display` impl, as its own
+    // rustdoc and the enum variant docs give them. These renderings are
+    // what an operator reads in a CLI report and what a log line carries,
+    // so a `Display` that silently writes nothing is a blank column in an
+    // audit trail rather than a visible failure — which is exactly how a
+    // whole-body mutation of these impls went unnoticed: every variant
+    // was constructed and inspected by field, never formatted.
+    // -----------------------------------------------------------------------
+
+    /// Each [`Severity`] renders as its lowercase label.
+    #[test]
+    fn severity_display_renders_lowercase_label() {
+        assert_eq!(Severity::Info.to_string(), "info");
+        assert_eq!(Severity::Notice.to_string(), "notice");
+        assert_eq!(Severity::Warn.to_string(), "warn");
+        assert_eq!(Severity::Error.to_string(), "error");
+        assert_eq!(Severity::Fatal.to_string(), "fatal");
+    }
+
+    /// [`LintResult`] renders the variant name, and for the three
+    /// detail-carrying variants appends `": "` and the detail.
+    #[test]
+    fn lint_result_display_renders_variant_and_detail() {
+        assert_eq!(LintResult::Pass.to_string(), "Pass");
+        assert_eq!(LintResult::NotApplicable.to_string(), "NotApplicable");
+        assert_eq!(LintResult::warn("advisory").to_string(), "Warn: advisory");
+        assert_eq!(LintResult::error("broken").to_string(), "Error: broken");
+        assert_eq!(LintResult::fatal("stop").to_string(), "Fatal: stop");
+    }
+
+    /// [`Finding`] renders as `lint_id [severity]: detail`, and omits the
+    /// `": detail"` tail for the two results that carry none.
+    ///
+    /// The severity label here is the one derived from the *result*, not
+    /// from the lint's declared [`Lint::severity`]: a lint declared
+    /// `Error` that returns `Warn` renders `[warn]`.
+    #[test]
+    fn finding_display_renders_id_severity_and_detail() {
+        let base = Finding {
+            lint_id: std::borrow::Cow::Borrowed("rfc5280.cert.bc.ca_false_for_leaf"),
+            citation: std::borrow::Cow::Borrowed("RFC 5280 §4.2.1.9"),
+            rule_bundle_version: std::borrow::Cow::Borrowed(""),
+            result: LintResult::Pass,
+            cert_index: Some(0),
+            evaluated_at_unix: 0,
+            cert_sha256: None,
+        };
+        let with = |result| Finding {
+            result,
+            ..base.clone()
+        };
+
+        assert_eq!(
+            with(LintResult::Pass).to_string(),
+            "rfc5280.cert.bc.ca_false_for_leaf [pass]"
+        );
+        assert_eq!(
+            with(LintResult::NotApplicable).to_string(),
+            "rfc5280.cert.bc.ca_false_for_leaf [n/a]"
+        );
+        assert_eq!(
+            with(LintResult::warn("advisory")).to_string(),
+            "rfc5280.cert.bc.ca_false_for_leaf [warn]: advisory"
+        );
+        assert_eq!(
+            with(LintResult::error("cA=TRUE on a leaf")).to_string(),
+            "rfc5280.cert.bc.ca_false_for_leaf [error]: cA=TRUE on a leaf"
+        );
+        assert_eq!(
+            with(LintResult::fatal("unparseable")).to_string(),
+            "rfc5280.cert.bc.ca_false_for_leaf [fatal]: unparseable"
+        );
+    }
+
+    /// [`ParameterError`] names the offending parameter id in both
+    /// variants, and the rejection reason in `InvalidValue`.
+    ///
+    /// The id is the part an operator acts on: it is what they wrote in
+    /// an OSCAL Profile `set-parameters` directive.
+    #[test]
+    fn parameter_error_display_names_the_parameter() {
+        assert_eq!(
+            ParameterError::UnknownParameter("max-octets".to_owned()).to_string(),
+            "unknown lint parameter 'max-octets'"
+        );
+        assert_eq!(
+            ParameterError::InvalidValue {
+                id: "max-octets".to_owned(),
+                reason: "expected non-negative integer, got 'twenty'".to_owned(),
+            }
+            .to_string(),
+            "invalid value for lint parameter 'max-octets': \
+             expected non-negative integer, got 'twenty'"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Lint trait default method bodies
+    //
+    // Oracle: the `Default:` line in each method's rustdoc on the `Lint`
+    // trait. Every shipped lint overrides most of these, so the defaults
+    // are reached only by a third-party impl that declines to — the case
+    // no in-crate test exercised until now.
+    // -----------------------------------------------------------------------
+
+    /// A `Lint` that implements only the five required methods, so every
+    /// optional method resolves to its trait default.
+    #[derive(Clone)]
+    struct MinimalLint;
+
+    impl Lint for MinimalLint {
+        fn id(&self) -> &'static str {
+            "test.minimal"
+        }
+        fn citation(&self) -> &'static str {
+            "none"
+        }
+        fn severity(&self) -> Severity {
+            Severity::Info
+        }
+        fn scope(&self) -> Scope {
+            Scope::Certificate
+        }
+        fn applies_to(&self) -> SubjectKind {
+            SubjectKind::Any
+        }
+    }
+
+    /// `title` defaults to the lint id, so a catalog built from lints
+    /// that never set a title still names each control.
+    #[test]
+    fn lint_title_defaults_to_the_id() {
+        assert_eq!(MinimalLint.title(), "test.minimal");
+        assert_eq!(MinimalLint.title(), MinimalLint.id());
+    }
+
+    /// `description` defaults to `None`, not to an empty string.
+    ///
+    /// The distinction is load-bearing for OSCAL emit: `None` omits the
+    /// `parts[name=statement]` block entirely, while `Some("")` would
+    /// emit a statement part with empty prose — a shape that reads to a
+    /// downstream consumer as "this control has a statement and it says
+    /// nothing."
+    #[test]
+    fn lint_description_defaults_to_none() {
+        assert_eq!(MinimalLint.description(), None);
+    }
+
+    /// `parameters` defaults to the empty slice, so a lint with no knobs
+    /// contributes no `control.params[*]` entries to an OSCAL catalog.
+    #[test]
+    fn lint_parameters_default_is_empty() {
+        assert!(MinimalLint.parameters().is_empty());
+    }
+
+    /// `set_parameter` defaults to rejecting every id as unknown.
+    ///
+    /// A lint with no parameters must not silently accept an override:
+    /// the operator wrote a `set-parameters` directive expecting it to
+    /// change behaviour, and swallowing it would report compliance under
+    /// settings that were never applied.
+    #[test]
+    fn lint_set_parameter_defaults_to_unknown_parameter() {
+        let mut lint = MinimalLint;
+        assert_eq!(
+            lint.set_parameter("max-octets", "20"),
+            Err(ParameterError::UnknownParameter("max-octets".to_owned()))
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2653,6 +2883,48 @@ mod tests {
         assert_eq!(f2.cert_sha256, None);
     }
 
+    /// `cert_sha256` deserialization accepts uppercase and mixed-case hex,
+    /// not only the lowercase form the serializer emits.
+    ///
+    /// The rule is Postel's: `cert_sha256_hex::serialize` emits lowercase
+    /// (matching `sha256sum` and OSCAL digest hrefs), and the matching
+    /// deserializer accepts any ASCII hex case, so a hash pasted from a
+    /// tool that uppercases — `certutil -hashfile`, `openssl dgst` output
+    /// re-cased by a spreadsheet, a hand-typed evidence pack — still
+    /// identifies the certificate it names. Rejecting uppercase would
+    /// turn a cosmetic difference into "provenance unavailable" on a
+    /// finding whose hash is otherwise correct.
+    ///
+    /// Oracle: FIPS 180-4's SHA-256 of the empty message,
+    /// `e3b0c442…7852b855`, written out as bytes by hand. Nothing here
+    /// computes a digest, so the expected value cannot drift with the
+    /// code under test.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn finding_cert_sha256_accepts_uppercase_hex() {
+        // SHA-256("") per FIPS 180-4, transcribed as bytes.
+        const SHA256_EMPTY: [u8; 32] = [
+            0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f,
+            0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b,
+            0x78, 0x52, 0xb8, 0x55,
+        ];
+        const UPPER: &str = "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855";
+        const MIXED: &str = "e3B0c44298Fc1c149aFbF4c8996Fb92427aE41E4649b934Ca495991b7852b855";
+
+        for hex in [UPPER, MIXED] {
+            let json = format!(
+                r#"{{"lint_id":"x","citation":"c","rule_bundle_version":"","result":"Pass","cert_index":null,"evaluated_at_unix":0,"cert_sha256":"{hex}"}}"#
+            );
+            let f: Finding = serde_json::from_str(&json)
+                .unwrap_or_else(|e| panic!("uppercase/mixed hex must deserialize: {e} ({hex})"));
+            assert_eq!(
+                f.cert_sha256,
+                Some(SHA256_EMPTY),
+                "case-folded hex {hex} must decode to the same 32 bytes as the lowercase form"
+            );
+        }
+    }
+
     #[test]
     #[cfg(feature = "serde")]
     fn finding_cert_sha256_rejects_non_hex_string() {
@@ -3094,6 +3366,45 @@ mod tests {
         // constructor too.
         let lints: Vec<Box<dyn Lint>> = vec![Box::new(AlwaysPass), Box::new(AlwaysPass)];
         let _ = LintRunner::with_bundle_version(lints, "x");
+    }
+
+    /// The duplicate-ID panic names the lint that was registered twice,
+    /// not merely the first lint in the set.
+    ///
+    /// The two tests above both register `[AlwaysPass, AlwaysPass]`,
+    /// where the duplicate *is* the first entry — so they cannot tell
+    /// "panic on the id already seen" from "panic on the first id
+    /// walked", and a mutant that drops the `!` from
+    /// `if !seen.insert(id)` passes them both while naming the wrong
+    /// lint. Naming the wrong lint is the whole cost of the message: an
+    /// operator merging two deviation-bearing lint bundles deduplicates
+    /// whatever the panic points at.
+    #[test]
+    #[should_panic(expected = "duplicate lint id \"test.always_warn\"")]
+    fn lint_runner_duplicate_panic_names_the_repeated_id_not_the_first() {
+        let lints: Vec<Box<dyn Lint>> = vec![
+            Box::new(AlwaysPass),
+            Box::new(AlwaysWarn),
+            Box::new(AlwaysWarn),
+        ];
+        let _ = LintRunner::new(lints);
+    }
+
+    /// `LintRunner`'s hand-written `Debug` reports the lint count and the
+    /// bundle version, and never the lints themselves.
+    ///
+    /// `Box<dyn Lint>` is not `Debug`, so the impl is written out by
+    /// hand; what it chooses to show is what appears in a panic message
+    /// or a `tracing` field at the integration layer. A count plus a
+    /// version is enough to tell two runners apart in a log.
+    #[test]
+    fn lint_runner_debug_reports_lint_count_and_bundle_version() {
+        let lints: Vec<Box<dyn Lint>> = vec![Box::new(AlwaysPass), Box::new(AlwaysWarn)];
+        let runner = LintRunner::with_bundle_version(lints, "bundle-v1");
+        assert_eq!(
+            format!("{runner:?}"),
+            "LintRunner { lint_count: 2, bundle_version: \"bundle-v1\" }"
+        );
     }
 
     #[test]
