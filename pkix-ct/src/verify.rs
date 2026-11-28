@@ -691,6 +691,17 @@ impl<V: SignatureVerifier> SctVerifier<V> {
         // which is the same for every SCT in the list.
         // `build_signed_input_precert_entry` checks it too, per SCT,
         // where it would have become every SCT's rejection reason.
+        // The same `ASN.1Cert` ceiling as the x509 paths, and the only
+        // one of the four sites that a test cannot reach cheaply. The
+        // x509 builders take the DER as bytes, so a `vec![0u8; MAX]`
+        // exercises their copy of this comparison; the precert paths
+        // parse the certificate first, so reaching this one needs a
+        // genuine certificate whose TBS-without-SCT-list is at or over
+        // 16 MiB -- too large to commit, and a runtime-constructed one
+        // would have to be padded to the byte. Left unpinned
+        // deliberately: it is the same constant compared the same way as
+        // `build_merkle_tree_leaf_x509_entry`'s, which
+        // tests/error_and_limits.rs does pin in both directions.
         if tbs_no_sct.len() > MAX_ASN1_CERT_LEN {
             return Err(Error::CertDerTooLong);
         }

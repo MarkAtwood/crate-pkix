@@ -132,4 +132,48 @@ fn the_asn1cert_ceiling_admits_its_own_maximum() {
         ),
         "one byte more cannot be expressed in three octets"
     );
+
+    // The signed-input builder has its own copy of the same check, and
+    // it is reached through verification: the version, log, window and
+    // algorithm checks all pass with the oracle's own SCT, so the
+    // builder runs and then the signature fails. Which error comes back
+    // is what separates the two readings -- at exactly the ceiling the
+    // length is fine and the signature is not, so `InvalidSignature` is
+    // the right answer and `CertDerTooLong` is the mutant's.
+    let logs = oracle_log_list();
+    let v = pkix_ct::SctVerifier::new(logs, pkix_path::DefaultVerifier);
+    assert!(
+        matches!(
+            v.verify_sct_for_cert(&sct, &at_limit),
+            Err(Error::InvalidSignature)
+        ),
+        "2^24 - 1 octets reaches the signature check; it does not fail the length check"
+    );
+    assert!(
+        matches!(
+            v.verify_sct_for_cert(&sct, &over_limit),
+            Err(Error::CertDerTooLong)
+        ),
+        "and one byte more does not reach it"
+    );
+}
+
+/// The oracle log, as `tests/verify.rs` builds it.
+fn oracle_log_list() -> CtLogList {
+    let log_id: [u8; 32] = fs::read("tests/fixtures/sct-oracle/log-id.bin")
+        .expect("read log id")
+        .as_slice()
+        .try_into()
+        .expect("log-id.bin is 32 bytes");
+    let mut logs = CtLogList::new();
+    logs.insert(CtLog::new(
+        log_id,
+        fs::read("tests/fixtures/sct-oracle/log-spki.der").expect("read log spki"),
+        "oracle".into(),
+        "http://example.invalid/ct/".into(),
+        UsableFrom::Unrecorded,
+        None,
+    ))
+    .expect("insert");
+    logs
 }
