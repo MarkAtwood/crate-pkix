@@ -1771,15 +1771,51 @@ mod tests {
         }
     }
 
+    /// Every method of the `Arc<T>` blanket impl must reach the inner
+    /// cache, not just the two the first version of this test used.
+    ///
+    /// `Arc<dyn RevocationCache>` is the shape the wrappers document for
+    /// sharing one store between the CRL and the OCSP fetcher, so the
+    /// forwarding impl is on the path of every cached check those
+    /// consumers make. A method that forwards nowhere is silent in a
+    /// different way for each one, and `invalidate_ocsp` is the quietest:
+    /// the wrapper calls it when cached bytes fail to parse, precisely so
+    /// that a one-off corruption does not break the key forever. Dropped,
+    /// the corrupt entry stays, and every later check on that certificate
+    /// pays the failing parse and then the network request it was meant
+    /// to save — a permanent miss on one key, with no error reporting it.
+    ///
+    /// Only the three plain methods per protocol are here; the guarded
+    /// inserts have their own test in `tests/cache_public_api.rs`, which
+    /// can observe whether the inner override or the trait default ran.
     #[test]
-    fn arc_trait_object_delegates_through() {
-        // Compile-time + behavioural check that Arc<dyn RevocationCache>
-        // is usable as a RevocationCache.
+    fn arc_trait_object_delegates_every_method_through() {
         let inner: Arc<dyn RevocationCache> = Arc::new(InMemoryCache::new());
         let future = SystemTime::now() + Duration::from_secs(3600);
-        let k = dummy_crl_key(None);
-        inner.put_crl(k.clone(), dummy_crl_entry(None, Some(future)));
-        assert!(inner.get_crl(&k).is_some());
+
+        let crl = dummy_crl_key(None);
+        inner.put_crl(crl.clone(), dummy_crl_entry(None, Some(future)));
+        assert!(
+            inner.get_crl(&crl).is_some(),
+            "put_crl then get_crl must reach the inner cache"
+        );
+        inner.invalidate_crl(&crl);
+        assert!(
+            inner.get_crl(&crl).is_none(),
+            "invalidate_crl must remove the entry from the inner cache"
+        );
+
+        let ocsp = dummy_ocsp_key("http://ocsp.example.com/");
+        inner.put_ocsp(ocsp.clone(), dummy_ocsp_entry(Some(future)));
+        assert!(
+            inner.get_ocsp(&ocsp).is_some(),
+            "put_ocsp then get_ocsp must reach the inner cache"
+        );
+        inner.invalidate_ocsp(&ocsp);
+        assert!(
+            inner.get_ocsp(&ocsp).is_none(),
+            "invalidate_ocsp must remove the entry from the inner cache"
+        );
     }
 
     // -----------------------------------------------------------------
@@ -2464,6 +2500,86 @@ mod tests {
             assert!(
                 cache.get_ocsp(&key).is_some(),
                 "OCSP response must be cached under (serial, ikh, url) key"
+            );
+        }
+
+        /// The cache key the wrapper will look under for this fixture.
+        fn fixture_key() -> OcspCacheKey {
+            use crate::{build_ocsp_request, OcspHashAlg};
+            let req = build_ocsp_request(&cert(LEAF_GOOD), &cert(CA), OcspHashAlg::Sha256).unwrap();
+            OcspCacheKey {
+                cert_serial: req.cert_serial,
+                issuer_key_hash: req.issuer_key_hash,
+                responder_url: "http://ocsp.example.com/".to_string(),
+            }
+        }
+
+        fn entry_expiring_at(next_update: u64) -> CachedOcspResponse {
+            CachedOcspResponse {
+                produced_at: SystemTime::UNIX_EPOCH,
+                this_update: SystemTime::UNIX_EPOCH,
+                next_update: Some(SystemTime::UNIX_EPOCH + Duration::from_secs(next_update)),
+                bytes: RESP_GOOD.to_vec(),
+            }
+        }
+
+        /// The OCSP twins of the CRL wrapper's two freshness tests.
+        ///
+        /// Both wrappers convert the caller's `now_unix` into the
+        /// `SystemTime` they compare `nextUpdate` against, and the OCSP
+        /// side had nothing watching that conversion: an arithmetic error
+        /// putting "now" before the epoch leaves every cached entry
+        /// looking live forever, so an expired OCSP response is served
+        /// indefinitely and the responder is never asked again. That is
+        /// the direction revocation cannot afford — a `good` response
+        /// outliving its own validity window hides a revocation that
+        /// happened after it was issued.
+        ///
+        /// The pair is kept for the same reason the CRL pair is. The live
+        /// case alone cannot tell correct freshness from a cache that
+        /// never expires anything; the stale case alone cannot tell it
+        /// from one reading the wall clock, under which `NOW`
+        /// (2026-06-01) is in the past and both entries look expired.
+        #[test]
+        fn a_cached_response_live_at_now_unix_is_served_without_a_fetch() {
+            let fetcher = CountingOcspFetcher {
+                resp_bytes: RESP_GOOD.to_vec(),
+                seen: RefCell::new(0),
+            };
+            let inner = HttpOcspFetcher::new(fetcher, DefaultVerifier, NOW);
+            let cache = InMemoryCache::new();
+            cache.put_ocsp(fixture_key(), entry_expiring_at(NOW + 3600));
+
+            let cached = CachedHttpOcspFetcher::new(inner, cache);
+            cached
+                .check_revocation(&cert(LEAF_GOOD), &cert(CA))
+                .expect("the cached response is live at now_unix");
+            assert_eq!(
+                *cached.inner.fetcher.seen.borrow(),
+                0,
+                "an entry live at the caller's now_unix must be served without \
+                 a network fetch"
+            );
+        }
+
+        #[test]
+        fn a_cached_response_stale_at_now_unix_is_refetched() {
+            let fetcher = CountingOcspFetcher {
+                resp_bytes: RESP_GOOD.to_vec(),
+                seen: RefCell::new(0),
+            };
+            let inner = HttpOcspFetcher::new(fetcher, DefaultVerifier, NOW);
+            let cache = InMemoryCache::new();
+            cache.put_ocsp(fixture_key(), entry_expiring_at(NOW - 3600));
+
+            let cached = CachedHttpOcspFetcher::new(inner, cache);
+            cached
+                .check_revocation(&cert(LEAF_GOOD), &cert(CA))
+                .expect("must succeed after refetching");
+            assert_eq!(
+                *cached.inner.fetcher.seen.borrow(),
+                1,
+                "an entry stale at the caller's now_unix must be refetched"
             );
         }
     }
