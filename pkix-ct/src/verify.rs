@@ -1277,6 +1277,12 @@ fn build_merkle_tree_leaf_precert_entry(
     issuer_key_hash: &[u8; 32],
     tbs_no_sct: &[u8],
 ) -> Result<Vec<u8>> {
+    // The ASN.1Cert ceiling again. Reaching this one needs a real
+    // certificate whose TBS is at or over 16 MiB, so it is left
+    // unpinned on purpose -- see the note at
+    // `verify_embedded_scts_with_report`. The same constant compared
+    // the same way is pinned in both directions at
+    // `build_merkle_tree_leaf_x509_entry`.
     if tbs_no_sct.len() > MAX_ASN1_CERT_LEN {
         return Err(Error::CertDerTooLong);
     }
@@ -1384,6 +1390,12 @@ fn build_signed_input_precert_entry(
     issuer_key_hash: &[u8; 32],
     tbs_no_sct: &[u8],
 ) -> Result<Vec<u8>> {
+    // The ASN.1Cert ceiling again. Reaching this one needs a real
+    // certificate whose TBS is at or over 16 MiB, so it is left
+    // unpinned on purpose -- see the note at
+    // `verify_embedded_scts_with_report`. The same constant compared
+    // the same way is pinned in both directions at
+    // `build_merkle_tree_leaf_x509_entry`.
     if tbs_no_sct.len() > MAX_ASN1_CERT_LEN {
         return Err(Error::CertDerTooLong);
     }
@@ -1508,6 +1520,12 @@ fn tbs_without_sct_list(leaf_cert_der: &[u8]) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(new_tbs_body.len() + 6);
     raw_der::push_header(&mut out, tbs_tag, new_tbs_body.len());
     out.extend_from_slice(&new_tbs_body);
+    // The ASN.1Cert ceiling again. Reaching this one needs a real
+    // certificate whose TBS is at or over 16 MiB, so it is left
+    // unpinned on purpose -- see the note at
+    // `verify_embedded_scts_with_report`. The same constant compared
+    // the same way is pinned in both directions at
+    // `build_merkle_tree_leaf_x509_entry`.
     if out.len() > MAX_ASN1_CERT_LEN {
         return Err(Error::CertDerTooLong);
     }
