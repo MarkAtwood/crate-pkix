@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-bnh7",
+  "title": "pkix-difftest: the harness ignores limbo's extended_key_usage, so ee-wrong-eku scores as a defect",
+  "description": "rfc5280::eku::ee-wrong-eku expects FAILURE and pkix-path passes it. The leaf carries EKU id-kp-clientAuth only; the testcase states extended_key_usage = ['serverAuth'] as the validator's requirement.\n\nNot a gap in pkix-path. ValidationPolicy::required_leaf_eku already exists (pkix-path/src/lib.rs:1261, checked at :4376). The harness never sets it: the limbo loader deserialises extended_key_usage and key_usage and ignores both, as its own module docs record.\n\nThis is the third instance of one pattern -- a corpus states an input, the loader parses it, no oracle applies it, and the resulting disagreement reads as the implementation being wrong. The first was the RFC 5280 §6.1.1 policy inputs (PKIX-zd45, 13 vectors), the second expected_peer_name (PKIX-rnsv, 2895 testcases). This one is worth one case.\n\nScope:\n  - carry the required leaf EKUs on Chain, defaulting to none\n  - populate from limbo's extended_key_usage\n  - set ValidationPolicy::required_leaf_eku in the pkix-path oracle\n  - the openssl/pyca abstention question again: openssl verify has -purpose, pyca's PolicyBuilder has an EKU notion, so all three may be able to comply. Check rather than assume, as with peer identity.\n\nWorth exactly 1 of the 49 ground-truth disagreements, so low priority. The care needed is on the 13 testcases that state an EKU and currently AGREE -- 10 clientAuth and 3 serverAuth -- which must not start failing. The corpus states an EKU on only 14 of 9807 testcases, so the blast radius is small either way.\n\nAlso unwired and inert for the same reason: key_usage (2 testcases), signature_algorithms (none populated), and multi-anchor trusted_certs where only trusted_certs[0] is used. Those are separate, listed here so the inventory is in one place -- the audit this bead's pattern deserves was started and not finished.",
+  "status": "open",
+  "priority": 3,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-28T06:17:23.99912372Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-28T06:17:23.99912372Z"
+}
