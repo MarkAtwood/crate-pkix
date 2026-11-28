@@ -285,6 +285,45 @@ mod tests {
         }
     }
 
+    /// `BuildError` must report the DER failure it wraps, in its message
+    /// and through [`std::error::Error::source`].
+    ///
+    /// The same gap as `ExtractError`'s, one layer along. `BuildError`
+    /// reaches a caller as the text inside
+    /// `pkix_revocation::Error::RevocationFetchFailed`, by way of
+    /// `crate::ocsp::request_build_failed`, which interpolates this
+    /// `Display` with `{e}`. The variant is only produced when an
+    /// issuer's `subject` DN or `subjectPublicKeyInfo` will not re-encode
+    /// for hashing — a structurally broken certificate that nevertheless
+    /// parsed — so the wrapped `der::Error` is the only thing that says
+    /// which field it was, and an operator who loses it has nothing left
+    /// to look at.
+    #[test]
+    fn build_error_reports_the_der_failure_it_wraps() {
+        let inner = der::Error::from(der::ErrorKind::Failed);
+        let inner_message = inner.to_string();
+        let err = BuildError::Asn1(inner);
+
+        let shown = format!("{err}");
+        assert!(
+            shown.contains("OCSP request encoding error"),
+            "Display must say which stage failed: {shown:?}"
+        );
+        assert!(
+            shown.contains(&inner_message),
+            "Display must carry the wrapped der::Error's own message \
+             ({inner_message:?}): {shown:?}"
+        );
+
+        let source = std::error::Error::source(&err)
+            .expect("BuildError::Asn1 must expose its der::Error as source()");
+        assert_eq!(
+            source.to_string(),
+            inner_message,
+            "source() must be the der::Error the variant carries"
+        );
+    }
+
     #[test]
     fn cert_id_uses_issuer_subject_not_self() {
         // Regression guard: the CertID's issuerNameHash MUST be over the
