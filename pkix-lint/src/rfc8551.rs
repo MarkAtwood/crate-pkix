@@ -232,6 +232,10 @@ mod tests {
         let lint = Rfc8551EkuEmailProtectionLint;
         assert_eq!(lint.id(), "rfc8551.cert.eku.email_protection_required");
         assert_eq!(lint.citation(), "RFC 8551 §3.3 (+ RFC 5280 §4.2.1.12)");
+        assert_eq!(
+            lint.title(),
+            "S/MIME certificate must include id-kp-emailProtection EKU"
+        );
         assert_eq!(lint.severity(), Severity::Error);
         assert_eq!(lint.scope(), Scope::Certificate);
         assert_eq!(lint.applies_to(), SubjectKind::Leaf);
