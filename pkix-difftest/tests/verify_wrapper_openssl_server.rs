@@ -37,7 +37,7 @@ use pkix_chain::{
     ServerName, TrustAnchor,
 };
 use pkix_difftest::oracles;
-use pkix_difftest::{Chain, Verdict};
+use pkix_difftest::{Chain, InitialPolicyInputs, Verdict};
 use pkix_profiles::Rfc5280Profile;
 use x509_cert::der::Decode as _;
 use x509_cert::Certificate;
@@ -226,6 +226,7 @@ fn build_args<'a>(case: &'a ServerCase<'a>) -> oracles::openssl::VerifyArgs<'a> 
 
 fn make_diff_chain(leaf: &Certificate, root: &Certificate, case: &ServerCase<'_>) -> Chain {
     Chain {
+        initial_policy_inputs: InitialPolicyInputs::default(),
         aux_certs_der: Vec::new(),
         certs_der: vec![cert_der(leaf), cert_der(root)],
         crls: Vec::new(),

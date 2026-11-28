@@ -36,7 +36,7 @@ use pkix_chain::{
     ServerName, TrustAnchor,
 };
 use pkix_difftest::oracles;
-use pkix_difftest::{Chain, Verdict};
+use pkix_difftest::{Chain, InitialPolicyInputs, Verdict};
 use pkix_profiles::{BasicTlsClientProfile, Rfc5280Profile};
 use x509_cert::der::Decode as _;
 use x509_cert::Certificate;
@@ -223,6 +223,7 @@ fn verify_tls_client_dns_diff_against_openssl() {
 
         // --- OpenSSL verdict ---
         let diff_chain = Chain {
+            initial_policy_inputs: InitialPolicyInputs::default(),
             aux_certs_der: Vec::new(),
             certs_der: vec![cert_der(&leaf), cert_der(&root)],
             crls: Vec::new(),

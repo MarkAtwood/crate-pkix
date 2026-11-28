@@ -209,6 +209,20 @@ fn run_corpus(cmd: &CorpusCmd) -> std::io::Result<()> {
         let mut verdicts = Vec::with_capacity(oracle_names.len());
         let mut had_oracle_error = false;
         for &name in &oracle_names {
+            // An oracle that cannot be given RFC 5280 §6.1.1 initial
+            // inputs must not vote on a chain whose inputs are not the
+            // defaults: it would be answering a different question, and
+            // its verdict would read as a disagreement about the
+            // certificates. Skipping it keeps cross-oracle comparison
+            // between oracles that were asked the same thing, and costs
+            // nothing on the chains where the inputs are the defaults --
+            // which is what every corpus but PKITS supplies, and 214 of
+            // the 249 PKITS vectors.
+            if !name.honours_policy_inputs()
+                && !item.chain.initial_policy_inputs.is_rfc5280_default()
+            {
+                continue;
+            }
             match run_oracle(name, &item.chain) {
                 Ok(v) => verdicts.push((name, v)),
                 Err(e) => {

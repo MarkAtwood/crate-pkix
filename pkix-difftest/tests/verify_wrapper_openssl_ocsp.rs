@@ -48,7 +48,7 @@ use pkix_chain::{
     verify_ocsp_responder, DefaultVerifier, Error, NoAiaFetcher, NoRevocation, TrustAnchor,
 };
 use pkix_difftest::oracles;
-use pkix_difftest::{Chain, Verdict};
+use pkix_difftest::{Chain, InitialPolicyInputs, Verdict};
 use pkix_profiles::BasicOcspResponderProfile;
 use x509_cert::der::Decode as _;
 use x509_cert::Certificate;
@@ -135,6 +135,7 @@ fn verify_ocsp_responder_diff_against_openssl_ocsphelper() {
         );
 
         let diff_chain = Chain {
+            initial_policy_inputs: InitialPolicyInputs::default(),
             aux_certs_der: Vec::new(),
             certs_der: vec![cert_der(&leaf), cert_der(&root)],
             crls: Vec::new(),

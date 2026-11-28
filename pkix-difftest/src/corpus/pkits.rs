@@ -17,6 +17,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use der::asn1::ObjectIdentifier;
 use der::Decode as _;
 use pkix_path::TrustAnchor;
 use pkix_path_builder::{build_path, CertPool};
@@ -24,7 +25,7 @@ use serde::Deserialize;
 use x509_cert::Certificate;
 
 use crate::corpus::{Corpus, CorpusItem};
-use crate::{Chain, Verdict};
+use crate::{Chain, InitialPolicyInputs, Verdict};
 
 /// PKITS vector entry.
 ///
@@ -267,6 +268,7 @@ fn build_item(certs_dir: &Path, crls_dir: &Path, vec: &PkitsVector) -> io::Resul
         .collect();
 
     let chain = Chain {
+        initial_policy_inputs: policy_inputs(vec)?,
         aux_certs_der,
         certs_der: chain_der,
         crls: crl_blocks,
@@ -278,40 +280,32 @@ fn build_item(certs_dir: &Path, crls_dir: &Path, vec: &PkitsVector) -> io::Resul
         validation_time_unix: None,
     };
 
-    // PKITS `should_validate` is the expected result UNDER THIS VECTOR'S
-    // policy inputs. No oracle here applies them — see
-    // `honours_policy_inputs` — so for the 35 vectors that ask for
-    // anything but the defaults, `should_validate` is the answer to a
-    // question that was never asked, and comparing a verdict against it
-    // reports a harness limitation as the implementation disagreeing
-    // with NIST.
+    // PKITS `should_validate` is the expected result under this vector's
+    // §6.1.1 inputs, and the pkix-path oracle now validates under them
+    // (`chain.initial_policy_inputs`), so every vector carries ground
+    // truth. Until it did, the 35 vectors asking for non-default inputs
+    // were scored against the answer to a question nobody asked, which
+    // reported a harness limitation as pkix-path disagreeing with NIST:
+    // 13 of the 15 baseline ground-truth disagreements were §4.8/§4.10/
+    // §4.12 policy vectors, and withholding their ground truth was the
+    // interim fix.
     //
-    // Ground truth is therefore withheld for those, which
-    // `classify` already handles: `expected: None` leaves
-    // `ground_truth_agreement` as `None` and the chain out of the
-    // ground-truth comparison entirely. It is still classified
-    // cross-oracle, which stays meaningful because every oracle is
-    // given the same (default) inputs.
-    //
-    // This hid 13 of the 15 ground-truth disagreements the baseline used
-    // to pin, every one of them a §4.8/§4.10/§4.12 policy vector. The
-    // two that remain are real: see PKIX-vb4o (DSA unimplemented, which
-    // pyca also refuses) and PKIX-i39n (delta-CRL removeFromCRL).
-    let expected = if honours_policy_inputs(vec) {
-        Some(if vec.should_validate {
-            Verdict::Pass
-        } else {
-            // The reason field is intentionally empty: PKITS does not
-            // standardise the *reason* a chain should fail, only that it
-            // should. `DiagnosticDivergence` classification will treat empty
-            // expected reasons specially (see PKIX-7nsf.5).
-            Verdict::Fail {
-                reason: String::new(),
-            }
-        })
+    // An oracle that cannot express §6.1.1 inputs must not vote on a
+    // chain whose inputs are not the defaults -- see
+    // `InitialPolicyInputs::is_rfc5280_default` and the oracle gate in
+    // `main.rs`. Scoring stays per-oracle; cross-oracle comparison only
+    // ever compares oracles that were asked the same question.
+    let expected = Some(if vec.should_validate {
+        Verdict::Pass
     } else {
-        None
-    };
+        // The reason field is intentionally empty: PKITS does not
+        // standardise the *reason* a chain should fail, only that it
+        // should. `DiagnosticDivergence` classification treats empty
+        // expected reasons specially (see PKIX-7nsf.5).
+        Verdict::Fail {
+            reason: String::new(),
+        }
+    });
 
     Ok(CorpusItem {
         name: vec.name.clone(),
@@ -320,28 +314,41 @@ fn build_item(certs_dir: &Path, crls_dir: &Path, vec: &PkitsVector) -> io::Resul
     })
 }
 
-/// Whether this vector's PKITS policy inputs are ones the harness
-/// actually supplies to its oracles — which today means the defaults.
+/// Resolve a PKITS `InitialPolicySet` name to its OID.
 ///
-/// PKITS §4.8, §4.10 and §4.12 drive the same certificate bundle several
-/// times with different RFC 5280 §6.1.1 initial inputs, and the
-/// "(Subpart N)" suffixes are exactly those repeats. 35 of 249 vectors
-/// ask for non-default inputs.
-///
-/// `PkitsVector` parses all four, and nothing reads them: the pkix-path
-/// oracle builds a bare `ValidationPolicy::new(now)`. They are `pub`
-/// fields on a `pub` struct, so dead-code analysis never objected. Until
-/// an oracle honours them, a vector that asks for non-default inputs
-/// cannot be scored against its expected result.
-///
-/// pkix-path supports all four directly
-/// (`ValidationPolicy::initial_policy_set`,
-/// `initial_policy_mapping_inhibit`, `initial_explicit_policy`,
-/// `initial_any_policy_inhibit`), so wiring it up is tracked in
-/// PKIX-zd45 rather than being impossible.
-fn honours_policy_inputs(vec: &PkitsVector) -> bool {
-    vec.initial_policy_set.as_slice() == ["anyPolicy"]
-        && !vec.initial_policy_mapping_inhibit
-        && !vec.initial_explicit_policy
-        && !vec.initial_any_policy_inhibit
+/// The manifest names policies rather than numbering them. `anyPolicy` is
+/// RFC 5280 §4.2.1.4's; the NIST test policies live under the NIST
+/// arc `2.16.840.1.101.3.2.1.48`, whose final component is the digit in
+/// the name. Only the five names the shipped manifest actually uses are
+/// resolvable, so a manifest naming a sixth fails loudly rather than
+/// silently validating under a policy set that omits it.
+fn policy_oid(name: &str) -> io::Result<ObjectIdentifier> {
+    let oid = match name {
+        "anyPolicy" => crate::ANY_POLICY,
+        "NIST-test-policy-1" => ObjectIdentifier::new_unwrap("2.16.840.1.101.3.2.1.48.1"),
+        "NIST-test-policy-2" => ObjectIdentifier::new_unwrap("2.16.840.1.101.3.2.1.48.2"),
+        "NIST-test-policy-3" => ObjectIdentifier::new_unwrap("2.16.840.1.101.3.2.1.48.3"),
+        "NIST-test-policy-6" => ObjectIdentifier::new_unwrap("2.16.840.1.101.3.2.1.48.6"),
+        other => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("unknown PKITS InitialPolicySet entry: {other}"),
+            ))
+        }
+    };
+    Ok(oid)
+}
+
+/// The §6.1.1 inputs this vector asks for.
+fn policy_inputs(vec: &PkitsVector) -> io::Result<InitialPolicyInputs> {
+    let mut policy_set = Vec::with_capacity(vec.initial_policy_set.len());
+    for name in &vec.initial_policy_set {
+        policy_set.push(policy_oid(name)?);
+    }
+    Ok(InitialPolicyInputs {
+        policy_set,
+        policy_mapping_inhibit: vec.initial_policy_mapping_inhibit,
+        explicit_policy: vec.initial_explicit_policy,
+        any_policy_inhibit: vec.initial_any_policy_inhibit,
+    })
 }

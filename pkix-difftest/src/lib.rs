@@ -98,6 +98,26 @@ pub enum OracleName {
 }
 
 impl OracleName {
+    /// Whether this oracle can be given the RFC 5280 §6.1.1 initial
+    /// inputs a corpus testcase specifies.
+    ///
+    /// `pkix-path` exposes all four as `ValidationPolicy` fields. The
+    /// other two do not, so the harness keeps them out of the comparison
+    /// for any chain whose inputs are not the defaults:
+    ///
+    /// - `openssl verify` has `-policy`, `-explicit_policy`,
+    ///   `-policy_check`, `-inhibit_map` and `-inhibit_any`, so it could
+    ///   probably comply; nothing wires them up yet.
+    /// - pyca's `PolicyBuilder` has no way to express a
+    ///   user-initial-policy-set at all.
+    #[must_use]
+    pub fn honours_policy_inputs(self) -> bool {
+        match self {
+            Self::PkixPath => true,
+            Self::OpenSsl | Self::Pyca => false,
+        }
+    }
+
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -145,6 +165,65 @@ impl fmt::Display for OracleName {
 /// often omit the root. Lifting this restriction is tracked under PKIX-7nsf.4
 /// (corpus loader) — once corpus shapes that omit the root are introduced,
 /// the loader will need an out-of-band trust source.
+/// The RFC 5280 §6.1.1 initial inputs to path validation, as a corpus
+/// testcase specifies them.
+///
+/// §6.1.1 lists these alongside the certificates as inputs to the
+/// algorithm, and a testcase's expected verdict is the answer *under its
+/// inputs*. PKITS §4.8, §4.10 and §4.12 drive one certificate bundle
+/// repeatedly under different inputs — the "(Subpart N)" suffixes are
+/// exactly those repeats — so a verdict produced under the defaults
+/// cannot be scored against the expected result of a vector that asked
+/// for something else.
+///
+/// [`Default`] is the RFC 5280 default: `anyPolicy` as the
+/// user-initial-policy-set and all three inhibit flags clear. A corpus
+/// that has no opinion leaves it at that, so an oracle can honour this
+/// unconditionally.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InitialPolicyInputs {
+    /// `user-initial-policy-set`. The anyPolicy OID alone means "no
+    /// restriction", which is the default.
+    pub policy_set: Vec<der::asn1::ObjectIdentifier>,
+    /// `initial-policy-mapping-inhibit`.
+    pub policy_mapping_inhibit: bool,
+    /// `initial-explicit-policy`.
+    pub explicit_policy: bool,
+    /// `initial-any-policy-inhibit`.
+    pub any_policy_inhibit: bool,
+}
+
+/// `anyPolicy` (RFC 5280 §4.2.1.4).
+pub const ANY_POLICY: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.32.0");
+
+impl Default for InitialPolicyInputs {
+    fn default() -> Self {
+        Self {
+            policy_set: vec![ANY_POLICY],
+            policy_mapping_inhibit: false,
+            explicit_policy: false,
+            any_policy_inhibit: false,
+        }
+    }
+}
+
+impl InitialPolicyInputs {
+    /// Whether these are the RFC 5280 defaults.
+    ///
+    /// An oracle that cannot express §6.1.1 inputs can still be given a
+    /// chain whose inputs are the defaults, because that is what it
+    /// implicitly applies. The harness uses this to decide whether such
+    /// an oracle may vote on a chain at all.
+    #[must_use]
+    pub fn is_rfc5280_default(&self) -> bool {
+        self.policy_set.as_slice() == [ANY_POLICY]
+            && !self.policy_mapping_inhibit
+            && !self.explicit_policy
+            && !self.any_policy_inhibit
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Chain {
     /// Leaf-first DER-encoded certificates.
@@ -185,6 +264,12 @@ pub struct Chain {
     /// limbo loader (PKIX-g9vc.2) sets `Some` from each testcase's
     /// `validation_time` field.
     pub validation_time_unix: Option<u64>,
+
+    /// The RFC 5280 §6.1.1 initial inputs this chain is to be validated
+    /// under. [`InitialPolicyInputs::default()`] for corpora that do not
+    /// vary them; the PKITS loader sets it from each vector's four
+    /// `Initial*` fields.
+    pub initial_policy_inputs: InitialPolicyInputs,
 }
 
 impl Chain {
@@ -242,6 +327,8 @@ impl Chain {
         }
 
         Ok(Chain {
+            // A bare PEM bundle states no §6.1.1 inputs.
+            initial_policy_inputs: InitialPolicyInputs::default(),
             aux_certs_der: Vec::new(),
             certs_der: der_blocks,
             crls: Vec::new(),
@@ -460,6 +547,7 @@ BBBB
         // We do not need a real CRL DER here — the field is a Vec<Vec<u8>>
         // with no parsing contract at the harness layer. Oracles parse it.
         let chain = Chain {
+            initial_policy_inputs: InitialPolicyInputs::default(),
             aux_certs_der: Vec::new(),
             certs_der: vec![vec![0u8; 4], vec![1u8; 4]],
             crls: Vec::new(),

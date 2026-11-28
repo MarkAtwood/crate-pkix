@@ -14,7 +14,7 @@
 use std::path::PathBuf;
 
 use pkix_difftest::oracles;
-use pkix_difftest::{Chain, Verdict};
+use pkix_difftest::{Chain, InitialPolicyInputs, Verdict};
 
 fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
@@ -158,6 +158,7 @@ fn revocation_fixture(name: &str) -> Vec<u8> {
 /// supplied CRL DER bytes attached.
 fn crl_chain(leaf_fixture: &str, ca_fixture: &str, crl_fixtures: &[&str], label: &str) -> Chain {
     let mut chain = Chain {
+        initial_policy_inputs: InitialPolicyInputs::default(),
         aux_certs_der: Vec::new(),
         certs_der: vec![
             revocation_fixture(leaf_fixture),

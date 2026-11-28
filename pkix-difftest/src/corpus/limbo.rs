@@ -70,7 +70,7 @@ use serde::Deserialize;
 use x509_cert::Certificate;
 
 use crate::corpus::{Corpus, CorpusItem};
-use crate::{Chain, Verdict};
+use crate::{Chain, InitialPolicyInputs, Verdict};
 
 /// Deterministic default validation time used when a testcase's
 /// `validation_time` field is `null`. Unix seconds = 2023-11-14T22:13:20Z.
@@ -543,6 +543,8 @@ fn build_item(tc: &FilteredTestcase) -> io::Result<CorpusItem> {
         try_build_chain(&positional_der, tc.validation_time_unix).unwrap_or(positional_der);
 
     let chain = Chain {
+        // x509-limbo testcases do not vary the §6.1.1 inputs.
+        initial_policy_inputs: InitialPolicyInputs::default(),
         // Limbo ships exactly the chain; nothing is dropped.
         aux_certs_der: Vec::new(),
         certs_der,

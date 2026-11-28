@@ -107,7 +107,15 @@ pub fn verify(chain: &Chain) -> io::Result<Verdict> {
             .duration_since(UNIX_EPOCH)
             .map_or(0, |d| d.as_secs())
     });
-    let policy = ValidationPolicy::new(now);
+    // RFC 5280 §6.1.1 initial inputs. A corpus that does not vary them
+    // supplies the defaults, so this is unconditional: `anyPolicy` alone
+    // with the flags clear is what `ValidationPolicy::new` already means.
+    let inputs = &chain.initial_policy_inputs;
+    let mut policy = ValidationPolicy::new(now);
+    policy.initial_policy_set.clone_from(&inputs.policy_set);
+    policy.initial_policy_mapping_inhibit = inputs.policy_mapping_inhibit;
+    policy.initial_explicit_policy = inputs.explicit_policy;
+    policy.initial_any_policy_inhibit = inputs.any_policy_inhibit;
 
     match validate_path(&validation_chain, &anchors, &policy, &DefaultVerifier) {
         Ok(_) => {}
